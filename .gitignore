@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment
+.env
+
+# uv
+.python-version
+
+# Data directories (gitignored per project plan)
+data/raw/
+data/normalized/
+data/qdrant/
+data/bm25/
+data/sqlite/
+data/eval_results/
+
+# Keep eval dataset tracked
+!data/eval_dataset.jsonl
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.swp

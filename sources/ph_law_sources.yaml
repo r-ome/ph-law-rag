@@ -1,0 +1,18 @@
+sources:
+  - source_id: consitution_1987
+    title: "1987 Constitution of the Philippines"
+    url: "https://www.officialgazette.gov.ph/constitutions/1987-constitution"
+    doc_type: constitution
+    file_format: html
+    category: constitutional
+    tags: [constitution, fundamental_law]
+    enabled: true
+
+  - source_id: civil_code
+    title: "Civil Code of the Philippines (RA 386)"
+    url: "https://www.lawphil.net/statuses/repacts/ra1950/ra_386_1950.html"
+    doc_type: statute
+    file_format: html
+    category: civil_law
+    tags: [civil_code, obligations, contracts, property]
+    enabled: true
