@@ -43,8 +43,69 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 ## Prerequisites
 
 - Python 3.11+
-- [Docker](https://docs.docker.com/get-docker/) (for Qdrant)
+- [`uv`](https://docs.astral.sh/uv/) for dependency management
+- [Docker](https://docs.docker.com/get-docker/) with a running local Docker daemon
+- [Colima](https://github.com/abiosoft/colima) if you use the Docker CLI without Docker Desktop on macOS
 - [Ollama](https://ollama.ai/) installed and running
+
+---
+
+## Run Docker Locally
+
+This project expects Qdrant to run locally in Docker and persist data into `data/qdrant/`.
+
+Start your local Docker runtime first:
+
+- Docker Desktop: open Docker Desktop and wait for it to report that Docker is running
+- Colima: run `colima start`
+
+If this is your first Colima start, or the default profile is missing, use:
+
+```bash
+colima start --cpu 2 --memory 4 --disk 20
+```
+
+Check that Docker is available before starting Qdrant:
+
+```bash
+docker ps
+docker context ls
+```
+
+If `docker` is pointed at the `colima` context, `colima` must be running. If you use Docker Desktop instead, switch contexts with:
+
+```bash
+docker context use default
+```
+
+Start Qdrant with local persistence:
+
+```bash
+mkdir -p data/qdrant
+docker run -d \
+  --name ph-law-rag-qdrant \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  -v "$(pwd)/data/qdrant:/qdrant/storage" \
+  qdrant/qdrant
+```
+
+Verify that Qdrant is up:
+
+```bash
+docker ps
+curl http://localhost:6333/collections
+```
+
+Useful local commands:
+
+```bash
+docker stop ph-law-rag-qdrant
+docker start ph-law-rag-qdrant
+docker logs ph-law-rag-qdrant
+```
+
+The Qdrant dashboard is available at `http://localhost:6333/dashboard`.
 
 ---
 
@@ -58,30 +119,40 @@ cd ph-law-rag
 # 2. Install dependencies
 uv sync
 
-# 3. Start Qdrant
-docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
+# 3. Start Docker locally
+# Docker Desktop: open the app
+# Colima: colima start
 
-# 4. Pull Ollama models
+# 4. Start Qdrant
+mkdir -p data/qdrant
+docker run -d \
+  --name ph-law-rag-qdrant \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  -v "$(pwd)/data/qdrant:/qdrant/storage" \
+  qdrant/qdrant
+
+# 5. Pull Ollama models
 ollama pull mistral
 ollama pull nomic-embed-text
 
-# 5. Configure environment
+# 6. Configure environment
 cp .env.example .env
 # Edit .env if needed — defaults work for a standard local setup
 
-# 6. Initialize data directories and database
+# 7. Initialize data directories and database
 raglab init
 
-# 7. Sync the corpus (fetch, normalize, hash, version documents)
+# 8. Sync the corpus (fetch, normalize, hash, version documents)
 raglab sync
 
-# 8. Ask a question
+# 9. Ask a question
 raglab ask "What are the elements of a valid contract under the Civil Code?"
 
-# 9. Launch the Streamlit UI
+# 10. Launch the Streamlit UI
 streamlit run app/ui/app.py
 
-# 10. Run evals
+# 11. Run evals
 raglab eval
 ```
 
