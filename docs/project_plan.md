@@ -408,6 +408,12 @@ Definition of done:
 26. Build eval dataset
 27. Implement RAGAS scorer and eval runner
 28. Write tests and docs
+29. Add `conversations` and `conversation_turns` migrations to `db.py`
+30. Implement `app/conversation/session.py` and `query_rewriter.py`
+31. Update `answer_service.py` for session-aware pipeline
+32. Update CLI `raglab ask` with `--session` option
+33. Update FastAPI `/query/ask` for threaded sessions
+34. Update Streamlit UI for multi-turn chat state
 
 ---
 
@@ -522,6 +528,27 @@ One row per chunk version.
 | `changed_count` | INTEGER |
 | `unchanged_count` | INTEGER |
 | `failed_count` | INTEGER |
+
+### `conversations`
+
+| Field | Type | Notes |
+|---|---|---|
+| `session_id` | TEXT PK | UUID |
+| `created_at` | TEXT | ISO8601 |
+| `title` | TEXT | Optional label |
+
+### `conversation_turns`
+
+| Field | Type | Notes |
+|---|---|---|
+| `turn_id` | TEXT PK | UUID |
+| `session_id` | TEXT FK | → conversations |
+| `turn_index` | INTEGER | Position in session (0-based) |
+| `question` | TEXT | Original user question |
+| `rewritten_question` | TEXT | Rewritten standalone query (may equal question) |
+| `answer` | TEXT | Generated answer |
+| `retrieved_chunks_json` | TEXT | JSON array of chunk IDs used |
+| `created_at` | TEXT | ISO8601 |
 
 ### `schema_migrations`
 
@@ -772,6 +799,60 @@ raglab eval
 **Local-first with Ollama** — No cloud API keys required. The tradeoff is lower model quality than GPT-4 or Claude. For a portfolio project demonstrating pipeline design, this is the right call. The LLM backend is pluggable via config if cloud inference is desired later.
 
 **Document-level re-indexing** — Same tradeoff as the original: when a document changes, all its vectors are deleted and the entire document is re-chunked and re-embedded. Simpler than chunk-level diffing and fast enough for a small corpus.
+
+---
+
+### Milestone 8: Conversation Context Management
+
+Goal: multi-turn conversations work end-to-end — follow-up questions are resolved against prior context before retrieval.
+
+Build:
+
+**New SQLite tables (new migration in `db.py`):**
+- `conversations` — `session_id` (PK), `created_at`, `title` (optional label)
+- `conversation_turns` — `turn_id` (PK), `session_id` (FK), `turn_index`, `question`, `rewritten_question`, `answer`, `retrieved_chunks_json`, `created_at`
+
+**New config fields in `app/config.py`:**
+```python
+max_conversation_turns: int = 5       # history window passed to rewriter
+enable_query_rewriting: bool = True   # toggle rewriting off for debugging
+```
+
+**New module `app/conversation/`:**
+- `session.py` — `create_session(conn) -> str`, `get_history(conn, session_id, limit) -> list[dict]`, `append_turn(conn, session_id, turn_data) -> str`
+- `query_rewriter.py` — `rewrite_query(question: str, history: list[dict]) -> str`: calls Ollama LLM with a short prompt that resolves pronouns and ellipsis ("what about that?", "and section 5?") into a self-contained query; returns original question unchanged if `enable_query_rewriting = False` or history is empty
+
+**Changes to existing files:**
+- `answer_service.py` — accept optional `session_id: str | None`; if provided, load history, rewrite query, run pipeline on rewritten query, persist turn to `conversation_turns`
+- `app/cli/main.py` — `raglab ask` gains `--session TEXT` option; if omitted, creates a new session each invocation (stateless); if provided, loads and continues that session
+- `app/api/main.py` — `POST /query/ask` request body gains optional `session_id`; response includes `session_id` so clients can thread turns
+- `app/ui/app.py` — maintain `session_id` in `st.session_state`; display full conversation history in the chat tab; "New conversation" button resets state
+
+**Query rewriting prompt (in `prompts.py`):**
+```
+Given the following conversation history and a follow-up question, rewrite
+the follow-up as a standalone question that can be understood without the
+history. Do not answer the question — only rewrite it. If the follow-up is
+already self-contained, return it unchanged.
+
+History:
+{history}
+
+Follow-up: {question}
+Standalone question:
+```
+
+Definition of done:
+- `raglab ask --session abc "what about section 5?"` correctly resolves "section 5" against prior turns in session `abc`
+- Streamlit chat tab maintains conversation state across turns in the browser
+- `POST /query/ask` with `session_id` returns a threaded response
+- Sessions with no history bypass rewriting (no unnecessary LLM call)
+- `max_conversation_turns` caps how much history is passed to the rewriter
+
+Key constraints:
+- Rewriting is a separate LLM call before retrieval — keep it short (use a fast/small model or the same Ollama model with a low token budget)
+- Never pass raw history into the retrieval prompt — only the rewritten standalone query goes to the retriever
+- History is stored in SQLite, not in-memory — sessions survive process restarts
 
 ---
 
