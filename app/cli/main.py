@@ -1,7 +1,8 @@
 import typer
 import json
-from app.config import settings 
+from app.config import settings, SourceConfig, load_allowed_sources
 from app.db import init_db
+from app.ingestion.sync import run_sync
 
 app = typer.Typer()
 
@@ -11,8 +12,7 @@ def healthcheck():
 
 @app.command("sync")
 def sync():
-	typer.echo("Not yet implemented")
-
+	run_sync()
 @app.command("eval")
 def eval():
 	typer.echo("Not yet implemented")

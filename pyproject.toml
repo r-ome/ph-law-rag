@@ -4,11 +4,17 @@ version = "0.1.0"
 description = "A RAG Project using PH Law"
 requires-python = ">=3.11"
 dependencies = [
+ "beautifulsoup4>=4.14.3",
  "fastapi>=0.136.0",
+ "httpx>=0.28.1",
+ "pdfplumber>=0.11.9",
  "pydantic>=2.13.3",
  "pydantic-settings>=2.14.0",
+ "pyyaml>=6.0.3",
  "streamlit>=1.56.0",
+ "trafilatura>=2.0.0",
  "typer>=0.24.2",
+ "typing>=3.10.0.0",
  "uvicorn>=0.46.0",
 ]
 

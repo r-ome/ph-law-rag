@@ -1,7 +1,7 @@
 sources:
-  - source_id: consitution_1987
+  - source_id: constitution_1987
     title: "1987 Constitution of the Philippines"
-    url: "https://www.officialgazette.gov.ph/constitutions/1987-constitution"
+    url: "https://www.lawphil.net/consti/cons1987.html"
     doc_type: constitution
     file_format: html
     category: constitutional
@@ -10,9 +10,423 @@ sources:
 
   - source_id: civil_code
     title: "Civil Code of the Philippines (RA 386)"
-    url: "https://www.lawphil.net/statuses/repacts/ra1950/ra_386_1950.html"
+    url: "https://www.lawphil.net/statutes/repacts/ra1949/ra_386_1949.html"
     doc_type: statute
     file_format: html
     category: civil_law
     tags: [civil_code, obligations, contracts, property]
+    enabled: true
+
+  - source_id: family_code_eo209
+    title: "Family Code of the Philippines (EO 209)"
+    url: "https://www.lawphil.net/executive/execord/eo1987/eo_209_1987.html"
+    doc_type: statute
+    file_format: html
+    category: civil_law
+    tags: [family_code, marriage, family_relations]
+    enabled: true
+
+  - source_id: revised_penal_code_act3815
+    title: "Revised Penal Code (Act No. 3815)"
+    url: "https://www.lawphil.net/statutes/acts/act1930/act_3815_1930b.html"
+    doc_type: statute
+    file_format: html
+    category: criminal_law
+    tags: [revised_penal_code, crimes, penalties]
+    enabled: true
+
+  - source_id: anti_vawc_ra9262
+    title: "Anti-Violence Against Women and Their Children Act of 2004 (RA 9262)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2004/ra_9262_2004.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [anti_vawc, violence_against_women, protective_orders]
+    enabled: true
+
+  - source_id: cybercrime_prevention_act_ra10175
+    title: "Cybercrime Prevention Act of 2012 (RA 10175)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2012/ra_10175_2012.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [cybercrime, computer_crimes, online_libel]
+    enabled: true
+
+  - source_id: data_privacy_act_ra10173
+    title: "Data Privacy Act of 2012 (RA 10173)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2012/ra_10173_2012.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [data_privacy, personal_information, national_privacy_commission]
+    enabled: true
+
+  - source_id: ip_code_ra8293
+    title: "Intellectual Property Code of the Philippines (RA 8293)"
+    url: "https://www.lawphil.net/statutes/repacts/ra1997/ra_8293_1997.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [intellectual_property, copyright, trademarks, patents]
+    enabled: true
+
+  - source_id: oposa_v_factoran_gr101083
+    title: "Oposa v. Factoran, G.R. No. 101083"
+    url: "https://www.lawphil.net/judjuris/juri1993/jul1993/gr_101083_1993.html"
+    doc_type: sc_decision
+    file_format: html
+    category: environmental_law
+    tags: [environment, intergenerational_responsibility, standing]
+    enabled: true
+
+  - source_id: people_v_genosa_gr135981
+    title: "People v. Genosa, G.R. No. 135981"
+    url: "https://www.lawphil.net/judjuris/juri2004/jan2004/gr_135981_2004.html"
+    doc_type: sc_decision
+    file_format: html
+    category: criminal_law
+    tags: [battered_woman_syndrome, self_defense, mitigating_circumstances]
+    enabled: true
+
+  - source_id: chavez_v_romulo_gr157036
+    title: "Chavez v. Romulo, G.R. No. 157036"
+    url: "https://www.lawphil.net/judjuris/juri2004/jun2004/gr_157036_2004.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [police_power, firearms, due_process]
+    enabled: true
+
+  - source_id: province_north_cotabato_v_grp_gr183591
+    title: "Province of North Cotabato v. Government Peace Panel, G.R. No. 183591"
+    url: "https://www.lawphil.net/judjuris/juri2008/oct2008/gr_183591_2008.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [right_to_information, public_consultation, ancestral_domain]
+    enabled: true
+
+  - source_id: ang_ladlad_v_comelec_gr190582
+    title: "Ang Ladlad LGBT Party v. COMELEC, G.R. No. 190582"
+    url: "https://www.lawphil.net/judjuris/juri2010/apr2010/gr_190582_2010.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [equal_protection, party_list, lgbt_rights]
+    enabled: true
+
+  - source_id: belgica_v_ochoa_gr208566
+    title: "Belgica v. Ochoa, G.R. No. 208566"
+    url: "https://www.lawphil.net/judjuris/juri2013/nov2013/gr_208566_2013.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [pork_barrel, separation_of_powers, public_funds]
+    enabled: true
+
+  - source_id: disini_v_secretary_of_justice_gr203335
+    title: "Disini v. Secretary of Justice, G.R. No. 203335"
+    url: "https://www.lawphil.net/judjuris/juri2014/feb2014/gr_203335_2014.html"
+    doc_type: sc_decision
+    file_format: html
+    category: cyber_law
+    tags: [cybercrime, online_libel, free_speech]
+    enabled: true
+
+  - source_id: imbong_v_ochoa_gr204819
+    title: "Imbong v. Ochoa, G.R. No. 204819"
+    url: "https://www.lawphil.net/judjuris/juri2014/apr2014/gr_204819_2014.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [reproductive_health, privacy, religion]
+    enabled: true
+
+  - source_id: vivares_v_st_theresas_college_gr202666
+    title: "Vivares v. St. Theresa's College, G.R. No. 202666"
+    url: "https://www.lawphil.net/judjuris/juri2014/sep2014/gr_202666_2014.html"
+    doc_type: sc_decision
+    file_format: html
+    category: privacy_law
+    tags: [privacy, habeas_data, social_media]
+    enabled: true
+
+  - source_id: resident_marine_mammals_v_reyes_gr180771
+    title: "Resident Marine Mammals v. Reyes, G.R. No. 180771"
+    url: "https://www.lawphil.net/judjuris/juri2015/apr2015/gr_180771_2015.html"
+    doc_type: sc_decision
+    file_format: html
+    category: environmental_law
+    tags: [environment, standing, protected_seascape]
+    enabled: true
+
+  - source_id: labor_code_pd442
+    title: "Labor Code of the Philippines (PD 442)"
+    url: "https://www.lawphil.net/statutes/presdecs/pd1974/pd_442_1974.html"
+    doc_type: statute
+    file_format: html
+    category: labor_law
+    tags: [labor_code, employment, workers_rights, labor_relations]
+    enabled: true
+
+  - source_id: anti_graft_ra3019
+    title: "Anti-Graft and Corrupt Practices Act (RA 3019)"
+    url: "https://www.lawphil.net/statutes/repacts/ra1960/ra_3019_1960.html"
+    doc_type: statute
+    file_format: html
+    category: administrative_law
+    tags: [anti_graft, corruption, public_officers, sandiganbayan]
+    enabled: true
+
+  - source_id: revised_corporation_code_ra11232
+    title: "Revised Corporation Code of the Philippines (RA 11232)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2019/ra_11232_2019.html"
+    doc_type: statute
+    file_format: html
+    category: commercial_law
+    tags: [corporation, corporate_governance, one_person_corporation]
+    enabled: true
+
+  - source_id: anti_money_laundering_ra9160
+    title: "Anti-Money Laundering Act of 2001 (RA 9160)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2001/ra_9160_2001.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [anti_money_laundering, amlc, bank_secrecy, terrorism_financing]
+    enabled: true
+
+  - source_id: child_abuse_law_ra7610
+    title: "Special Protection of Children Against Abuse (RA 7610)"
+    url: "https://www.lawphil.net/statutes/repacts/ra1992/ra_7610_1992.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [child_abuse, child_protection, minors, exploitation]
+    enabled: true
+
+  - source_id: anti_trafficking_ra9208
+    title: "Anti-Trafficking in Persons Act of 2003 (RA 9208)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2003/ra_9208_2003.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [trafficking, human_trafficking, exploitation, migrant_workers]
+    enabled: true
+
+  - source_id: magna_carta_women_ra9710
+    title: "Magna Carta of Women (RA 9710)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2009/ra_9710_2009.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [womens_rights, gender_equality, magna_carta_women]
+    enabled: true
+
+  - source_id: e_commerce_act_ra8792
+    title: "Electronic Commerce Act of 2000 (RA 8792)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2000/ra_8792_2000.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [e_commerce, electronic_documents, electronic_signatures]
+    enabled: true
+
+  - source_id: clean_air_act_ra8749
+    title: "Philippine Clean Air Act of 1999 (RA 8749)"
+    url: "https://www.lawphil.net/statutes/repacts/ra1999/ra_8749_1999.html"
+    doc_type: statute
+    file_format: html
+    category: environmental_law
+    tags: [clean_air, air_pollution, environment, emissions]
+    enabled: true
+
+  - source_id: consumer_act_ra7394
+    title: "Consumer Act of the Philippines (RA 7394)"
+    url: "https://www.lawphil.net/statutes/repacts/ra1992/ra_7394_1992.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [consumer_protection, product_liability, trade, fair_trade]
+    enabled: true
+
+  - source_id: omnibus_election_code_bp881
+    title: "Omnibus Election Code (BP 881)"
+    url: "https://www.lawphil.net/statutes/bataspam/bp_881_1985.html"
+    doc_type: statute
+    file_format: html
+    category: election_law
+    tags: [elections, comelec, election_offenses, campaign]
+    enabled: true
+
+  - source_id: anti_hazing_law_ra11053
+    title: "Anti-Hazing Act of 2018 (RA 11053)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2018/ra_11053_2018.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [hazing, fraternities, initiation_rites, student_rights]
+    enabled: true
+
+  - source_id: philippine_competition_act_ra10667
+    title: "Philippine Competition Act (RA 10667)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2015/ra_10667_2015.html"
+    doc_type: statute
+    file_format: html
+    category: commercial_law
+    tags: [competition, antitrust, monopoly, philippine_competition_commission]
+    enabled: true
+
+  - source_id: anti_terrorism_act_ra11479
+    title: "Anti-Terrorism Act of 2020 (RA 11479)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2020/ra_11479_2020.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [anti_terrorism, terrorism, atc, national_security]
+    enabled: true
+
+  - source_id: universal_health_care_ra11223
+    title: "Universal Health Care Act (RA 11223)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2019/ra_11223_2019.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [universal_health_care, philhealth, health_coverage]
+    enabled: true
+
+  - source_id: anti_rape_law_ra8353
+    title: "Anti-Rape Law of 1997 (RA 8353)"
+    url: "https://www.lawphil.net/statutes/repacts/ra1997/ra_8353_1997.html"
+    doc_type: statute
+    file_format: html
+    category: criminal_law
+    tags: [rape, sexual_assault, crimes_against_persons]
+    enabled: true
+
+  - source_id: migrant_workers_act_ra10022
+    title: "Migrant Workers and Overseas Filipinos Act (RA 10022)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2010/ra_10022_2010.html"
+    doc_type: statute
+    file_format: html
+    category: labor_law
+    tags: [ofw, migrant_workers, overseas_employment, dmw]
+    enabled: true
+
+  - source_id: safe_spaces_act_ra11313
+    title: "Safe Spaces Act (RA 11313)"
+    url: "https://www.lawphil.net/statutes/repacts/ra2019/ra_11313_2019.html"
+    doc_type: statute
+    file_format: html
+    category: special_law
+    tags: [safe_spaces, gender_based_harassment, bawal_bastos]
+    enabled: true
+
+  - source_id: marcos_v_manglapus_gr88211
+    title: "Marcos v. Manglapus, G.R. No. 88211"
+    url: "https://www.lawphil.net/judjuris/juri1989/sep1989/gr_88211_1989.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [right_to_return, president_powers, national_security]
+    enabled: true
+
+  - source_id: tanada_v_angara_gr118295
+    title: "Tanada v. Angara, G.R. No. 118295"
+    url: "https://www.lawphil.net/judjuris/juri1997/may1997/gr_118295_1997.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [wto, gatt, sovereignty, treaty, international_law]
+    enabled: true
+
+  - source_id: estrada_v_desierto_gr146710
+    title: "Estrada v. Desierto, G.R. No. 146710"
+    url: "https://www.lawphil.net/judjuris/juri2001/mar2001/gr_146710_2001.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [resignation, edsa_ii, presidential_succession, estoppel]
+    enabled: true
+
+  - source_id: david_v_arroyo_gr171396
+    title: "David v. Arroyo, G.R. No. 171396"
+    url: "https://www.lawphil.net/judjuris/juri2006/may2006/gr_171396_2006.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [proclamation_1017, state_of_national_emergency, free_speech, police_power]
+    enabled: true
+
+  - source_id: manila_prince_hotel_v_gsis_gr122156
+    title: "Manila Prince Hotel v. GSIS, G.R. No. 122156"
+    url: "https://www.lawphil.net/judjuris/juri1997/feb1997/gr_122156_1997.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [filipino_first_policy, privatization, self_executing_provisions]
+    enabled: true
+
+  - source_id: republic_v_sereno_gr237428
+    title: "Republic v. Sereno, G.R. No. 237428"
+    url: "https://www.lawphil.net/judjuris/juri2018/may2018/gr_237428_2018.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [quo_warranto, chief_justice, judicial_independence, saln]
+    enabled: true
+
+  - source_id: lagman_v_medialdea_gr231658
+    title: "Lagman v. Medialdea, G.R. No. 231658"
+    url: "https://www.lawphil.net/judjuris/juri2017/jul2017/gr_231658_2017.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [martial_law, mindanao, marawi, presidential_powers]
+    enabled: true
+
+  - source_id: araullo_v_aquino_gr209287
+    title: "Araullo v. Aquino, G.R. No. 209287"
+    url: "https://www.lawphil.net/judjuris/juri2014/jul2014/gr_209287_2014.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [dap, disbursement_acceleration_program, separation_of_powers, appropriations]
+    enabled: true
+
+  - source_id: secretary_of_national_defense_v_manalo_gr180906
+    title: "Secretary of National Defense v. Manalo, G.R. No. 180906"
+    url: "https://www.lawphil.net/judjuris/juri2008/oct2008/gr_180906_2008.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [writ_of_amparo, enforced_disappearance, human_rights, extrajudicial_killings]
+    enabled: true
+
+  - source_id: social_weather_stations_v_comelec_gr147571
+    title: "Social Weather Stations v. COMELEC, G.R. No. 147571"
+    url: "https://www.lawphil.net/judjuris/juri2001/may2001/gr_147571_2001.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [freedom_of_expression, surveys, election_surveys, prior_restraint]
+    enabled: true
+
+  - source_id: pharmaceutical_v_duque_gr173034
+    title: "Pharmaceutical and Health Care Association v. Duque, G.R. No. 173034"
+    url: "https://www.lawphil.net/judjuris/juri2007/oct2007/gr_173034_2007.html"
+    doc_type: sc_decision
+    file_format: html
+    category: constitutional_law
+    tags: [milk_code, international_law, treaty, police_power, health]
+    enabled: true
+
+  - source_id: disomangcop_v_datumanong_gr149848
+    title: "Disomangcop v. Datumanong, G.R. No. 149848"
+    url: "https://www.lawphil.net/judjuris/juri2004/nov2004/gr_149848_2004.html"
+    doc_type: sc_decision
+    file_format: html
+    category: administrative_law
+    tags: [local_autonomy, armm, administrative_regions, devolution]
     enabled: true
