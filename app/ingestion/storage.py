@@ -2,11 +2,10 @@ import json
 from uuid import uuid4
 from datetime import datetime, timezone
 from pathlib import Path
-from app.db import get_connection
 from app.config import settings, SourceConfig
 from app.ingestion.hashing import hash_content
 
-def save_raw_fetch(source_id:str, file_format: str, content:str) -> str:
+def save_raw_fetch(source_id:str, file_format: str, content:bytes) -> str:
 	raw_dir = Path(settings.raw_data_dir)
 	raw_dir.mkdir(parents=True, exist_ok=True)
 	file_path = raw_dir / f"{source_id}.{file_format}"
@@ -66,7 +65,7 @@ def find_or_create_document(conn, source: SourceConfig) -> tuple[str, bool]:
 
 	return doc_id, True
 
-def get_latest_content_hash(conn, doc_id:str) -> str:
+def get_latest_content_hash(conn, doc_id:str) -> str | None:
 	row = conn.execute(
 	"""
 		SELECT content_hash
@@ -84,7 +83,7 @@ def get_latest_content_hash(conn, doc_id:str) -> str:
 def insert_version(
 	conn,
 	doc_id: str,
-	http_status: str,
+	http_status: int,
 	content_hash: str,
 	content_length: int,
 	raw_path: str,
@@ -118,7 +117,7 @@ def insert_version(
 		raw_path,
 		normalized_path,
 		extraction_method,
-		status != "New"
+		status != "new"
 	]
 	)
 	return version_id

@@ -8,7 +8,7 @@ class FetchResult:
 	url: str
 	file_format: str
 	status: str # "ok" | "failed"
-	http_status: int | None
+	http_status: int
 	content: bytes | None
 	error: str | None
 
@@ -36,7 +36,7 @@ def fetch_source(source: SourceConfig) -> FetchResult:
 			url=url,
 			file_format=source.file_format,
 			status="failed",
-			http_status=None,
+			http_status=500,
 			content=None,
 			error=str(e)
 		)

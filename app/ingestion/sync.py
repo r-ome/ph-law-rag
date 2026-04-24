@@ -13,6 +13,7 @@ from app.ingestion.normalizer import normalize_text
 from app.ingestion.hashing import hash_content
 
 def process_source(source: SourceConfig):
+	from app.indexing.index_service import index_document
 	fetch_result = fetch_source(source)
 
 	if fetch_result.status == "failed":
@@ -20,12 +21,17 @@ def process_source(source: SourceConfig):
 		return {"url": fetch_result.url, "status": "failed"}
 
 	url = fetch_result.url
+	content = fetch_result.content
+ 
+	if content is None:
+		print(f"[FAIL] {source.source_id} - empty response content")
+		return { "url": url, "status": "failed" }
 
 	if source.file_format == "pdf":
-		raw_text = parse_pdf(fetch_result.content)
+		raw_text = parse_pdf(content)
 		extraction_method = "pdfplumber"
 	else:
-		raw_text = parse_html(fetch_result.content, url)
+		raw_text = parse_html(content, url)
 		extraction_method = "trafilatura"
 
 	normalized_text = normalize_text(raw_text)
@@ -40,14 +46,31 @@ def process_source(source: SourceConfig):
 			print(f"[SKIP] {source.source_id} — unchanged")
 			return {"url": url, "status": "unchanged"}
 
-		raw_path = save_raw_fetch(source.source_id, source.file_format, fetch_result.content)
+		raw_path = save_raw_fetch(source.source_id, source.file_format, content)
 		normalized_path = save_normalized_document(source.source_id, normalized_text)
 		status = "new" if is_new else "changed"
-		insert_version(
+		version_id = insert_version(
 			conn, doc_id, fetch_result.http_status, content_hash,
 			len(normalized_text), raw_path, normalized_path,
-			extraction_method, 0 if is_new else 1
+			extraction_method,status
 		)
+  
+		chunk_count = index_document(
+			conn=conn,
+			doc_id=doc_id,
+			text=normalized_text,
+			source_metadata={
+				"doc_id": doc_id,
+				"source_id": source.source_id,
+				"title": source.title,
+				"url": source.url,
+				"doc_type": source.doc_type,
+				"category": source.category,
+				"tags": source.tags
+			},
+			version_id=version_id
+		)
+		print(f" indexed: {chunk_count} chunks")
 		conn.commit()
 		print(f"[OK] {source.source_id} — {status}")
 	finally:

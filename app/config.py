@@ -10,6 +10,13 @@ class Settings(BaseSettings):
 	raw_data_dir: str = "data/raw"
 	normalized_data_dir: str = "data/normalized"
 	request_timeout: int = 30
+	qdrant_collection: str = "ph_law"
+	qdrant_url: str = "http://localhost:6333"
+	bm25_path: str = "data/bm25"
+	chunk_size: int = 256
+	chunk_overlap: int = 32
+	embedding_model: str = "nomic-embed-text"
+	ollama_base_url: str = "http://localhost:11434"
 
 class SourceConfig(BaseModel):
 	source_id: str
