@@ -1,3 +1,4 @@
+from typing import cast
 from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
@@ -12,4 +13,4 @@ def chunk_texts(text: str, source_metadata: dict) -> list[TextNode]:
 		text=text,
 		metadata=source_metadata
 	)
-	return splitter.get_nodes_from_documents([doc])
+	return cast(list[TextNode], splitter.get_nodes_from_documents([doc]))

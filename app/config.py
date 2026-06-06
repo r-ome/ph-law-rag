@@ -17,6 +17,16 @@ class Settings(BaseSettings):
 	chunk_overlap: int = 32
 	embedding_model: str = "nomic-embed-text"
 	ollama_base_url: str = "http://localhost:11434"
+	dense_top_k: int = 10
+	sparse_top_k: int = 10
+	rerank_top_n: int = 5
+	max_distance: float = 0.5
+	min_chunks_for_answer: int = 2
+	llm_model: str = "mistral"
+	# llm_model: str = "deepseek-r1:8b"
+	# llm_model: str = "qwen3:4b"
+	reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+	debug: bool = False
 
 class SourceConfig(BaseModel):
 	source_id: str

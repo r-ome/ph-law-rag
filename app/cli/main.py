@@ -3,7 +3,7 @@ import json
 from app.config import settings, SourceConfig
 from app.db import init_db
 from app.ingestion.sync import run_sync
-
+from app.retriever.retrieve import retrieve
 app = typer.Typer()
 
 @app.command("healthcheck")
@@ -17,10 +17,20 @@ def sync():
 @app.command("eval")
 def eval():
 	typer.echo("Not yet implemented")
+ 
+@app.command("retrieve")
+def test_retrieve(query: str):
+    typer.echo(retrieve(query))
 
 @app.command("ask")
-def ask():
-	typer.echo("Not yet implemented")
+def ask(query: str):
+	from app.retriever.answer_service import answer
+	result = answer(query)
+	typer.echo(result["answer"])
+	if result["sources"]:
+		typer.echo("\nSources:")
+		for s in result["sources"]:
+			typer.echo(f"[{s['ref']}] {s['title']} - {s['url']}")
 
 @app.command("show-config")
 def show_config():

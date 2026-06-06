@@ -47,3 +47,10 @@ def delete_by_doc_id(client: QdrantClient, doc_id: str) -> None:
 		)
 	)
 			
+def query(client, vector: list[float], top_k: int):
+	return client.query_points(
+		collection_name=settings.qdrant_collection,
+		query=vector,
+		limit=top_k,
+		with_payload=True
+	).points

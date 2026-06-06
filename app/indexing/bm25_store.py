@@ -1,11 +1,12 @@
+from collections.abc import Sequence
 from pathlib import Path
 from llama_index.retrievers.bm25 import BM25Retriever
-from llama_index.core.schema import TextNode
+from llama_index.core.schema import BaseNode
 from app.config import settings
 
-def build_and_save(nodes: list[TextNode]) -> None:
+def build_and_save(nodes: Sequence[BaseNode]) -> None:
 	retriever = BM25Retriever.from_defaults(
-			nodes=nodes,
+			nodes=list(nodes),
 			similarity_top_k=10
 			)
 	retriever.persist(settings.bm25_path)

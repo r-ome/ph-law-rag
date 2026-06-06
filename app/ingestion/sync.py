@@ -12,7 +12,7 @@ from app.ingestion.parser import parse_pdf, parse_html
 from app.ingestion.normalizer import normalize_text
 from app.ingestion.hashing import hash_content
 
-def process_source(source: SourceConfig):
+def process_source(source: SourceConfig) -> dict:
 	from app.indexing.index_service import index_document
 	fetch_result = fetch_source(source)
 
