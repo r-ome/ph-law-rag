@@ -1,7 +1,10 @@
 from app.retriever.hybrid_retriever import hybrid_retriever
 from app.retriever.reranker import rerank
 from app.retriever.context_builder import build_context
-from app.retriever.prompts import SYSTEM_PROMPT, ABSTAIN_MESSAGE, build_user_prompt
+from app.retriever.prompts import (
+    SYSTEM_PROMPT, ABSTAIN_MESSAGE,
+    is_abstention, build_user_prompt
+)
 from app.retriever.llm_client import generate, LLMError
 from app.retriever.types import RetrievalResult
 from app.config import settings
@@ -25,8 +28,7 @@ def _debug_trace(
             for r in reranked
         ]
     }
-    
-    
+
 def _package(
     answer: str,
     sources: list[dict],
@@ -77,8 +79,8 @@ def answer(question: str) -> dict:
             prompt=user_prompt,
             error=True
         )
-        
-    soft_abstained = answer_text.strip() == ABSTAIN_MESSAGE
+
+    soft_abstained = is_abstention(answer_text)
     
     return _package(
         answer_text,

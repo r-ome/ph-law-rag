@@ -53,7 +53,7 @@ def ask(query: str):
 
 @app.command("show-config")
 def show_config():
-	typer.echo(json.dumps(settings.model_dump(), indent=2))
+	typer.echo(json.dumps(settings.model_dump(mode="json"), indent=2))
 
 @app.command("init")
 def init():

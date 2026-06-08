@@ -1,7 +1,7 @@
 import yaml
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 class Settings(BaseSettings):
 	model_config = SettingsConfigDict(env_file=".env")
@@ -29,8 +29,9 @@ class Settings(BaseSettings):
 	debug: bool = False
 	eval_dataset_path: str = "data/eval_dataset.jsonl"
 	eval_results_dir: str = "data/eval_results"
-	ragas_llm_model: str = "mistral"
+	ragas_llm_model: str = "claude-sonnet-4-6"
 	ragas_embedding_model: str = "nomic-embed-text"
+	anthropic_api_key: SecretStr = SecretStr("")
 
 class SourceConfig(BaseModel):
 	source_id: str

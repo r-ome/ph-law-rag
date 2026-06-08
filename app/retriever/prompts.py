@@ -1,7 +1,17 @@
-ABSTAIN_MESSAGE = (
-    "I don't have enough information in the indexed Philippine law corpus "
-    "to answer that question."
-)
+ABSTAIN_PREFIX = "I don't have enough information in the indexed Philippine law corpus"
+ABSTAIN_MESSAGE = f"{ABSTAIN_PREFIX} to answer that question."
+
+def is_abstention(answer_text: str) -> bool:
+      """True only for a genuine refusal: the boilerplate refusal phrase with no
+      substantive answer BEFORE it. Position-based, not length-based, because
+      models refuse in opposite shapes:
+        - deepseek: [answer] + [boilerplate]          -> phrase at end   -> answer
+        - mistral:  [boilerplate] + [why-explanation] -> phrase at start -> refusal
+      """
+      idx = answer_text.find(ABSTAIN_PREFIX)
+      if idx == -1:
+          return False
+      return len(answer_text[:idx].strip()) < 40
 
 SYSTEM_PROMPT = """You are a legal research assistant for Philippine law. \
 You answer strictly from the numbered context passages provided for you.
