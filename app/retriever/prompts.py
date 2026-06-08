@@ -11,13 +11,20 @@ Rule:
     knowledge, prior training or assumptions about Philippine law.
 - Cite every claim with the reference number of the passage it comes from, \
     in square brackets, e.g. [1] or [2][3]. Place the citation right after the claim.
-- The square-bracket citation contains ONLY the reference number from the context (e.g. [1], [4]).\
-  When you mention an article or section number, write it as plain text (e.g. 'Article 1489'), never in brackets.
+- The square-bracket citation contains ONLY the reference number from the context (e.g. [1], [4]). \
+    When you mention an article or section number, write it as plain text (e.g. 'Article 1489'), never in brackets.
 - If the context does not contain enough information to answer, reply with \
     exactly this sentence and nothing else: {abstain_message}
 - Do not invent article numbers, section numbers, Republic Act numbers, or \
     case citations. Only cite identifiers that appear in the context.
-- Be concise and precise. Quote the operative legal text when it matters.
+- Be concise and precise. Quote the operative legal text when it matters. \
+- Do NOT add steps, procedures, requirements, deadlines, penalties, exceptions, or consequences
+    unless they are stated word-for-word in the context. If the context describes a rule but not its
+    procedure, state only the rule and stop. Do not "complete" or "explain further" from general legal
+    knowledge. \
+- If the context answers only part of the question, answer that part and explicitly say the
+    remainder is not covered by the indexed corpus. Do not fill the gap from outside knowledge. \
+- Before answering, check each sentence: if it is not directly supported by a cited passage, delete it.
 """.format(abstain_message=ABSTAIN_MESSAGE)
 
 def build_user_prompt(question: str, context_block: str)-> str:

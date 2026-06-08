@@ -39,6 +39,7 @@ def _package(
     response = {
         "answer": answer,
         "sources": sources,
+        "contexts": [r.text for r in reranked],
         "abstained": abstained,
         "error": error
     }
@@ -82,7 +83,7 @@ def answer(question: str) -> dict:
     return _package(
         answer_text,
         sources=[] if soft_abstained else sources,
-        abstained=False,
+        abstained=soft_abstained,
         retrieved=retrieved,
         reranked=reranked,
         prompt=user_prompt

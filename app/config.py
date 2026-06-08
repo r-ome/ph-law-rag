@@ -22,11 +22,15 @@ class Settings(BaseSettings):
 	rerank_top_n: int = 5
 	max_distance: float = 0.5
 	min_chunks_for_answer: int = 2
-	llm_model: str = "mistral"
 	# llm_model: str = "deepseek-r1:8b"
+	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"
 	reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 	debug: bool = False
+	eval_dataset_path: str = "data/eval_dataset.jsonl"
+	eval_results_dir: str = "data/eval_results"
+	ragas_llm_model: str = "mistral"
+	ragas_embedding_model: str = "nomic-embed-text"
 
 class SourceConfig(BaseModel):
 	source_id: str

@@ -14,9 +14,28 @@ def healthcheck():
 def sync():
 	run_sync()
 
+@app.command("eval-score")
+def eval_score(run_path: str):
+	from app.evals.runner import run_eval_set, load_dataset
+	from app.evals.ragas_scorer import score
+	from app.evals.report import print_report, save_scored
+
+	results = load_dataset(run_path)
+	scored = score(results)
+	print_report(results, scored)
+	save_scored(results, scored)
+
 @app.command("eval")
 def eval():
-	typer.echo("Not yet implemented")
+	from app.evals.runner import run_eval_set
+	from app.evals.ragas_scorer import score
+	from app.evals.report import print_report, save_scored
+
+	results, raw_path = run_eval_set()
+	typer.echo(f"\nRaw results saved to {raw_path}")
+	scored = score(results)
+	print_report(results, scored)
+	save_scored(results, scored)
  
 @app.command("retrieve")
 def test_retrieve(query: str):

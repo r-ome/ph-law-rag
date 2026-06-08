@@ -23,6 +23,7 @@ def generate(system_prompt: str, user_prompt: str) -> str:
     url = f"{settings.ollama_base_url}/api/chat"
     payload = {
         "model": settings.llm_model,
+        "temperature": 0,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
