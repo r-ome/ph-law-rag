@@ -106,3 +106,24 @@ def init_db():
 	_bootstrap_migrations(conn)
 	_apply_migrations(conn)
 	conn.close()
+
+def list_documents() -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+			"""
+				SELECT
+					d.doc_id, d.source_id, d.title, d.url, d.doc_type,
+					d.category, d.enabled, d.updated_at,
+					MAX(v.fetched_at) AS last_fetched,
+					COUNT(DISTINCT c.chunk_id) as chunk_count
+				FROM documents d
+				LEFT JOIN document_versions v on v.doc_id = d.doc_id
+				LEFT JOIN chunks c on c.doc_id = d.doc_id
+				GROUP BY d.doc_id
+				ORDER BY d.category, d.title
+			"""
+		).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
