@@ -370,11 +370,42 @@ Build:
 - `docs/local_setup.md` — detailed Qdrant Docker setup, Ollama model pull, first run
 - Tests (unit for normalizer, chunker, hash logic; integration for sync and ask pipeline)
 - `.env.example` with all configurable values documented
-- `docker-compose.yml` for Qdrant
+- `docker-compose.yml` for the full stack: **Qdrant + FastAPI + Streamlit** (3 services, one container each — not one container running all three). Ollama is **not** containerized.
+
+#### Full-stack docker-compose design
+
+Three services run in containers; Ollama runs natively on the host so it keeps Apple Silicon GPU access via Metal (containers run in a Linux VM with no Metal/GPU passthrough — a containerized Ollama would be CPU-only and slow). Qdrant/FastAPI/Streamlit are CPU+RAM only and do not use the GPU.
+
+Services:
+- `qdrant` — image `qdrant/qdrant`, ports `6333:6333` / `6334:6334`, volume for `/qdrant/storage` so vectors persist across restarts.
+- `api` — FastAPI (uvicorn), port `8000:8000`, depends_on `qdrant`.
+- `ui` — Streamlit, port `8501:8501`, depends_on `api`.
+
+Networking rules (Compose puts services on a shared network where the **service name is the hostname**):
+- `ui` → `api` at `http://api:8000` (not `localhost`).
+- `api` → `qdrant` at `http://qdrant:6333` (not `localhost`).
+- `api` → host-native Ollama at `http://host.docker.internal:11434`. Add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `api` service so this resolves on Colima and Docker Desktop alike.
+
+Host prerequisites (document in README):
+- Ollama installed natively, models pulled (`ollama pull nomic-embed-text`, `ollama pull mistral`).
+- Ollama must listen on all interfaces so containers can reach it: `OLLAMA_HOST=0.0.0.0:11434 ollama serve` (default `127.0.0.1` binding rejects container traffic).
+- Works on Colima (`colima start --cpu 4 --memory 8`) without Docker Desktop.
+
+#### Config overrides when running under docker-compose
+
+These are existing `Settings` fields (`app/config.py`); override via environment in the compose file's `api` service, not by editing defaults. Local (non-Docker) runs keep the `localhost` defaults.
+
+| Config field | Local default | docker-compose value (set on `api` service) |
+|---|---|---|
+| `qdrant_url` | `http://localhost:6333` | `http://qdrant:6333` |
+| `ollama_base_url` | `http://localhost:11434` | `http://host.docker.internal:11434` |
+
+The Streamlit `ui` service needs the FastAPI base URL pointed at `http://api:8000` (via whatever env var the UI adapter uses for the API endpoint). Document each override in `.env.example` with a comment noting the Docker vs. local distinction.
 
 Definition of done:
 - Repo is presentation-ready
 - A reviewer can clone, follow README, and have a working system in under 15 minutes
+- `docker compose up` starts Qdrant + FastAPI + Streamlit; with host Ollama running, the Streamlit demo answers an end-to-end query
 
 ---
 

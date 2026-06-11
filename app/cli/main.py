@@ -1,18 +1,28 @@
 import typer
 import json
-from app.config import settings, SourceConfig
+from pathlib import Path
+from app.config import settings
 from app.db import init_db
-from app.ingestion.sync import run_sync
-from app.retriever.retrieve import retrieve
 app = typer.Typer()
 
 @app.command("healthcheck")
 def healthcheck():
-	typer.echo("OK")
+	from app.api.health_query import ping_url
+
+	qdrant_ok = ping_url(f"{settings.qdrant_url}/collections")
+	ollama_ok = ping_url(f"{settings.ollama_base_url}/api/version")
+	typer.echo(json.dumps({
+		"status": "ok" if qdrant_ok and ollama_ok else "degraded",
+		"qdrant": qdrant_ok,
+		"ollama": ollama_ok,
+	}, indent=2))
 
 @app.command("sync")
 def sync():
-	run_sync()
+	from app.ingestion.sync import run_sync
+
+	result = run_sync()
+	typer.echo(f"\nSync complete: {result}")
 
 @app.command("eval-score")
 def eval_score(run_path: str):
@@ -39,7 +49,9 @@ def eval():
  
 @app.command("retrieve")
 def test_retrieve(query: str):
-    typer.echo(retrieve(query))
+	from app.retriever.retrieve import retrieve
+
+	typer.echo(retrieve(query))
 
 @app.command("ask")
 def ask(query: str):
@@ -57,8 +69,17 @@ def show_config():
 
 @app.command("init")
 def init():
+	for path in [
+		settings.raw_data_dir,
+		settings.normalized_data_dir,
+		"data/qdrant",
+		settings.bm25_path,
+		Path(settings.db_path).parent,
+		settings.eval_results_dir,
+	]:
+		Path(path).mkdir(parents=True, exist_ok=True)
 	init_db()
-	typer.echo("Database initialized")
+	typer.echo("Data directories created and database initialized")
 
 if __name__ == "__main__":
 	app()

@@ -1,19 +1,19 @@
 # ph-law-rag
 
-A local-first RAG (Retrieval-Augmented Generation) assistant over Philippine law primary sources — statutes, Supreme Court decisions, and the 1987 Constitution.
+A local-first RAG (Retrieval-Augmented Generation) assistant over Philippine law primary sources.
 
-Built as a portfolio project demonstrating production-grade retrieval pipeline design: hybrid dense + sparse search, cross-encoder reranking, incremental document sync, and grounded generation with source citations — all running locally with no cloud API dependencies.
+Built as a portfolio project demonstrating production-grade retrieval pipeline design: hybrid dense + sparse search, cross-encoder reranking, incremental document sync, and grounded generation with source citations — all running locally with no cloud API dependencies (evals aside).
 
 ---
 
 ## What it does
 
-1. Fetches a curated allowlist of Philippine law pages and PDFs (~48 sources)
+1. Fetches a curated allowlist of Philippine law sources (4 civil-law statutes in V1)
 2. Normalizes and hashes content for incremental sync — re-runs skip unchanged documents
-3. Chunks, embeds, and stores vectors locally in Qdrant
+3. Chunks, embeds, and stores vectors locally in Qdrant + a persisted BM25 index
 4. Answers legal questions with a local LLM, grounded in retrieved context
 5. Cites source documents and article/section numbers
-6. Abstains when evidence is insufficient
+6. Abstains when the corpus doesn't support a grounded answer
 7. Scores answer quality via RAGAS semantic eval metrics
 8. Exposes a Streamlit chat UI and a FastAPI for programmatic access
 
@@ -24,14 +24,14 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 | Concern | Tool |
 |---|---|
 | RAG orchestration | LlamaIndex |
-| LLM | Ollama (Mistral or Llama3) |
+| LLM | Ollama (Mistral) |
 | Embeddings | Ollama `nomic-embed-text` (768-dim) |
 | Vector store | Qdrant (local Docker) |
 | Sparse index | LlamaIndex BM25Retriever |
 | Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | PDF ingestion | `pdfplumber` |
 | HTML ingestion | `trafilatura` + BeautifulSoup fallback |
-| Evals | RAGAS |
+| Evals | RAGAS (Anthropic judge) |
 | Frontend | Streamlit |
 | API | FastAPI |
 | Config | pydantic-settings |
@@ -46,115 +46,88 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 - [`uv`](https://docs.astral.sh/uv/) for dependency management
 - [Docker](https://docs.docker.com/get-docker/) with a running local Docker daemon
 - [Colima](https://github.com/abiosoft/colima) if you use the Docker CLI without Docker Desktop on macOS
-- [Ollama](https://ollama.ai/) installed and running
+- [Ollama](https://ollama.ai/) installed and running natively on the host
+
+> Ollama runs on the **host**, not in a container — on Apple Silicon only the host can use the GPU. See [`docs/local_setup.md`](docs/local_setup.md) for the full rationale.
 
 ---
 
-## Run Docker Locally
-
-This project expects Qdrant to run locally in Docker and persist data into `data/qdrant/`.
-
-Start your local Docker runtime first:
-
-- Docker Desktop: open Docker Desktop and wait for it to report that Docker is running
-- Colima: run `colima start`
-
-If this is your first Colima start, or the default profile is missing, use:
+## Quick start
 
 ```bash
-colima start --cpu 2 --memory 4 --disk 20
-```
-
-Check that Docker is available before starting Qdrant:
-
-```bash
-docker ps
-docker context ls
-```
-
-If `docker` is pointed at the `colima` context, `colima` must be running. If you use Docker Desktop instead, switch contexts with:
-
-```bash
-docker context use default
-```
-
-Start Qdrant with local persistence:
-
-```bash
-mkdir -p data/qdrant
-docker run -d \
-  --name ph-law-rag-qdrant \
-  -p 6333:6333 \
-  -p 6334:6334 \
-  -v "$(pwd)/data/qdrant:/qdrant/storage" \
-  qdrant/qdrant
-```
-
-Verify that Qdrant is up:
-
-```bash
-docker ps
-curl http://localhost:6333/collections
-```
-
-Useful local commands:
-
-```bash
-docker stop ph-law-rag-qdrant
-docker start ph-law-rag-qdrant
-docker logs ph-law-rag-qdrant
-```
-
-The Qdrant dashboard is available at `http://localhost:6333/dashboard`.
-
----
-
-## Setup
-
-```bash
-# 1. Clone the repo
+# 1. Clone and install
 git clone https://github.com/your-username/ph-law-rag.git
 cd ph-law-rag
-
-# 2. Install dependencies
 uv sync
 
-# 3. Start Docker locally
-# Docker Desktop: open the app
-# Colima: colima start
+# 2. Start Qdrant (see "Run Qdrant locally" below if Docker isn't running yet)
+docker compose up -d qdrant
 
-# 4. Start Qdrant
-mkdir -p data/qdrant
-docker run -d \
-  --name ph-law-rag-qdrant \
-  -p 6333:6333 \
-  -p 6334:6334 \
-  -v "$(pwd)/data/qdrant:/qdrant/storage" \
-  qdrant/qdrant
-
-# 5. Pull Ollama models
+# 3. Start Ollama bound to all interfaces, and pull the models
+OLLAMA_HOST=0.0.0.0:11434 ollama serve   # in its own terminal
 ollama pull mistral
 ollama pull nomic-embed-text
 
-# 6. Configure environment
+# 4. Configure
 cp .env.example .env
-# Edit .env if needed — defaults work for a standard local setup
 
-# 7. Initialize data directories and database
+# 5. Initialize the DB and data dirs
 raglab init
 
-# 8. Sync the corpus (fetch, normalize, hash, version documents)
+# 6. Populate the corpus — REQUIRED before asking anything (the DB ships empty)
 raglab sync
 
-# 9. Ask a question
-raglab ask "What are the elements of a valid contract under the Civil Code?"
+# 7. Ask a question
+raglab ask "What are the requisites of a valid contract under the Civil Code?"
 
-# 10. Launch the Streamlit UI
-streamlit run app/ui/app.py
+# 8. Launch the UI
+streamlit run app/ui/home.py
 
-# 11. Run evals
+# 9. Run evals (requires anthropic_api_key in .env)
 raglab eval
 ```
+
+> **You must run `raglab sync` before querying.** The database ships empty; without a sync every query retrieves nothing and the system abstains.
+
+For a step-by-step walkthrough and troubleshooting, see [`docs/local_setup.md`](docs/local_setup.md).
+
+---
+
+## Run the full stack with docker-compose
+
+Runs Qdrant + FastAPI + Streamlit as three containers. Ollama stays on the host.
+
+```bash
+docker compose up        # Qdrant (:6333), API (:8000), UI (:8501)
+```
+
+Notes:
+- Start host Ollama with `OLLAMA_HOST=0.0.0.0:11434 ollama serve` so the containers can reach it (the default `127.0.0.1` binding rejects container traffic).
+- The cross-encoder reranker is **pre-baked into the image at build time**, so the first query isn't blocked on a slow model download.
+- The `data/` volume is shared from the host — run `raglab sync` (locally or `docker compose exec api raglab sync`) before querying.
+
+---
+
+## Run Qdrant locally (without compose)
+
+If you prefer to run Qdrant standalone, start your Docker runtime first:
+
+- Docker Desktop: open the app and wait for it to report Docker is running
+- Colima: `colima start` (first time: `colima start --cpu 4 --memory 8 --disk 20`)
+
+```bash
+docker ps              # confirm Docker is reachable
+mkdir -p data/qdrant
+docker run -d \
+  --name ph-law-rag-qdrant \
+  -p 6333:6333 -p 6334:6334 \
+  -v "$(pwd)/data/qdrant:/qdrant/storage" \
+  qdrant/qdrant
+
+curl http://localhost:6333/collections   # verify
+```
+
+The Qdrant dashboard is at `http://localhost:6333/dashboard`.
 
 ---
 
@@ -163,10 +136,11 @@ raglab eval
 | Command | Description |
 |---|---|
 | `raglab init` | Create data directories and bootstrap the SQLite database |
-| `raglab sync` | Fetch, normalize, hash, and version all enabled sources |
+| `raglab sync` | Fetch, normalize, hash, version, chunk, embed, and index all enabled sources |
 | `raglab ask "..."` | Ask a question and get a grounded answer with citations |
-| `raglab ask --session <id> "..."` | Continue a named conversation session |
-| `raglab eval` | Run RAGAS eval on `data/eval_dataset.jsonl` |
+| `raglab retrieve "..."` | Inspect the retrieval trace for a query (no generation) |
+| `raglab eval` | Run the eval pipeline over `data/eval_dataset.jsonl` |
+| `raglab eval-score <run_path>` | Score an existing eval run with RAGAS |
 | `raglab show-config` | Print the current config as JSON |
 | `raglab healthcheck` | Verify Qdrant and Ollama are reachable |
 
@@ -178,11 +152,9 @@ The FastAPI app exposes:
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/health` | Health check |
+| GET | `/health` | Health check; verifies Qdrant and Ollama reachability |
 | POST | `/query/ask` | Ask a question; returns answer + citations |
 | GET | `/documents` | List all indexed documents |
-| GET | `/documents/{doc_id}` | Single document metadata |
-| POST | `/sync` | Trigger a sync as a background task |
 
 Start the API:
 
@@ -194,58 +166,59 @@ uvicorn app.api.main:app --reload
 
 ## Corpus
 
-~48 curated sources across:
+V1 is deliberately scoped to **4 civil-law primary sources**:
 
-- **Constitutional** — 1987 Constitution
-- **Civil law** — Civil Code (RA 386), Family Code (EO 209)
-- **Criminal law** — Revised Penal Code (Act 3815)
-- **Labor law** — Labor Code (PD 442)
-- **Special laws** — Anti-VAWC (RA 9262), Cybercrime Prevention Act (RA 10175), Data Privacy Act (RA 10173), IP Code (RA 8293), and more
-- **Supreme Court decisions** — 20+ landmark decisions from the SC E-Library
+- **Civil Code of the Philippines** (RA 386)
+- **Electronic Commerce Act of 2000** (RA 8792)
+- **Realty Installment Buyer Protection Act / Maceda Law** (RA 6552)
+- **Consumer Act of the Philippines** (RA 7394)
 
-Sources are defined in `sources/ph_law_sources.yaml`. Set `enabled: false` to exclude a source from sync.
+The scope is intentional: a tight, coherent corpus keeps evals meaningful and makes abstention behavior testable — out-of-scope questions (e.g. criminal or constitutional law) *should* be refused, not guessed. The pipeline itself is source-agnostic; sources are defined in `sources/ph_law_sources.yaml` and toggled with `enabled`.
 
 ---
 
 ## Retrieval design
 
-Hybrid retrieval is used because Philippine law requires both semantic understanding and exact-match precision:
+Hybrid retrieval is used because legal text needs both semantic understanding and exact-match precision:
 
 | Query type | Dense | BM25 |
 |---|---|---|
-| "What are the elements of estafa?" | handles | — |
-| "Republic Act 10173 section 16" | — | handles |
-| "G.R. No. 12345" | — | handles |
-| "rights of an accused person" | handles | partial |
+| "What makes a contract void?" | handles | — |
+| "RA 8792 section 33" | — | handles |
+| "Maceda Law grace period" | partial | handles |
+| "rights of an installment buyer" | handles | partial |
 
 Pipeline:
 1. Embed query via `nomic-embed-text`
 2. Dense retrieval from Qdrant (top-10)
 3. BM25 sparse retrieval (top-10)
 4. RRF fusion (k=60)
-5. Cross-encoder reranking (top-5 pass to context builder)
-6. Abstention gate: if fewer than `min_chunks_for_answer` chunks survive the distance filter, skip generation
-7. Grounded generation via Ollama
+5. Cross-encoder reranking (top-5 pass to the context builder)
+6. Abstention gate: if fewer than `min_chunks_for_answer` chunks survive, skip generation and return the abstain message — no LLM call
+7. Grounded generation via Ollama, with `[n]` citations
+
+See [`docs/architecture.md`](docs/architecture.md) for diagrams and [`docs/ADR/`](docs/ADR/) for the decisions behind these choices.
 
 ---
 
 ## Configuration
 
-All config is in `.env` and loaded via `app/config.py`. Key settings:
+All config lives in `.env` and is loaded via `app/config.py`. Key settings:
 
 ```env
-LLM_MODEL=mistral
-EMBEDDING_MODEL=nomic-embed-text
-OLLAMA_BASE_URL=http://localhost:11434
-QDRANT_URL=http://localhost:6333
-CHUNK_SIZE=256
-CHUNK_OVERLAP=32
-DENSE_TOP_K=10
-RERANK_TOP_N=5
-DEBUG=false
+llm_model=mistral
+embedding_model=nomic-embed-text
+ollama_base_url=http://localhost:11434
+qdrant_url=http://localhost:6333
+chunk_size=256
+chunk_overlap=32
+dense_top_k=10
+rerank_top_n=5
+min_chunks_for_answer=2
+debug=false
 ```
 
-See `.env.example` for all options with descriptions.
+See `.env.example` for all options. When running under docker-compose, `qdrant_url` and `ollama_base_url` are overridden on the `api` service (`http://qdrant:6333` and `http://host.docker.internal:11434`).
 
 ---
 
@@ -258,14 +231,13 @@ ph-law-rag/
 ├── app/
 │   ├── config.py               # pydantic-settings config
 │   ├── db.py                   # SQLite bootstrap + migrations
-│   ├── ingestion/              # fetch → parse → normalize → version
+│   ├── cli/                    # Typer CLI (raglab)
+│   ├── ingestion/              # fetch → parse → normalize → hash → version
 │   ├── indexing/               # chunk → embed → upsert (Qdrant + BM25)
-│   ├── retrieval/              # dense + sparse → RRF → rerank
-│   ├── generation/             # prompt → Ollama → answer
-│   ├── evals/                  # RAGAS scoring
-│   ├── conversation/           # session management + query rewriting
+│   ├── retriever/              # dense + sparse → RRF → rerank → prompt → answer
+│   ├── evals/                  # RAGAS scoring + report
 │   ├── api/                    # FastAPI adapter
-│   └── ui/                     # Streamlit adapter
+│   └── ui/                     # Streamlit adapter (home.py)
 ├── data/
 │   ├── eval_dataset.jsonl      # eval questions (tracked)
 │   ├── raw/                    # downloaded HTML/PDF (gitignored)
@@ -275,93 +247,60 @@ ph-law-rag/
 │   ├── sqlite/                 # raglab.db (gitignored)
 │   └── eval_results/           # RAGAS outputs (gitignored)
 ├── tests/
-│   ├── unit/
-│   └── integration/
+│   ├── unit/                   # normalizer, hashing, chunker, abstention, RRF
+│   └── integration/            # sync incremental, ask pipeline (gated)
 └── docs/
-    └── project_plan.md         # source of truth for architecture
+    ├── project_plan.md         # source of truth for architecture
+    ├── architecture.md         # system + pipeline diagrams
+    ├── local_setup.md          # detailed setup + troubleshooting
+    └── ADR/                    # architecture decision records
 ```
 
 ---
 
-## ROADMAP
+## Testing
 
-### Milestone 1 — Scaffold and Local Runtime `✅ complete`
+```bash
+uv run pytest -m "not integration"   # fast, deterministic — no services needed
+uv run pytest                        # includes integration tests (need Qdrant + Ollama + a synced corpus)
+```
 
-- Repo structure, `pyproject.toml`, `config.py`, `db.py`
-- Typer CLI with `init`, `sync`, `ask`, `eval`, `healthcheck`, `show-config` stubs
-- FastAPI `/health` route
-- Streamlit stub
+Integration tests `skipif` cleanly when services are unavailable.
 
-### Milestone 2 — Document Sync and Normalization `✅ complete`
+---
 
-- `sources/ph_law_sources.yaml` — 48 sources across constitutional, civil, criminal, labor, special laws, and SC decisions
-- `fetcher.py` — httpx downloader with timeout and user-agent
-- `parser.py` — PDF (pdfplumber) and HTML (trafilatura + BeautifulSoup fallback) extraction
-- `normalizer.py` — whitespace collapse, dedup blank lines
-- `hashing.py` — SHA-256 of normalized text
-- `storage.py` — hash comparison, disk write, SQLite versioning
-- `sync.py` — orchestrator with per-source status reporting and `sync_runs` tracking
-- 48 documents fetched, normalized, and versioned
+## Roadmap
 
-### Milestone 3 — Chunking, Embeddings, and Indexing `⬜ next`
+| Milestone | Status |
+|---|---|
+| 1 — Scaffold and local runtime | ✅ complete |
+| 2 — Document sync and normalization | ✅ complete |
+| 3 — Chunking, embeddings, indexing | ✅ complete |
+| 4 — Hybrid retrieval and generation | ✅ complete |
+| 5 — Streamlit UI and FastAPI wiring | ✅ complete |
+| 6 — Evals (RAGAS) | ✅ complete |
+| 7 — Polish, docs, tests, docker-compose | ✅ complete |
+| 8 — Conversation context (multi-turn, query rewriting) | ⬜ planned |
 
-- `chunker.py` — LlamaIndex SentenceSplitter (256 tokens, 32 overlap)
-- `embedder.py` — Ollama `nomic-embed-text` client
-- `vector_store.py` — Qdrant wrapper (upsert, delete-by-doc, query)
-- `bm25_store.py` — BM25Retriever build, persist, and load
-- `index_service.py` — delete stale → chunk → embed → upsert → rebuild BM25
-- Wire indexing into `raglab sync`
-
-### Milestone 4 — Hybrid Retrieval and Generation `⬜ planned`
-
-- `dense_retriever.py`, `sparse_retriever.py`, `hybrid_retriever.py` (RRF fusion)
-- `reranker.py` — cross-encoder rescoring
-- `context_builder.py` — numbered context block with citations
-- `prompts.py` — grounded system prompt with abstention instruction
-- `llm_client.py` — Ollama HTTP client
-- `answer_service.py` — full ask pipeline with debug trace
-- Wire `raglab ask` end-to-end
-
-### Milestone 5 — Streamlit UI and FastAPI Wiring `⬜ planned`
-
-- Streamlit: chat UI with citations, source browser, settings sidebar, Sync Now button
-- FastAPI: `/query/ask`, `/documents`, `/sync` routes
-- Both adapters call shared service modules — no business logic in either
-
-### Milestone 6 — Evals `⬜ planned`
-
-- 40–60 question eval dataset across factual, paraphrase, synthesis, ambiguous, and out-of-scope categories
-- `runner.py`, `ragas_scorer.py`, `report.py`
-- RAGAS metrics: faithfulness, answer relevance, context precision, context recall
-- `raglab eval` produces a category-level summary table
-
-### Milestone 7 — Polish and GitHub Readiness `⬜ planned`
-
-- `docs/architecture.md`, `docs/tradeoffs.md`, `docs/local_setup.md`
-- Unit tests (normalizer, chunker, hash logic) and integration tests (sync, ask pipeline)
-- `docker-compose.yml` for Qdrant
-- Repo is clone-and-run ready in under 15 minutes
-
-### Milestone 8 — Conversation Context Management `⬜ planned`
-
-- `conversations` and `conversation_turns` SQLite tables
-- `app/conversation/session.py` — create, load, append turns
-- `app/conversation/query_rewriter.py` — resolve pronouns and ellipsis into standalone queries
-- `--session` flag on `raglab ask`; session threading in FastAPI and Streamlit
+Future: cloud LLM backend (AWS Bedrock) with an eval delta vs. local, metadata filtering in Qdrant, expanded corpus, scanned-PDF OCR.
 
 ---
 
 ## Design decisions
 
-**LlamaIndex over LangChain** — LlamaIndex has more opinionated, better-abstracted primitives for document retrieval. For a RAG-first project it's the right choice. LangChain would be appropriate for complex multi-step agent loops.
+Full rationale lives in [`docs/ADR/`](docs/ADR/). In brief:
 
-**Qdrant over ChromaDB** — Native hybrid search (dense + sparse in one query), stable concurrent-safe architecture. The tradeoff is requiring Docker for local setup.
+**LlamaIndex over LangChain** — better-abstracted primitives for document retrieval; LangChain fits complex multi-step agent loops, which this isn't.
 
-**RAGAS over custom scoring** — Semantic scoring via LLM-graded metrics is more meaningful than keyword matching. Tradeoff: RAGAS requires a working LLM at eval time.
+**Qdrant over ChromaDB** — native hybrid search and a stable concurrent-safe architecture. Tradeoff: requires Docker.
 
-**Trafilatura over BeautifulSoup** — Strips navigation boilerplate, which is the primary quality problem for Philippine law pages. Falls back to BeautifulSoup when trafilatura returns nothing.
+**Hybrid (dense + BM25) over dense-only** — legal text is full of exact citations (RA numbers, sections) that dense retrieval misses; BM25 covers them.
 
-**Local-first with Ollama** — No cloud API keys required. Lower model quality than GPT-4/Claude, but the LLM backend is swappable via config if cloud inference is desired later.
+**RAGAS over custom scoring** — semantic, LLM-graded metrics beat keyword matching. Tradeoff: needs an LLM at eval time (Anthropic judge).
+
+**Local-first with Ollama** — no cloud keys for the core pipeline; lower model quality than frontier APIs, but the backend is swappable via config.
+
+**Abstention by design** — a confident wrong answer is worse than "I don't know" in a legal tool, enforced by a hard gate plus prompt instruction.
 
 ---
 

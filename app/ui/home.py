@@ -1,6 +1,5 @@
+import httpx
 import streamlit as st
-from app.retriever.answer_service import answer
-from app.db import list_documents
 from app.config import settings
 
 st.set_page_config(page_title="PH Law RAG", layout="wide")
@@ -9,7 +8,6 @@ st.title("PH Law RAG")
 with st.sidebar:
     st.header("Settings")
     debug = st.toggle("Debug Mode", value=settings.debug)
-    settings.debug = debug
     st.caption(f"Model: {settings.llm_model}")
     st.caption(f"dense_top_k: {settings.dense_top_k}")
     st.caption(f"rerank_top_n: {settings.rerank_top_n}")
@@ -32,7 +30,19 @@ with chat_tab:
             st.markdown(prompt)
         with st.chat_message("assistant"):
             with st.spinner("Retrieving and generating..."):
-                result = answer(prompt)
+                try:
+                    resp = httpx.post(
+                        f"{settings.api_base_url}/query/ask",
+                        json={"question": prompt, "debug": debug},
+                        timeout=120,
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                except (httpx.HTTPError, ValueError) as exc:
+                    result = {
+                        "answer": f"API request failed: {exc}",
+                        "sources": [],
+                    }
             st.markdown(result["answer"])
             if result["sources"]:
                 st.markdown("**Sources:**")
@@ -46,6 +56,12 @@ with chat_tab:
         )
 
 with sources_tab:
-    docs = list_documents()
+    try:
+        resp = httpx.get(f"{settings.api_base_url}/documents", timeout=10)
+        resp.raise_for_status()
+        docs = resp.json()["documents"]
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
+        st.error(f"Could not load documents: {exc}")
+        docs = []
     st.caption(f"{len(docs)} documents indexed")
-    st.dataframe(docs, use_container_width=True)
+    st.dataframe(docs, width="stretch")

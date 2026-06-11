@@ -1,0 +1,98 @@
+# Overview
+
+- A RAG Pipeline with the Philippine law as its corpus. A personal project that I want to work and experiment on. Currently, it runs using Streamlit as the UI and FastAPI as the API. You can ask questions related to the Philippine law and the model will answer your question and cite the sources, articles, etc where it's located in the Philippine Law. Only 4 documents are indexed and will index more later.
+
+# System Diagram
+
+```mermaid
+flowchart LR
+%%{init: {'theme':'dark'}}%%
+User([User]) --> UI[Streamlit UI<br/>home.py]
+UI -->|HTTP| API[FastAPI<br/>routes_query.py]
+API --> AS[answer_service]
+
+Dense --> Qdrant[(Qdrant<br/>vectors)]
+Sparse --> BM25[(BM25 index)]
+Dense -.embeds query.-> Ollama[Ollama<br/>nomic-embed-text]
+
+AS --> HR[hybrid_retriever<br/>RRF fusion]
+HR --> Dense[dense_retriever] --> HR
+HR --> Sparse[sparse_retriever] --> HR
+HR --> Reranker
+Reranker --> Gen["generator(Mistral model)"]
+AS --> Abstain{is_abstention?}
+
+subgraph Sync["'raglab sync'" command — offline]
+    Fetch[fetcher] --> Parse[parser] --> Norm[normalizer] --> Index[index_service]
+    Index --> Qdrant
+    Index --> BM25
+end
+```
+
+## Sync Pipeline
+
+```mermaid
+flowchart LR
+%%{init: {'theme': "dark"}}%%
+    f[Fetch]
+    p[Parse]
+    n[Normalize]
+    h[Hash]
+    c[Chunk]
+    v[Version]
+    i[Index]
+
+f --> p;
+p --> n;
+n --> h;
+h -.compare to latest hash.-> Match{if match}
+Match -.false.-> v
+Match -.true.-> skip
+v --> c;
+c --> i;
+```
+
+## Indexing Pipeline
+
+```mermaid
+flowchart LR
+%%{init: {'theme':'dark'}}%%
+chunk --> Embed["embed(nomic-embed-text)"] --> delete-stale --> store["store in Qdrant + BM25"];
+```
+
+## Query Pipeline
+
+```mermaid
+flowchart LR
+%%{init: {'theme':'dark'}}%%
+retrieve["dense + sparse<br/>(Qdrant) (BM25)"] --> merge["reciprocal rank fusion(RRF)"]
+merge --> rerank["rerank<br/>(ms-marco-MiniLM-L-6-v2)"]
+rerank--> gate
+gate --> abstain{abstain?}
+abstain -.answer.-> generate["Generate (Mistral)"]
+abstain -.abstain.-> generate
+```
+
+## Eval Pipeline
+
+```mermaid
+flowchart LR
+%%{init: {'theme':'dark'}}%%
+query[User's Query] --> answer["Query pipeline<br/>(refer to Query Pipeline)"]
+answer --> ragas["RAGAS<br/>(claude-sonnet-4-6)"]
+ragas --> report;
+```
+
+# Data Flow
+
+1. User asks question
+2. Question then pass through BM25 retrieval(sparse) using lexical search and Qdrant retrieval(dense) using cosine similarity
+3. Chunks retrieved will then be merged using RRF (Reciprocal Rank Fusion) then gets reranked using the reranker model (cross-encoder)
+4. Top chunks will then be passed to generator model + the user's query
+5. Generator model will then generate answer for the user
+
+# Storage
+
+- Qdrant as Vector Store for embeddings
+- sqlite3 for documents, chunks, versions, metadata, sync_runs
+- raw files get saved (html, normalized and hashed) on data/

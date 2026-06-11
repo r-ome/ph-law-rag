@@ -37,6 +37,7 @@ def _package(
     reranked: list[RetrievalResult],
     prompt: str | None,
     error: bool = False,
+    debug: bool = False
 ) -> dict:
     response = {
         "answer": answer,
@@ -45,12 +46,13 @@ def _package(
         "abstained": abstained,
         "error": error
     }
-    if settings.debug:
+    if debug:
         response["debug"] = _debug_trace(retrieved, reranked, prompt)
     return response
 
 
-def answer(question: str) -> dict:
+def answer(question: str, debug: bool | None = None) -> dict:
+    debug_enabled = settings.debug if debug is None else debug
     retrieved = hybrid_retriever(question)
     reranked = rerank(question, retrieved)
     
@@ -61,7 +63,8 @@ def answer(question: str) -> dict:
             abstained=True,
             retrieved=retrieved,
             reranked=reranked,
-            prompt=None
+            prompt=None,
+            debug=debug_enabled
         )
     
     context_block, sources = build_context(reranked,)
@@ -77,7 +80,8 @@ def answer(question: str) -> dict:
             retrieved=retrieved,
             reranked=reranked,
             prompt=user_prompt,
-            error=True
+            error=True,
+            debug=debug_enabled
         )
 
     soft_abstained = is_abstention(answer_text)
@@ -88,5 +92,6 @@ def answer(question: str) -> dict:
         abstained=soft_abstained,
         retrieved=retrieved,
         reranked=reranked,
-        prompt=user_prompt
+        prompt=user_prompt,
+        debug=debug_enabled
     )

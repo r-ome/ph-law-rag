@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 	ragas_llm_model: str = "claude-sonnet-4-6"
 	ragas_embedding_model: str = "nomic-embed-text"
 	anthropic_api_key: SecretStr = SecretStr("")
+	api_base_url: str = "http://localhost:8000"
 
 class SourceConfig(BaseModel):
 	source_id: str

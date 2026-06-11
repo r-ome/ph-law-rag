@@ -1,418 +1,92 @@
 # ph-law-rag — Claude Instructions
 
-See `docs/project_plan.md` for the full architecture, data model, and milestone definitions. That file is the source of truth. Update it when implementation meaningfully diverges.
+`docs/project_plan.md` is the source of truth for architecture, data model, config, and stack. Read it before building. Update it when implementation meaningfully diverges. Don't restate plan content here — reference it.
+
+## Working rules
+
+- Be concise. Implementation first, minimal explanation unless asked. Plain language over jargon.
+- Use `uv` for deps (`uv add <pkg>`). Python 3.11+.
+- Lazy/in-function imports for optional deps (Qdrant, Ollama, ingestion, indexing) so the CLI never fails at startup when a service or package is missing.
+- Adapters (`app/api`, `app/ui`) hold no business logic.
+- Config field names/defaults come from the plan's Config System section — match exactly.
+- Work the current milestone only; don't pull work forward.
+- The user codes the milestones themselves. Default to showing code or pseudocode in the chat — do NOT write, create, or edit files unless the user explicitly says to (e.g. "write it", "create the file", "update X"). "Give me the code" / "show me" means display it, not apply it.
+- Don't assume. When intent, scope, or approach is ambiguous, ask first rather than acting — unless the user has explicitly told you to proceed.
 
 ---
 
-## Milestone 1: Scaffold and Local Runtime
+## Milestone 1 — Scaffold & local runtime
 
-**Goal:** Project boots cleanly, all entry points work.
+**Goal:** project boots cleanly, all entry points work.
 
-### What to build
+Build:
 
-1. **Repo folder structure** — create all directories listed in the Architecture section of the project plan (empty `__init__.py` files where needed to make packages importable).
+- Repo folder structure per plan's Architecture section (`__init__.py` where needed).
+- `pyproject.toml`: `raglab` console script, all deps from plan's stack up front.
+- `app/config.py`: `Settings` via `pydantic-settings`, loaded from `.env`.
+- `.env.example`: one line per key, default + short comment.
+- `app/db.py`: connect to `settings.db_path` (create file + parent dirs); `schema_migrations` table; apply migrations in order, skipping applied ones. Migration 1 creates `documents`, `document_versions`, `chunks`, `sync_runs` per plan's Data Model.
+- CLI (Typer, registered as `raglab`). All commands stubs except: `init` (creates the `data/*` dirs, bootstraps DB via `db.py`, prints confirmation) and `show-config` (prints `settings.model_dump()` as JSON). Stubs: `sync`, `ask`, `eval`, `healthcheck`.
+- `app/api/main.py`: FastAPI, `GET /health` → `{"status": "ok"}`.
+- `app/ui/app.py`: Streamlit stub, title "PH Law RAG", placeholder text.
 
-2. **`pyproject.toml`** — Python 3.11+, define a `raglab` console script entry point, include all project dependencies up front (see stack in project plan).
+**Done when:** `raglab init` runs error-free and is idempotent on repeat; `raglab show-config` prints config JSON; `uvicorn app.api.main:app` serves `/health`; `streamlit run app/ui/app.py` opens without error; config loads from `.env`.
 
-3. **`app/config.py`** — `Settings` class using `pydantic-settings`, loaded from `.env`. Use the exact field names and defaults from the Config System section in the project plan.
-
-4. **`.env.example`** — one line per config key with its default value and a short comment.
-
-5. **`app/db.py`** — SQLite bootstrap:
-   - Connect to `settings.db_path`, creating the file and parent dirs if needed.
-   - Create a `schema_migrations` table on first run.
-   - Apply migrations in order; skip already-applied versions.
-   - Migration 1: create `documents`, `document_versions`, `chunks`, `sync_runs` tables using the exact schema from the Data Model section of the project plan.
-
-6. **CLI (`app/cli.py` or `app/main.py`)** — Typer app, registered as the `raglab` console script. Commands at this milestone are stubs except `init`:
-   - `raglab init` — creates `data/raw/`, `data/normalized/`, `data/qdrant/`, `data/bm25/`, `data/sqlite/`, `data/eval_results/` directories; bootstraps the DB by calling `db.py`; prints confirmation.
-   - `raglab sync` — stub: prints "sync not yet implemented".
-   - `raglab ask` — stub: prints "ask not yet implemented".
-   - `raglab eval` — stub: prints "eval not yet implemented".
-   - `raglab healthcheck` — stub: prints "healthcheck not yet implemented".
-   - `raglab show-config` — prints the current `Settings` as JSON (use `settings.model_dump()`).
-
-7. **`app/api/main.py`** — FastAPI app with a single route:
-   - `GET /health` → returns `{"status": "ok"}`.
-
-8. **`app/ui/app.py`** — Streamlit stub:
-   - Title: "PH Law RAG"
-   - A single `st.write("UI not yet implemented.")` placeholder.
-
-### Definition of done
-
-- `raglab init` runs without error, creates data directories, and bootstraps the DB.
-- `raglab show-config` prints the loaded config as JSON.
-- `uvicorn app.api.main:app` starts and `GET /health` returns `{"status": "ok"}`.
-- `streamlit run app/ui/app.py` opens the browser stub without error.
-- Config loads correctly from a `.env` file.
-- DB initializes cleanly (no errors on repeated `raglab init` runs — idempotent).
-
-### Key constraints
-
-- Do not start on ingestion, retrieval, or indexing logic yet — those are Milestone 2+.
-- Keep all imports lazy where possible so the CLI doesn't fail at startup if optional deps (Qdrant, Ollama clients) are missing.
-- No business logic in `app/api/main.py` or `app/ui/app.py` — they are adapters only.
-- Use `uv` for dependency management.
+**Don't:** start ingestion/retrieval/indexing.
 
 ---
 
-## Milestone 2: Document Sync and Normalization
+## Milestone 2 — Document sync & normalization
 
-**Goal:** `raglab sync` fetches, normalizes, hashes, and versions documents. Re-running on an unchanged corpus skips all processing.
+**Goal:** `raglab sync` fetches, normalizes, hashes, versions docs. Unchanged corpus → all processing skipped.
 
-### New config fields to add to `app/config.py`
+Add config: `raw_data_dir`, `normalized_data_dir`, `source_config_path`, `request_timeout`.
+Add deps: `httpx pdfplumber trafilatura beautifulsoup4 pyyaml`.
+New pkg: `app/ingestion/`.
 
-Add these to `Settings` before starting — they'll be needed throughout this milestone:
+Build:
 
-```python
-raw_data_dir: str = "data/raw"
-normalized_data_dir: str = "data/normalized"
-source_config_path: str = "sources/ph_law_sources.yaml"
-request_timeout: int = 30
-```
+1. `sources/ph_law_sources.yaml` — expand to ~25–30 enabled sources covering: 1987 Constitution; Civil Code (RA 386), Family Code (EO 209); Revised Penal Code (Act 3815); RA 9262 / 10175 / 10173 / 8293; 5–10 SC E-Library decisions. Fix typo `consitution_1987` → `constitution_1987`. Each entry: `source_id, title, url, doc_type, file_format (html|pdf), category, tags[], enabled`.
+2. `fetcher.py` — `httpx` GET with `User-Agent` + `timeout=settings.request_timeout`. Returns a `FetchResult` dataclass (`source_id, url, file_format, status[ok|failed], http_status, content, error`). Never raises; failures set `status="failed"` + `error`. No retries.
+3. `pdf_parser.py` — `parse_pdf(content: bytes) -> str`: `pdfplumber` over `BytesIO`, text per page joined with `\n`, skip empty (scanned) pages.
+4. `html_parser.py` — `parse_html(content: bytes, url: str) -> str`: `trafilatura.extract(url=url, include_comments=False, include_tables=True)`; on None/empty fall back to `BeautifulSoup(...).get_text("\n")`.
+5. `normalizer.py` — `normalize(text)`: strip, collapse intra-line whitespace, collapse 3+ blank lines to 2. `compute_hash(text)`: SHA-256 hex of UTF-8.
+6. `storage.py` — `get_latest_hash(conn, doc_id)` (latest `content_hash` by `fetched_at DESC`, else None); `save_raw` → `{raw_data_dir}/{source_id}.{fmt}`; `save_normalized` → `{normalized_data_dir}/{source_id}.txt` (both create parent dirs, return path); `write_version(conn, doc_id, data)` inserts into `document_versions`, `version_id = uuid4()`, returns it.
+7. `sync.py` — `run_sync() -> dict`. Per enabled source: upsert into `documents`; fetch (on fail, record + continue); parse by format; normalize; hash; compare to latest. Matching hash → `unchanged`, skip disk + version insert. New/different → save raw + normalized + `write_version`. Track `scanned/changed/unchanged/failed`; write a `sync_runs` row at end; return those counts. Print per-source: `[OK] <id> — changed` / `[SKIP] <id> — unchanged` / `[FAIL] <id> — <error>`.
+8. Wire `raglab sync` to call `run_sync()` (import inside the command).
 
-### New packages to add to `pyproject.toml`
+**Done when:** sync fetches all enabled sources, prints per-source status, writes a `sync_runs` row; second run on unchanged corpus prints `[SKIP]` for all and writes no new versions; a changed doc yields a new `document_versions` row with `changed_from_previous = 1`.
 
-```
-httpx
-pdfplumber
-trafilatura
-beautifulsoup4
-pyyaml
-```
-
-Run `uv add <package>` for each.
-
-### New folders to create
-
-```
-app/ingestion/__init__.py   (empty)
-```
-
-### What to build (in order)
+**Constraints:** never raise inside `run_sync`. Hash normalized text, not raw bytes. Pick one `doc_id` scheme and stay consistent. No indexing here.
 
 ---
 
-#### 1. `sources/ph_law_sources.yaml` — expand to ~25–30 sources
+## Milestone 3 — Chunking, embeddings, indexing
 
-The file exists but only has 2 entries. Expand it. Cover these themes:
-- Constitutional: 1987 Constitution
-- Civil law: Civil Code (RA 386), Family Code (EO 209)
-- Criminal law: Revised Penal Code (Act 3815)
-- Special laws: Anti-VAWC (RA 9262), Cybercrime Prevention Act (RA 10175), Data Privacy Act (RA 10173), IP Code (RA 8293)
-- SC decisions: 5–10 decisions from SC E-Library
+**Goal:** new/changed docs are chunked, embedded, stored in Qdrant (dense) + BM25 (sparse). Unchanged docs → no re-indexing.
 
-Also fix the existing typo: `source_id: consitution_1987` → `constitution_1987`.
+Prereqs: Qdrant (`docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant`), Ollama (`ollama pull nomic-embed-text`).
+Add config: `qdrant_collection, qdrant_url, bm25_path, chunk_size=256, chunk_overlap=32, embedding_model, ollama_base_url`.
+Add deps: `llama-index-core llama-index-embeddings-ollama llama-index-retrievers-bm25 llama-index-vector-stores-qdrant qdrant-client`.
+New pkg: `app/indexing/`.
 
-Each entry must have: `source_id`, `title`, `url`, `doc_type`, `file_format` (`html` or `pdf`), `category`, `tags` (list), `enabled` (bool).
+Build:
 
----
+1. `chunker.py` — `chunk_text(text, source_metadata) -> list[TextNode]` via LlamaIndex `SentenceSplitter(chunk_size, chunk_overlap)` over a single `Document`. Metadata carries `doc_id, source_id, title, url, doc_type, category, tags`.
+2. `embedder.py` — `get_embed_model()` returns a reusable `OllamaEmbedding(model_name, base_url)`; `embed_texts(texts)` → `get_text_embedding_batch(texts)`.
+3. `vector_store.py` — `get_qdrant_client()` (`QdrantClient(url)`); `ensure_collection` (create if absent, `VectorParams(size=768, distance=COSINE)`, no recreate); `upsert_nodes` (one batched upsert, point ID = node `chunk_id`); `delete_by_doc_id` (filter on `doc_id`, delete before re-index).
+4. `bm25_store.py` — `build_and_save(nodes)` builds `BM25Retriever.from_defaults(similarity_top_k=10)` and persists to `bm25_path`; `load()` returns persisted retriever or None. BM25 has no incremental update — always rebuild from the full node set (reconstruct from `chunks` table).
+5. `index_service.py` — `index_document(doc_id, text, source_metadata, conn) -> int`: delete stale Qdrant vectors (`delete_by_doc_id`) and `chunks` rows for `doc_id`; chunk; batch-embed; upsert vectors; write each chunk to `chunks` (`chunk_id, doc_id, version_id, chunk_index, text, char_count, token_estimate, qdrant_id=chunk_id, metadata_json, created_at`); rebuild BM25 from all chunks; return chunk count.
+6. Wire into `sync.py`: after a successful version insert, call `index_document(...)` with the source metadata and print indexed chunk count (import inside the function).
 
-#### 2. `app/ingestion/fetcher.py` — HTTP downloader
+**Done when:** sync auto-chunks/embeds new/changed docs after versioning; Qdrant holds vectors (check `:6333/dashboard`); `data/bm25/` has the persisted index; unchanged corpus → `[SKIP]` all, no re-index; `chunks` has one row per chunk with correct `doc_id`/`qdrant_id`.
 
-Returns a `FetchResult` dataclass:
-
-```python
-@dataclass
-class FetchResult:
-    source_id: str
-    url: str
-    file_format: str   # "html" or "pdf"
-    status: str        # "ok" | "failed"
-    http_status: int | None
-    content: bytes | None
-    error: str | None
-```
-
-Logic:
-- Use `httpx` with a `User-Agent` header (e.g. `"ph-law-rag/1.0"`) and `timeout=settings.request_timeout`
-- On HTTP error or exception, set `status="failed"` and populate `error`; never raise
-- No retry logic yet — keep it simple
+**Constraints:** embed in one batch, never per-chunk. Always rebuild BM25 from scratch off the full `chunks` table. Delete stale vectors before re-indexing — no duplicates. Instantiate Qdrant/Ollama clients inside functions, never at module level.
 
 ---
 
-#### 3. `app/ingestion/pdf_parser.py` — PDF text extraction
+## Review checklist
 
-```python
-def parse_pdf(content: bytes) -> str:
-```
+Compare against `docs/project_plan.md`. Flag unnecessary complexity (LlamaIndex should simplify, not obscure). Keep business logic out of Streamlit/FastAPI. Preserve incremental-sync and local-first design. Prefer an explicit retrieval trace in debug mode over silent failure.
 
-- Use `pdfplumber` — open from `io.BytesIO(content)`
-- Extract text page by page; join with `\n`
-- If a page returns no text (scanned), skip it silently
-- Return the combined text string
-
----
-
-#### 4. `app/ingestion/html_parser.py` — HTML text extraction
-
-```python
-def parse_html(content: bytes, url: str) -> str:
-```
-
-- Try `trafilatura.extract()` first — pass `url` as the `url` argument, `include_comments=False`, `include_tables=True`
-- If `trafilatura` returns `None` or empty string, fall back to `BeautifulSoup(content, "html.parser").get_text(separator="\n")`
-- Return the extracted text string
-
----
-
-#### 5. `app/ingestion/normalizer.py` — text cleanup and hashing
-
-```python
-def normalize(text: str) -> str:
-def compute_hash(text: str) -> str:
-```
-
-`normalize`:
-- Strip leading/trailing whitespace
-- Collapse runs of spaces/tabs to a single space (per line)
-- Collapse 3+ consecutive blank lines to 2
-- Return cleaned string
-
-`compute_hash`:
-- SHA-256 of `text.encode("utf-8")`
-- Return hex digest string
-
----
-
-#### 6. `app/ingestion/storage.py` — hash comparison, disk write, SQLite write
-
-Three functions:
-
-```python
-def get_latest_hash(conn, doc_id: str) -> str | None:
-def save_raw(source_id: str, file_format: str, content: bytes) -> Path:
-def save_normalized(source_id: str, text: str) -> Path:
-def write_version(conn, doc_id: str, version_data: dict) -> str:
-```
-
-- `get_latest_hash`: query `document_versions` for the most recent `content_hash` for this `doc_id`, ordered by `fetched_at DESC`. Return `None` if no prior version.
-- `save_raw`: write `content` to `{settings.raw_data_dir}/{source_id}.{file_format}`. Create parent dirs. Return the path.
-- `save_normalized`: write `text` to `{settings.normalized_data_dir}/{source_id}.txt`. Create parent dirs. Return the path.
-- `write_version`: insert a row into `document_versions`. Generate `version_id` with `uuid.uuid4()`. Return the `version_id`.
-
----
-
-#### 7. `app/ingestion/sync.py` — orchestrator
-
-```python
-def run_sync() -> dict:
-```
-
-Logic per source:
-1. Load `sources/ph_law_sources.yaml`; skip entries where `enabled: false`
-2. Upsert each source into the `documents` table (insert if new, update `updated_at` if exists)
-3. Fetch via `fetcher.py`; if `status == "failed"`, record it and continue to next source
-4. Parse content: use `pdf_parser` if `file_format == "pdf"`, `html_parser` if `html`
-5. Normalize text via `normalizer.normalize()`
-6. Compute hash via `normalizer.compute_hash()`
-7. Compare against `storage.get_latest_hash()`:
-   - If hash matches → mark as `unchanged`, skip disk writes and DB version insert
-   - If different or no prior version → mark as `changed` or `new`
-8. For `changed`/`new`: save raw, save normalized, call `storage.write_version()`
-9. Track counts: `scanned`, `changed`, `unchanged`, `failed`
-10. Write a row to `sync_runs` on completion
-
-Return a summary dict:
-```python
-{"scanned": int, "changed": int, "unchanged": int, "failed": int}
-```
-
-Print per-source status as it runs: `[OK] civil_code — changed` / `[SKIP] civil_code — unchanged` / `[FAIL] civil_code — <error>`.
-
----
-
-#### 8. Wire `raglab sync` in `app/cli/main.py`
-
-Replace the stub:
-
-```python
-@app.command("sync")
-def sync():
-    from app.ingestion.sync import run_sync
-    result = run_sync()
-    typer.echo(f"\nSync complete: {result}")
-```
-
-Keep the import inside the function so the CLI doesn't fail at startup if ingestion deps aren't installed yet.
-
----
-
-### Definition of done
-
-- `raglab sync` fetches all enabled sources, prints per-source status, and writes a `sync_runs` row.
-- Running sync a second time on an unchanged corpus prints `[SKIP]` for every source and writes no new `document_versions` rows.
-- A changed document (edit the YAML to force a re-fetch or change a URL) produces a new `document_versions` row with `changed_from_previous = 1`.
-
-### Key constraints
-
-- Never raise inside `run_sync` — catch per-source errors and keep going.
-- Hash normalized text, not raw bytes.
-- `doc_id` = derived identifier — use `hashlib.sha256(url.encode()).hexdigest()[:16]` or just the `source_id` directly. Pick one and be consistent.
-- No indexing logic here — `sync.py` only fetches, parses, normalizes, hashes, and versions. Indexing is Milestone 3.
-
----
-
-## Milestone 3: Chunking, Embeddings, and Indexing
-
-**Goal:** New and changed documents are chunked, embedded, and stored in Qdrant (dense) and BM25 (sparse). Re-running on unchanged docs skips indexing entirely.
-
-### Prerequisites before writing any code
-
-- Docker running Qdrant: `docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant`
-- Ollama running with embed model pulled: `ollama pull nomic-embed-text`
-
-### New config fields to add to `app/config.py`
-
-```python
-qdrant_collection: str = "ph_law"
-qdrant_url: str = "http://localhost:6333"
-bm25_path: str = "data/bm25"
-chunk_size: int = 256
-chunk_overlap: int = 32
-embedding_model: str = "nomic-embed-text"
-ollama_base_url: str = "http://localhost:11434"
-```
-
-### New packages
-
-```
-uv add llama-index-core llama-index-embeddings-ollama llama-index-retrievers-bm25 llama-index-vector-stores-qdrant qdrant-client
-```
-
-### New folder
-
-```
-app/indexing/__init__.py   (empty)
-```
-
-### What to build (in order)
-
----
-
-#### 1. `app/indexing/chunker.py` — text chunker
-
-```python
-def chunk_text(text: str, source_metadata: dict) -> list[TextNode]:
-```
-
-- Use LlamaIndex `SentenceSplitter(chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap)`
-- Call `splitter.get_nodes_from_documents([Document(text=text, metadata=source_metadata)])`
-- Return the list of `TextNode` objects — each node carries the metadata automatically
-- `source_metadata` should contain: `doc_id`, `source_id`, `title`, `url`, `doc_type`, `category`, `tags`
-
----
-
-#### 2. `app/indexing/embedder.py` — Ollama embedding client
-
-```python
-def get_embed_model() -> OllamaEmbedding:
-def embed_texts(texts: list[str]) -> list[list[float]]:
-```
-
-- Use `OllamaEmbedding(model_name=settings.embedding_model, base_url=settings.ollama_base_url)` from `llama_index.embeddings.ollama`
-- `get_embed_model` returns the embedding model instance (call once, reuse)
-- `embed_texts` calls `embed_model.get_text_embedding_batch(texts)` and returns the list of vectors
-
----
-
-#### 3. `app/indexing/vector_store.py` — Qdrant wrapper
-
-```python
-def get_qdrant_client() -> QdrantClient:
-def ensure_collection(client: QdrantClient) -> None:
-def upsert_nodes(client: QdrantClient, nodes: list[TextNode], vectors: list[list[float]]) -> None:
-def delete_by_doc_id(client: QdrantClient, doc_id: str) -> None:
-```
-
-- `get_qdrant_client`: returns `QdrantClient(url=settings.qdrant_url)`
-- `ensure_collection`: creates the collection if it doesn't exist, with `VectorParams(size=768, distance=Distance.COSINE)`. Use `recreate_collection=False`.
-- `upsert_nodes`: builds `PointStruct` objects from nodes + vectors, uses `chunk_id` from node metadata as the point ID, upserts in one batch call
-- `delete_by_doc_id`: calls `client.delete(collection_name=..., points_selector=Filter(must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]))` to remove all vectors for a document before re-indexing
-
----
-
-#### 4. `app/indexing/bm25_store.py` — BM25 index
-
-```python
-def build_and_save(nodes: list[TextNode]) -> None:
-def load() -> BM25Retriever | None:
-```
-
-- `build_and_save`: creates a `BM25Retriever.from_defaults(nodes=all_nodes, similarity_top_k=10)` from the full node list, then persists it to `settings.bm25_path` using `retriever.persist(path)`
-- `load`: loads and returns the persisted retriever using `BM25Retriever.from_persist_dir(path)`, returns `None` if the path doesn't exist
-- Note: BM25 must be rebuilt from **all** indexed nodes every time a document changes — it cannot be updated incrementally. Query `chunks` table for all existing chunks to reconstruct the full node list before rebuilding.
-
----
-
-#### 5. `app/indexing/index_service.py` — indexing orchestrator
-
-```python
-def index_document(doc_id: str, text: str, source_metadata: dict, conn) -> int:
-```
-
-Logic:
-1. Delete stale vectors from Qdrant: `delete_by_doc_id(client, doc_id)`
-2. Delete stale rows from `chunks` table: `DELETE FROM chunks WHERE doc_id = ?`
-3. Chunk the normalized text via `chunker.chunk_text()`
-4. Embed all chunks in one batch via `embedder.embed_texts()`
-5. Upsert vectors to Qdrant via `vector_store.upsert_nodes()`
-6. Write each chunk to the `chunks` table in SQLite — include `chunk_id`, `doc_id`, `version_id`, `chunk_index`, `text`, `char_count`, `token_estimate`, `qdrant_id` (same as chunk_id), `metadata_json`, `created_at`
-7. Rebuild BM25 index — load all chunks from `chunks` table, reconstruct nodes, call `bm25_store.build_and_save()`
-8. Return the count of chunks indexed
-
----
-
-#### 6. Wire indexing into `app/ingestion/sync.py`
-
-In `process_source`, after a successful `insert_version` call, add:
-
-```python
-from app.indexing.index_service import index_document
-
-chunk_count = index_document(doc_id, normalized_text, {
-    "doc_id": doc_id,
-    "source_id": source.source_id,
-    "title": source.title,
-    "url": source.url,
-    "doc_type": source.doc_type,
-    "category": source.category,
-    "tags": source.tags,
-}, conn)
-print(f"         indexed {chunk_count} chunks")
-```
-
-Keep the import inside the function body so the CLI doesn't fail at startup if indexing deps are missing.
-
----
-
-### Definition of done
-
-- `raglab sync` automatically chunks and embeds new/changed documents after versioning them.
-- Qdrant collection exists and holds vectors — verify at `http://localhost:6333/dashboard`.
-- `data/bm25/` directory contains the persisted BM25 index files after first sync.
-- Re-running sync on an unchanged corpus prints `[SKIP]` for all sources — no re-indexing happens.
-- `chunks` table in SQLite has one row per chunk with correct `doc_id` and `qdrant_id`.
-
-### Key constraints
-
-- Embed in batch — do not call the embedding model once per chunk.
-- BM25 is always rebuilt from scratch from the full `chunks` table — never try to update it incrementally.
-- Delete stale vectors before re-indexing a changed document — never accumulate duplicate vectors.
-- Keep all Qdrant and Ollama client instantiation inside functions, not at module level — avoids import-time failures if the services aren't running.
-
----
-
-## Ongoing Review Instructions
-
-When reviewing code:
-
-1. Compare implementation against `docs/project_plan.md`.
-2. Flag unnecessary complexity — LlamaIndex abstractions should simplify, not obscure.
-3. Keep business logic out of Streamlit and FastAPI adapters.
-4. Preserve incremental-sync architecture.
-5. Preserve local-first design.
-6. Prefer explicit retrieval trace in debug mode over silent failures.
-
-If the implementation differs from the plan, note whether the difference is: acceptable simplification, technical debt, bug, scope creep, or worthwhile improvement.
+For any divergence from the plan, label it: acceptable simplification / tech debt / bug / scope creep / improvement.
