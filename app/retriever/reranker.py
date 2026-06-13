@@ -22,4 +22,6 @@ def rerank(query_text:str, results: list[RetrievalResult]) -> list[RetrievalResu
         r.score = float(score)
         
     results.sort(key=lambda r: r.score, reverse=True)
-    return results[: settings.rerank_top_n]
+    top = results[0].score
+    kept = [r for r in results if r.score >= top - settings.rerank_score_margin]
+    return kept[: settings.rerank_top_n]

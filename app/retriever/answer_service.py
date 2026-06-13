@@ -7,6 +7,7 @@ from app.retriever.prompts import (
 )
 from app.retriever.llm_client import generate, LLMError
 from app.retriever.types import RetrievalResult
+from app.retriever.edge_expansion import expand_with_edges
 from app.config import settings
 
 def _debug_trace(
@@ -55,6 +56,8 @@ def answer(question: str, debug: bool | None = None) -> dict:
     debug_enabled = settings.debug if debug is None else debug
     retrieved = hybrid_retriever(question)
     reranked = rerank(question, retrieved)
+    if settings.edge_expansion_enabled:
+        reranked = expand_with_edges(question, reranked)
     
     if len(reranked) < settings.min_chunks_for_answer:
         return _package(
