@@ -14,11 +14,13 @@ def _source() -> SourceConfig:
         source_id="civil_code",
         title="civil_code",
         url="https://www.example.test/civil-code",
-        doc_type="statute",
+        doc_type="republic_act",
         file_format="html",
-        category="civil_law",
+        category="statute",
         tags=["civil"],
-        enabled=True
+        enabled=True,
+        status="operative",
+        source_index="lawphil",
     )
 
 @pytest.fixture

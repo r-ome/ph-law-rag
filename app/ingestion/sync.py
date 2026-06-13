@@ -66,7 +66,9 @@ def process_source(source: SourceConfig) -> dict:
 				"url": source.url,
 				"doc_type": source.doc_type,
 				"category": source.category,
-				"tags": source.tags
+				"tags": source.tags,
+				"structure": source.structure,
+				"status": source.status,
 			},
 			version_id=version_id
 		)

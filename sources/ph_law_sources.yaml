@@ -1,36 +1,372 @@
 sources:
+  - source_id: constitution_1899
+    enabled: true
+    file_format: html
+    url: "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/3/365"
+    availability: available
+    category: constitutional_law
+    doc_type: constitution
+    tags: [constitution, malolos_constitution, first_republic, "1899"]
+    title: "1899 Malolos Constitution"
+    approval_date: 1899-01-21
+    status: superseded
+    source_index: sc_elibrary
+    source_record_id: "365"
+    structure: hierarchical
+
+  - source_id: constitution_1935
+    enabled: true
+    file_format: html
+    url: "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/3/352"
+    availability: available
+    category: constitutional_law
+    doc_type: constitution
+    tags: [constitution, commonwealth, "1935"]
+    title: "1935 Constitution"
+    approval_date: 1935-05-14
+    effectivity_date: 1935-11-15
+    status: superseded
+    source_index: sc_elibrary
+    source_record_id: "352"
+    structure: hierarchical
+
+  - source_id: constitution_1943
+    enabled: true
+    file_format: html
+    url: "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/3/56229"
+    availability: available
+    category: constitutional_law
+    doc_type: constitution
+    tags: [constitution, second_republic, "1943"]
+    title: "1943 Constitution"
+    approval_date: 1943-09-04
+    status: superseded
+    source_index: sc_elibrary
+    source_record_id: "56229"
+    structure: hierarchical
+
+  - source_id: constitution_1973
+    enabled: true
+    file_format: html
+    url: "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/3/354"
+    availability: available
+    category: constitutional_law
+    doc_type: constitution
+    tags: [constitution, martial_law, "1973"]
+    title: "1973 Constitution"
+    approval_date: 1973-01-17
+    status: superseded
+    source_index: sc_elibrary
+    source_record_id: "354"
+    structure: hierarchical
+
+  - source_id: constitution_1986
+    enabled: true
+    file_format: html
+    url: "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/3/357"
+    availability: available
+    category: constitutional_law
+    doc_type: constitution
+    tags: [constitution, freedom_constitution, provisional_constitution, "1986"]
+    title: "1986 Provisional Constitution (Freedom Constitution)"
+    approval_date: 1986-03-25
+    status: superseded
+    supersedes: [constitution_1973]
+    source_index: sc_elibrary
+    source_record_id: "357"
+    structure: hierarchical
+
+  - source_id: constitution_1987
+    enabled: true
+    file_format: html
+    url: "https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/3/353"
+    availability: available
+    category: constitutional_law
+    doc_type: constitution
+    tags: [constitution, current_constitution, "1987"]
+    title: "1987 Constitution"
+    approval_date: 1987-02-02
+    effectivity_date: 1987-02-02
+    status: operative
+    supersedes: [constitution_1986]
+    source_index: sc_elibrary
+    source_record_id: "353"
+    structure: hierarchical
+
+  # ── Statutes ──────────────────────────────────────────────────────────
   - source_id: civil_code
-    title: "Civil Code of the Philippines (RA 386)"
-    url: "https://www.lawphil.net/statutes/repacts/ra1949/ra_386_1949.html"
-    doc_type: statute
-    file_format: html
-    category: civil_law
-    tags: [civil_code, obligations, contracts, prescription, book_iv]
     enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1949/ra_386_1949.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [civil_code, obligations, contracts, property, succession]
+    title: "Civil Code of the Philippines"
+    official_number: "Republic Act No. 386"
+    approval_date: 1949-06-18
+    effectivity_date: 1950-08-30
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
 
-  - source_id: e_commerce_act_ra8792
-    title: "Electronic Commerce Act of 2000 (RA 8792)"
-    url: "https://www.lawphil.net/statutes/repacts/ra2000/ra_8792_2000.html"
-    doc_type: statute
-    file_format: html
-    category: civil_law
-    tags: [e_commerce, electronic_documents, electronic_signatures]
+  - source_id: revised_penal_code
     enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/acts/act1930/act_3815_1930.html"
+    availability: available
+    category: statute
+    doc_type: act
+    tags: [revised_penal_code, criminal_law, felonies, penalties]
+    title: "The Revised Penal Code"
+    official_number: "Act No. 3815"
+    approval_date: 1930-12-08
+    effectivity_date: 1932-01-01
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
 
-  - source_id: realty_installment_buyer_act_ra6552
-    title: "Realty Installment Buyer Protection Act / Maceda Law (RA 6552)"
-    url: "https://www.lawphil.net/statutes/repacts/ra1972/ra_6552_1972.html"
-    doc_type: statute
-    file_format: html
-    category: civil_law
-    tags: [maceda_law, installment_sales, realty, contracts]
+  - source_id: rpc_penalty_amendments_2017
     enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, penalties, fines, revised_penal_code]
+    title: "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code"
+    official_number: "Republic Act No. 10951"
+    approval_date: 2017-08-29
+    status: operative
+    amends: [revised_penal_code]
+    source_index: lawphil
+    structure: hierarchical
 
-  - source_id: consumer_act_ra7394
-    title: "Consumer Act of the Philippines (RA 7394)"
-    url: "https://www.lawphil.net/statutes/repacts/ra1992/ra_7394_1992.html"
-    doc_type: statute
-    file_format: html
-    category: civil_law
-    tags: [consumer_protection, product_liability, trade, fair_trade]
+  - source_id: ip_code
     enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1997/ra_8293_1997.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [intellectual_property, patents, trademarks, copyright]
+    title: "Intellectual Property Code of the Philippines"
+    official_number: "Republic Act No. 8293"
+    approval_date: 1997-06-06
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: data_privacy_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2012/ra_10173_2012.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [data_privacy, personal_information, npc]
+    title: "Data Privacy Act of 2012"
+    official_number: "Republic Act No. 10173"
+    approval_date: 2012-08-15
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: cybercrime_prevention_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2012/ra_10175_2012.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [cybercrime, computer_offenses, online_libel]
+    title: "Cybercrime Prevention Act of 2012"
+    official_number: "Republic Act No. 10175"
+    approval_date: 2012-09-12
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: vawc
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2004/ra_9262_2004.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [vawc, violence_against_women, protection_orders]
+    title: "Anti-Violence Against Women and Their Children Act of 2004"
+    official_number: "Republic Act No. 9262"
+    approval_date: 2004-03-08
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: dangerous_drugs_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2002/ra_9165_2002.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [dangerous_drugs, controlled_substances, pdea]
+    title: "Comprehensive Dangerous Drugs Act of 2002"
+    official_number: "Republic Act No. 9165"
+    approval_date: 2002-06-07
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: dangerous_drugs_amendments_2014
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2014/ra_10640_2014.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, dangerous_drugs, chain_of_custody, evidence]
+    title: "An Act to Further Strengthen the Anti-Drug Campaign of the Government, Amending for the Purpose Section 21 of Republic Act No. 9165"
+    official_number: "Republic Act No. 10640"
+    approval_date: 2014-07-15
+    status: operative
+    amends: [dangerous_drugs_act]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: bp_22
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/bataspam/bp1979/bp_22_1979.html"
+    availability: available
+    category: statute
+    doc_type: batas_pambansa
+    tags: [bouncing_checks, bp22, criminal_law]
+    title: "Bouncing Checks Law"
+    official_number: "Batas Pambansa Blg. 22"
+    approval_date: 1979-04-03
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: public_land_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/comacts/ca1936/ca_141_1936.html"
+    availability: available
+    category: statute
+    doc_type: commonwealth_act
+    tags: [public_land, land_registration, property]
+    title: "The Public Land Act"
+    official_number: "Commonwealth Act No. 141"
+    approval_date: 1936-11-07
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: judiciary_reorganization_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/bataspam/bp1981/bp_129_1981.html"
+    availability: available
+    category: statute
+    doc_type: batas_pambansa
+    tags: [judiciary, court_organization, jurisdiction, remedial_law]
+    title: "The Judiciary Reorganization Act of 1980"
+    official_number: "Batas Pambansa Blg. 129"
+    approval_date: 1981-08-14
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: adr_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2004/ra_9285_2004.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [alternative_dispute_resolution, arbitration, mediation, remedial_law]
+    title: "Alternative Dispute Resolution Act of 2004"
+    official_number: "Republic Act No. 9285"
+    approval_date: 2004-04-02
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: judiciary_reorganization_amendments_2021
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2021/ra_11576_2021.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [judiciary, jurisdiction, court_reform, remedial_law]
+    title: "An Act Further Expanding the Jurisdiction of the Metropolitan, Municipal, and Municipal Circuit Trial Courts"
+    official_number: "Republic Act No. 11576"
+    approval_date: 2021-07-30
+    status: operative
+    amends: [judiciary_reorganization_act]
+    source_index: lawphil
+    structure: hierarchical
+
+  # ── Presidential issuances (samples) ──────────────────────────────────
+  - source_id: family_code
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/executive/execord/eo1987/eo_209_1987.html"
+    availability: available
+    category: presidential_issuance
+    doc_type: executive_order
+    tags: [family_code, marriage, persons, family_relations]
+    title: "The Family Code of the Philippines"
+    official_number: "Executive Order No. 209"
+    approval_date: 1987-07-06
+    effectivity_date: 1988-08-03
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: labor_code
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/presdecs/pd1974/pd_442_1974.html"
+    availability: available
+    category: presidential_issuance
+    doc_type: presidential_decree
+    tags: [labor_code, employment, labor_relations, social_legislation]
+    title: "Labor Code of the Philippines"
+    official_number: "Presidential Decree No. 442"
+    approval_date: 1974-05-01
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  # ── Court materials (samples) ─────────────────────────────────────────
+  - source_id: rules_civil_procedure
+    enabled: false
+    file_format: html
+    url: "https://lawphil.net/courts/rules/civil.html"
+    availability: unavailable
+    category: court_material
+    doc_type: rules_of_court
+    tags: [rules_of_court, civil_procedure, remedial_law]
+    title: "Rules of Civil Procedure"
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+    notes: "TOC-only fetch (courts/rules/civil.html is an index table); needs consolidated full-text source before re-enabling."
+
+  - source_id: oposa_v_factoran
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/judjuris/juri1993/jul1993/gr_101083_1993.html"
+    availability: available
+    category: court_material
+    doc_type: sc_decision
+    tags: [jurisprudence, environmental_law, locus_standi, intergenerational_responsibility]
+    title: "Oposa v. Factoran, G.R. No. 101083 (1993)"
+    official_number: "G.R. No. 101083"
+    approval_date: 1993-07-30
+    status: operative
+    source_index: lawphil
+    structure: prose
