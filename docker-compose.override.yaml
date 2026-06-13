@@ -1,0 +1,20 @@
+# Dev-only overrides — auto-merged by `docker compose up` (no -f flag needed).
+# Mounts host source over the baked image copies and turns on hot reload, so
+# code edits take effect without a rebuild. Rebuild only when deps change
+# (pyproject.toml / uv.lock). For the frozen prod image, bypass this file with:
+#   docker compose -f docker-compose.yaml up
+#
+# NOTE: we mount only ./app and ./sources — never `.:/app`, which would shadow
+# the image's /app/.venv (the installed deps). ./data is mounted by the base file.
+services:
+  api:
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+    volumes:
+      - ./app:/app/app
+      - ./sources:/app/sources
+
+  ui:
+    command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501 --server.runOnSave true
+    volumes:
+      - ./app:/app/app
+      - ./sources:/app/sources
