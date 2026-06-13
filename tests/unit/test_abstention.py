@@ -35,14 +35,11 @@ def test_no_phrase_is_not_refusal():
 def test_empty_string_is_not_refusal():
     assert is_abstention("") is False
     
-def test_short_preamble_below_threshold_is_refusal():
-    preamble = "x" * 39 + ABSTAIN_PREFIX
-    print(len(preamble))
-    assert is_abstention(preamble) is True
-    
-def test_preamble_at_threshold_is_not_refusal():
-    preamble = "x" * 40 + ABSTAIN_PREFIX
-    assert is_abstention(preamble) is False
+def test_any_nonwhitespace_preamble_is_not_refusal():
+    # New contract: the abstain phrase must LEAD the reply. Any substantive
+    # preamble before it (even short) means it is not a full refusal.
+    assert is_abstention("x" * 39 + ABSTAIN_PREFIX) is False
+    assert is_abstention("The passages discuss naming a country, but " + ABSTAIN_PREFIX) is False
     
 def test_whitespace_preamble_is_refusal():
     answer = " \n\t " + ABSTAIN_PREFIX + " to answer that question."

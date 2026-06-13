@@ -711,15 +711,15 @@ Abstention gate: if fewer than `min_chunks_for_answer` chunks survive the `max_d
 
 ### Dataset Design
 
-40–60 questions across categories:
+The tracked eval dataset currently has 70 questions across categories. Keep the out-of-scope slice stable when expanding the corpus so abstention metrics remain comparable across runs.
 
 | Category | Count | Description |
 |---|---|---|
-| Factual | 15 | Specific article, section, or RA lookup |
-| Paraphrase | 10 | Same meaning as a factual query, different wording |
+| Factual | 34 | Specific article, section, or RA lookup |
+| Paraphrase | 8 | Same meaning as a factual query, different wording |
 | Synthesis | 10 | Requires combining context from 2+ sources |
-| Ambiguous | 8 | May be partially answerable |
-| Out-of-scope | 10 | Should trigger abstention |
+| Ambiguous | 6 | May be partially answerable |
+| Out-of-scope | 12 | Should trigger abstention |
 
 ### RAGAS Metrics
 

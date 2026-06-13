@@ -2,16 +2,13 @@ ABSTAIN_PREFIX = "I don't have enough information in the indexed Philippine law 
 ABSTAIN_MESSAGE = f"{ABSTAIN_PREFIX} to answer that question."
 
 def is_abstention(answer_text: str) -> bool:
-      """True only for a genuine refusal: the boilerplate refusal phrase with no
-      substantive answer BEFORE it. Position-based, not length-based, because
-      models refuse in opposite shapes:
-        - deepseek: [answer] + [boilerplate]          -> phrase at end   -> answer
-        - mistral:  [boilerplate] + [why-explanation] -> phrase at start -> refusal
-      """
-      idx = answer_text.find(ABSTAIN_PREFIX)
-      if idx == -1:
-          return False
-      return len(answer_text[:idx].strip()) < 40
+      """True only for a genuine full refusal. The prompt instructs the model to
+      emit the boilerplate refusal phrase ALONE — nothing before it — when it
+      cannot answer, so a strict leading-prefix check is reliable across models.
+      A partial answer (which leads with substantive text and may note the
+      uncovered remainder afterwards) does not start with the phrase, so it is
+      correctly treated as an answer, not a refusal."""
+      return answer_text.strip().startswith(ABSTAIN_PREFIX)
 
 SYSTEM_PROMPT = """You are a legal research assistant for Philippine law. \
 You answer strictly from the numbered context passages provided for you.
@@ -23,8 +20,9 @@ Rule:
     in square brackets, e.g. [1] or [2][3]. Place the citation right after the claim.
 - The square-bracket citation contains ONLY the reference number from the context (e.g. [1], [4]). \
     When you mention an article or section number, write it as plain text (e.g. 'Article 1489'), never in brackets.
-- If the context does not contain enough information to answer, reply with \
-    exactly this sentence and nothing else: {abstain_message}
+- If the context does not contain enough information to answer the question at all, \
+    your ENTIRE reply must be exactly this sentence, with NO text before or after it: {abstain_message} \
+    Do not explain why, do not describe what the passages discuss — output only that one sentence.
 - Do not invent article numbers, section numbers, Republic Act numbers, or \
     case citations. Only cite identifiers that appear in the context.
 - Be concise and precise. Quote the operative legal text when it matters. \

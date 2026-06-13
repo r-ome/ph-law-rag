@@ -31,9 +31,10 @@ def eval_score(run_path: str):
 	from app.evals.report import print_report, save_scored
 
 	results = load_dataset(run_path)
+	run_tag = Path(run_path).stem.replace("run_", "")
 	scored = score(results)
 	print_report(results, scored)
-	save_scored(results, scored)
+	save_scored(results, scored, run_tag=run_tag)
 
 @app.command("eval")
 def eval():
@@ -43,9 +44,10 @@ def eval():
 
 	results, raw_path = run_eval_set()
 	typer.echo(f"\nRaw results saved to {raw_path}")
+	run_tag = raw_path.stem.replace("run_", "")
 	scored = score(results)
 	print_report(results, scored)
-	save_scored(results, scored)
+	save_scored(results, scored, run_tag=run_tag)
  
 @app.command("retrieve")
 def test_retrieve(query: str):

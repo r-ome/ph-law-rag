@@ -38,7 +38,9 @@ def test_in_corpus_questions_returns_grounded_answer():
     assert isinstance(resp["answer"], str) and resp["answer"].strip()
     
 def test_out_of_scope_question_abstains():
-    query = "what you'd name your new kingdom"
+    # A genuinely out-of-scope legal question (no tax law in the corpus) is a
+    # stabler, more meaningful abstention test than nonsense input.
+    query = "What is the income tax rate for individual taxpayers in the Philippines?"
     resp = answer(query)
     
     assert resp["abstained"] is True
