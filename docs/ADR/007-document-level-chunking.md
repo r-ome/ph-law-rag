@@ -2,13 +2,13 @@
 
 ## Date
 
-2026-06-11
+2026-06-11 (proposed) · 2026-06-13 (accepted)
 
 ## Status
 
-Proposed
+Accepted
 
-> Not yet implemented; current code uses fixed-size chunking (ADR-006). Supersedes ADR-006 if built.
+> Implemented in `app/indexing/chunker.py`. Supersedes ADR-006.
 
 ## Context
 
@@ -33,3 +33,19 @@ Chunk along document structure (Section / Article boundaries) instead of a fixed
 - Needs per-document boundary parsing plus a fallback for non-hierarchical docs.
 - More complex than fixed-size; variable chunk sizes may need a secondary split.
 - Measure against the ADR-006 baseline with evals before accepting.
+
+## Implementation notes
+
+Built in `app/indexing/chunker.py`. Key design decisions that emerged during implementation:
+
+- **Marker grammar (line-start regex).** UNIT markers (`Article N`, `Section N`) begin a chunk; PARENT markers (`Book`/`Title`/`Chapter`, roman-numeral `ARTICLE` constitution divisions, `Rule N`) only update `structure_path` context and are never unit boundaries themselves.
+- **Three routing rules.** The manual `structure` hint wins: `prose` → sentence-split; `hierarchical` → structural if any units parsed, else prose fallback; `auto` → structural only if units `_looks_structural`.
+- **Cautious auto-detect.** `_looks_structural` requires a monotonic ascending run of ≥ `MIN_UNITS` (5), not just many markers. This defeats prose decisions that *quote* scattered sections out of order (e.g. "Sec. 16" then "Sec. 15").
+- **Per-chunk metadata.** Each structural node carries `is_structural, unit_type, unit_number, unit_label, structure_path`. This metadata powers the pinpoint citation locator in `app/retriever/context_builder._locator` (e.g. "Article III, Section 12"). Prose nodes carry `is_structural=False`.
+- **Oversized units.** A unit longer than ~`chunk_size * 4` chars is sub-split with `SentenceSplitter`, retaining unit identity via `part_index`.
+- **Preamble.** Text before the first unit (statute title / enacting clause) is emitted as prose so nothing is dropped.
+
+### Known limitations (deferred)
+
+- Article *title* (e.g. "Bill of Rights" for Article III) is not captured in metadata — only the unit label and parent path.
+- No cross-unit edge awareness (amends/repeals/supersedes) at chunk level; that lives in the source manifest.

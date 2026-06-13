@@ -47,7 +47,12 @@ with chat_tab:
             if result["sources"]:
                 st.markdown("**Sources:**")
                 for s in result["sources"]:
-                    st.markdown(f"[{s['ref']}] [{s['title']}]({s['url']})")
+                    line = f"[{s['ref']}] [{s['title']}]({s['url']})"
+                    if s.get("locator"):
+                        line += f" — {s['locator']}"
+                    if s.get("via"):
+                        line += f"  _({s['via']})_"
+                    st.markdown(line)
             if result.get('debug'):
                 with st.expander("Debug trace"):
                     st.json(result["debug"])

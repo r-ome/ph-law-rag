@@ -56,7 +56,7 @@ def index_document(
 				len(node.text),
 				len(node.text) //4,
 				chunk_id,
-				json.dumps(source_metadata),
+				json.dumps(node.metadata),
 				now
 			]
 		)
