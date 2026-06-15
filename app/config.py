@@ -40,6 +40,8 @@ class Settings(BaseSettings):
 	api_base_url: str = "http://localhost:8000"
 	edge_expansion_enabled: bool = True
 	edge_hop_top_k: int = 3
+	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
+	answerability_gate_model: str = "mistral"  # gate pinned to mistral even when A/B-ing another generator
 
 Category = Literal[
 	"constitutional_law", "statute", "presidential_issuance",

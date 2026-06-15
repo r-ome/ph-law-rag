@@ -8,6 +8,7 @@ from app.retriever.prompts import (
 from app.retriever.llm_client import generate, LLMError
 from app.retriever.types import RetrievalResult
 from app.retriever.edge_expansion import expand_with_edges
+from app.retriever.answerability import is_answerable
 from app.config import settings
 
 def _debug_trace(
@@ -69,7 +70,18 @@ def answer(question: str, debug: bool | None = None) -> dict:
             prompt=None,
             debug=debug_enabled
         )
-    
+
+    if settings.answerability_gate_enabled and not is_answerable(question, reranked):
+        return _package(
+            ABSTAIN_MESSAGE,
+            sources=[],
+            abstained=True,
+            retrieved=retrieved,
+            reranked=reranked,
+            prompt=None,
+            debug=debug_enabled
+        )
+
     context_block, sources = build_context(reranked,)
     
     user_prompt = build_user_prompt(question, context_block)

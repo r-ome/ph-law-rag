@@ -19,10 +19,10 @@ def _strip_reasoning(text: str) -> str:
 
 
 
-def generate(system_prompt: str, user_prompt: str) -> str:
+def generate(system_prompt: str, user_prompt: str, model: str | None = None) -> str:
     url = f"{settings.ollama_base_url}/api/chat"
     payload = {
-        "model": settings.llm_model,
+        "model": model or settings.llm_model,
         "temperature": 0,
         "messages": [
             {"role": "system", "content": system_prompt},
