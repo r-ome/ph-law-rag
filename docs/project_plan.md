@@ -887,6 +887,171 @@ Key constraints:
 
 ---
 
+## Future Feature: Exam Mode and Bar Readiness
+
+Exam Mode is a separate product workflow for bar takers and law students. It should not be treated as ordinary legal Q&A. The goal is to simulate bar-style practice, grade user-written answers against private references/rubrics, and return actionable feedback.
+
+### Product Concept
+
+The user selects a subject, year range, difficulty, and number of questions. The app presents bar-style questions under timed conditions. After the user submits an answer, the system produces a practice score plus feedback explaining where the answer earned points, where it lost points, and what legal analysis was missing.
+
+This feature is a strong candidate for a later commercial or hosted version because it is naturally meterable: one submitted answer roughly equals one billable grading event.
+
+### Data Sources
+
+- Supreme Court bar questionnaires are public and can be used as exam prompts where allowed by source terms.
+- Supreme Court questionnaires are available for recent bar years, including questionnaires up to 2025.
+- Suggested answers, such as UP Law Center suggested answers, may be purchased and used privately as ground truth/reference material.
+- The currently identified suggested-answer range is 2012 through 2022. Later questionnaires may exist without corresponding purchased suggested answers yet.
+- Do not publish copyrighted suggested-answer text unless the license expressly permits it.
+- Public reports may publish aggregate metrics, category scores, and failure analysis without redistributing private answer keys.
+
+This creates two related but distinct datasets:
+
+1. **Question-only dataset** — public bar questions, potentially covering 2012 through 2025, useful for retrieval smoke tests, mock exams, and manual answer review.
+2. **Graded eval dataset** — questions with private suggested answers/rubrics, currently expected to cover 2012 through 2022, useful for scoring model answers and user-written exam answers.
+
+Suggested private file organization:
+
+```text
+data/evals/bar_exam/
+  questions_2012_2025.jsonl                   # public prompts/metadata where allowed
+  suggested_answers_2012_2022.private.jsonl   # purchased/private, gitignored
+  rubrics_2012_2022.private.jsonl             # derived from suggested answers, gitignored
+  eval_items_2012_2022.private.jsonl          # joined question + rubric IDs, gitignored
+```
+
+Suggested metadata fields:
+
+```json
+{
+  "question_id": "bar_2025_pil_prior_restraint_abc_news",
+  "year": 2025,
+  "subject": "Political and Public International Law",
+  "question_number": "I",
+  "source": "Supreme Court Bar Questionnaire",
+  "has_suggested_answer": false,
+  "suggested_answer_source": null,
+  "category": "application",
+  "skills": ["issue_spotting", "doctrine_application", "synthesis"],
+  "expected_sources": ["constitution_1987", "prior_restraint_cases"]
+}
+```
+
+Suggested question IDs:
+
+```text
+bar_2025_pil_prior_restraint_abc_news
+bar_2024_civil_oblicon_q03
+bar_2022_crim_special_laws_q05
+```
+
+### Scoring Model
+
+Use rubric-based grading, not simple semantic similarity. A typical rubric should break points down by:
+
+- issue spotting
+- rule accuracy
+- application to facts
+- conclusion
+- citation/source support where appropriate
+- clarity and organization
+
+Example rubric shape:
+
+```json
+{
+  "question_id": "bar_2025_pil_prior_restraint_abc_news",
+  "max_score": 10,
+  "criteria": [
+    {"name": "Identifies prior restraint / freedom of press issue", "points": 2},
+    {"name": "States the presumption against prior restraint", "points": 2},
+    {"name": "Discusses narrow exceptions / clear and present danger", "points": 2},
+    {"name": "Applies doctrine to DOJ prohibition and violence facts", "points": 2},
+    {"name": "Reaches and explains the correct conclusion", "points": 1},
+    {"name": "Clear bar-style structure", "points": 1}
+  ]
+}
+```
+
+### Feedback Output
+
+The grader should return structured JSON so UI and reports can be built reliably:
+
+```json
+{
+  "score": 6.5,
+  "max_score": 10,
+  "issue_spotting": 1.5,
+  "rule_accuracy": 2,
+  "application": 1.5,
+  "conclusion": 1,
+  "clarity": 0.5,
+  "what_went_well": [],
+  "what_cost_points": [],
+  "missing_analysis": [],
+  "wrong_or_unsupported_points": [],
+  "study_recommendations": []
+}
+```
+
+### Architecture Notes
+
+- Keep Exam Mode separate from the general ask pipeline.
+- Runtime grading should usually not need live retrieval because the question, reference answer, and rubric are already known.
+- Use RAG only when the feature needs to show source support, explain a doctrine, or debug a grading result.
+- Use one cloud judge call per submitted answer where possible.
+- Cache grading results by a hash of `question_id + rubric_version + user_answer`.
+- Precompute rubrics and reference summaries offline.
+- Use local models for low-risk tasks such as study-plan formatting, but prefer a stronger cloud model for final grading if accuracy matters.
+
+### Cost Controls
+
+- Grade only on submit, never while the user is typing.
+- Limit answer length per question.
+- Cache repeated submissions.
+- Keep a free tier limited by number of graded answers.
+- Consider paid grading credits or a subscription plan.
+- Batch analytics and cohort reports offline.
+- Keep infrastructure simple: a single VPS plus SQLite/Postgres and object storage is enough for an MVP.
+
+### Commercial Segments
+
+- Bar takers: roughly 10k-11.5k examinees per recent year; high urgency and clear willingness to prepare.
+- Law students: larger surrounding market; useful for subject drills and semester review.
+- Practicing lawyers: potentially higher willingness to pay, but the quality and liability bar is much higher.
+
+Initial wedge should likely be bar takers or law students, not practicing lawyers. Exam Mode offers measurable progress and lower legal-risk framing than a production legal-advice assistant.
+
+### Sequencing
+
+Do not build Exam Mode before the retrieval system is stable. First improve the current retrieval metrics, especially:
+
+- multi-hop/synthesis retrieval
+- provision-aware indexing
+- query decomposition
+- neighboring chunk/section expansion
+- debug traces showing which query found which chunk
+
+Once the current eval set is stable, start with a small private bar-exam slice:
+
+1. One subject, such as Political Law or Civil Law
+2. 30-50 curated questions
+3. Private suggested answers and hand-authored rubrics
+4. Cloud-judge grading
+5. Manual audit of scores and feedback quality
+
+Definition of done for an MVP:
+
+- User can start a timed practice session
+- User can submit written answers
+- System returns a structured practice score and feedback
+- Results are saved per user/session
+- Aggregate per-subject and per-skill weakness reports are available
+- Private answer keys/rubrics are gitignored and never exposed in public artifacts
+
+---
+
 ## Phase 2 Ideas
 
 After V1:
