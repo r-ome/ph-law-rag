@@ -63,6 +63,7 @@ def process_source(source: SourceConfig) -> dict:
 				"doc_id": doc_id,
 				"source_id": source.source_id,
 				"title": source.title,
+				"official_number": source.official_number,
 				"url": source.url,
 				"doc_type": source.doc_type,
 				"category": source.category,

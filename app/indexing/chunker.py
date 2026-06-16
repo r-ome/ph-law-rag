@@ -152,7 +152,7 @@ def _structural_nodes(text: str, units: list[dict], sm: dict) -> list[TextNode]:
 			"structure_path": u["path"],
 		}
 		if len(seg) <= settings.chunk_size * 4:  # ~4 chars/token; whole unit fits
-			nodes.append(TextNode(text=seg, metadata=base))
+			nodes.append(TextNode(text=_with_source_context(seg, base), metadata=base))
 		else:  # oversized unit → provision-aware sub-split, keep identity
 			nodes += _enumeration_nodes(seg, u, base)
 	return nodes
@@ -200,8 +200,8 @@ def _render(stack: list[dict], u: dict):
 def _sized_nodes(text: str, meta: dict) -> list[TextNode]:
 	"""One node if it fits; else size-split with part_index. Universal leaf for this module."""
 	if len(text) <= settings.chunk_size * 4:
-		return [TextNode(text=text, metadata=meta)]
-	return [TextNode(text=sub, metadata={**meta, "part_index": i})
+		return [TextNode(text=_with_source_context(text, meta), metadata=meta)]
+	return [TextNode(text=_with_source_context(sub, meta), metadata={**meta, "part_index": i})
 			for i, sub in enumerate(_splitter().split_text(text))]
 
 
@@ -242,8 +242,26 @@ def _enumeration_nodes(seg: str, u: dict, base: dict) -> list[TextNode]:
 
 def _prose_nodes(text: str, sm: dict) -> list[TextNode]:
 	doc = Document(text=text, metadata={**sm, "is_structural": False})
-	return cast(list[TextNode], _splitter().get_nodes_from_documents([doc]))
+	nodes = cast(list[TextNode], _splitter().get_nodes_from_documents([doc]))
+	for node in nodes:
+		node.text = _with_source_context(node.text, node.metadata)
+	return nodes
 
 
 def _splitter() -> SentenceSplitter:
 	return SentenceSplitter(chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap)
+
+
+def _with_source_context(text: str, metadata: dict) -> str:
+	if not text.strip():
+		return text
+
+	title = metadata.get("title")
+	official_number = metadata.get("official_number")
+	if not title and not official_number:
+		return text
+
+	header = f"Source: {title}" if title else "Source"
+	if official_number:
+		header += f" ({official_number})"
+	return f"{header}\n{text}"
