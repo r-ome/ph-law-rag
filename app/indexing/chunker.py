@@ -16,6 +16,59 @@ PARENT_RE = re.compile(r"^\s*(?:BOOK|Book|TITLE|Title|CHAPTER|Chapter|SUBTITLE|S
 
 MIN_UNITS = 5  # auto-detect: minimum length of a monotonic ascending run to call a doc structural
 
+# ── Enumeration markers (line-start, scanned only inside an oversized unit) ──
+_PAREN   = re.compile(r"^\s*\(([a-z]{1,4}|\d{1,3})\)\s")   # (a) (iv) (aa) (12) — {1,4} catches (iii)/(viii)
+_DECIMAL = re.compile(r"^\s*(\d{1,3}(?:\.\d{1,3})+)\s")     # 4.2  123.1 — own series, never split(".")[0]
+
+_RVALS = [(1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"),
+          (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")]
+_RMAP = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+
+
+def _to_roman(n: int) -> str:
+	out = ""
+	for v, sym in _RVALS:
+		while n >= v:
+			out += sym
+			n -= v
+	return out
+
+
+def _from_roman(s: str) -> int:
+	total = prev = 0
+	for ch in reversed(s):
+		v = _RMAP[ch]
+		total += -v if v < prev else v
+		prev = v
+	return total
+
+
+def _alpha_succ(s: str) -> str:
+	"""Legal homogeneous run: a→b … z→aa→bb, zz→aaa (NOT spreadsheet aa→ab)."""
+	ch = s[0]
+	return chr(ord(ch) + 1) * len(s) if ch != "z" else "a" * (len(s) + 1)
+
+
+def _succ(kind: str, last: str) -> str:
+	if kind == "arabic":
+		return str(int(last) + 1)
+	if kind == "alpha":
+		return _alpha_succ(last)
+	if kind == "roman":
+		return _to_roman(_from_roman(last) + 1)
+	if kind == "decimal":  # 4.2→4.3 ; 123.1→123.2 ; keeps the prefix
+		head, _, tail = last.rpartition(".")
+		return f"{head}.{int(tail) + 1}"
+	return ""
+
+
+def _open_kind(body: str) -> str:
+	if body.isdigit():
+		return "arabic"
+	if body == "i":  # ONLY (i) may OPEN a roman series; multi-char romans only continue
+		return "roman"
+	return "alpha"
+
 
 def chunk_texts(text: str, source_metadata: dict) -> list[TextNode]:
 	# Rule 1: the manual hint wins.
@@ -100,9 +153,90 @@ def _structural_nodes(text: str, units: list[dict], sm: dict) -> list[TextNode]:
 		}
 		if len(seg) <= settings.chunk_size * 4:  # ~4 chars/token; whole unit fits
 			nodes.append(TextNode(text=seg, metadata=base))
-		else:  # oversized unit → sub-split, keep identity
-			for i, sub in enumerate(_splitter().split_text(seg)):
-				nodes.append(TextNode(text=sub, metadata={**base, "part_index": i}))
+		else:  # oversized unit → provision-aware sub-split, keep identity
+			nodes += _enumeration_nodes(seg, u, base)
+	return nodes
+
+
+def _scan_marker(line: str):
+	if (m := _PAREN.match(line)):
+		return m.group(1), False
+	if (m := _DECIMAL.match(line)):
+		return m.group(1), True
+	return None, False
+
+
+def _resolve(stack: list[dict], body: str, is_dec: bool):
+	"""Mutate stack for this line-start marker. Returns (kind, parent_kind).
+	Classifies by SEQUENCE/CONTEXT, never by glyph shape."""
+	# 1. try to CONTINUE the deepest matching frame, popping anything deeper
+	for depth in range(len(stack) - 1, -1, -1):
+		fr = stack[depth]
+		if is_dec != (fr["kind"] == "decimal"):  # decimal markers continue only decimal frames, and vice-versa
+			continue
+		if body == _succ(fr["kind"], fr["last"]):
+			del stack[depth + 1:]
+			fr["last"] = body
+			return fr["kind"], (stack[depth - 1]["kind"] if depth > 0 else None)
+	# 2. else OPEN a new nested frame
+	kind = "decimal" if is_dec else _open_kind(body)
+	parent_kind = stack[-1]["kind"] if stack else None
+	stack.append({"kind": kind, "last": body})
+	return kind, parent_kind
+
+
+def _render(stack: list[dict], u: dict):
+	"""Build (unit_number, label) from non-roman frames. enum_path = concat of (marker)s."""
+	non_roman = [f for f in stack if f["kind"] != "roman"]
+	cap = u["type"].capitalize()
+	if non_roman and non_roman[-1]["kind"] == "decimal":
+		token = non_roman[-1]["last"]  # "4.2" already encodes the section number
+		return token, f"{cap} {token}"
+	enum_path = "".join(f"({f['last']})" for f in non_roman)
+	unit_number = f"{u['number']}{enum_path}"  # "4" + "(c)(4)" → "4(c)(4)"
+	return unit_number, f"{cap} {unit_number}"
+
+
+def _sized_nodes(text: str, meta: dict) -> list[TextNode]:
+	"""One node if it fits; else size-split with part_index. Universal leaf for this module."""
+	if len(text) <= settings.chunk_size * 4:
+		return [TextNode(text=text, metadata=meta)]
+	return [TextNode(text=sub, metadata={**meta, "part_index": i})
+			for i, sub in enumerate(_splitter().split_text(text))]
+
+
+def _enumeration_nodes(seg: str, u: dict, base: dict) -> list[TextNode]:
+	"""Provision-aware sub-split of an oversized legal unit. Split a marker iff
+	kind != roman AND parent_kind != roman (roman series & anything under a roman parent stay glued)."""
+	stack: list[dict] = []
+	boundaries: list[tuple[int, str, str]] = []  # (char_offset, unit_number, label)
+	pos = 0
+	for line in seg.splitlines(keepends=True):
+		body, is_dec = _scan_marker(line)
+		if body is not None:
+			kind, parent_kind = _resolve(stack, body, is_dec)
+			if kind != "roman" and parent_kind != "roman":
+				unit_number, label = _render(stack, u)
+				boundaries.append((pos, unit_number, label))
+		pos += len(line)
+
+	if not boundaries:  # no provisions found → behave like the old size-split
+		return _sized_nodes(seg, base)
+
+	nodes: list[TextNode] = []
+	head = seg[: boundaries[0][0]].strip()  # chapeau before first provision = the parent item text
+	if head:
+		nodes += _sized_nodes(head, base)
+
+	bounds = boundaries + [(len(seg), "", "")]
+	path = base.get("structure_path") or ""
+	for (start, unit_number, label), (end, _, _) in zip(bounds, bounds[1:]):
+		body_text = seg[start:end].strip()
+		if not body_text:
+			continue
+		crumb = f"{path} — {label}" if path else label  # breadcrumb baked INTO the text → self-contained
+		meta = {**base, "unit_number": unit_number, "unit_label": label}
+		nodes += _sized_nodes(f"{crumb}\n{body_text}", meta)
 	return nodes
 
 
