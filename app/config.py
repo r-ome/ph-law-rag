@@ -43,6 +43,11 @@ class Settings(BaseSettings):
 	edge_hop_top_k: int = 3
 	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
 	answerability_gate_model: str = "mistral"  # gate pinned to mistral even when A/B-ing another generator
+	query_decomposition_enabled: bool = False
+	query_planner_model: str = "mistral"
+	query_planner_max_subqueries: int = 3
+	subquery_packaging_enabled: bool = False  # per-subquery rerank + reserved slots (isolates the rerank-neck bug)
+	subquery_reserve_n: int = 2  # top chunks reserved per subquery before round-robin merge
 
 Category = Literal[
 	"constitutional_law", "statute", "presidential_issuance",

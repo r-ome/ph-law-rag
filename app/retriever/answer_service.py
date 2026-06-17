@@ -56,8 +56,13 @@ def _package(
 
 def answer(question: str, debug: bool | None = None) -> dict:
     debug_enabled = settings.debug if debug is None else debug
-    retrieved = hybrid_retriever(question)
-    reranked = rerank(question, retrieved)
+    if settings.subquery_packaging_enabled:
+        from app.retriever.subquery_retrieval import packaged_retrieve
+        reranked = packaged_retrieve(question)
+        retrieved = reranked  # no separate candidate list in this path (debug trace)
+    else:
+        retrieved = hybrid_retriever(question)
+        reranked = rerank(question, retrieved)
     if settings.edge_expansion_enabled:
         reranked = expand_with_edges(question, reranked)
     
