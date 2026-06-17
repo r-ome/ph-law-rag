@@ -27,6 +27,13 @@ class Settings(BaseSettings):
 	max_distance: float = 0.5
 	min_chunks_for_answer: int = 1
 	retrieval_operative_only: bool = True
+	# Post-rerank parent expansion: once >= min_children leaves of one section survive the cutoff,
+	# swap them for the whole parent section so generation sees the full enumeration/list (the
+	# within-doc list-span regression from provision-aware chunking). No partial truncation — if the
+	# parent would blow max_chars, fall back to the leaves exactly as retrieved.
+	parent_expansion_enabled: bool = False
+	parent_expansion_min_children: int = 2
+	parent_expansion_max_chars: int = 8000
 	# llm_model: str = "deepseek-r1:8b"
 	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"

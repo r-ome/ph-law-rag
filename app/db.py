@@ -71,7 +71,26 @@ MIGRATIONS = [
 			failed_count INTEGER
 		);
 		""",
-	)
+	),
+	(
+		2,
+		"parent sections for post-rerank parent expansion",
+		"""
+		CREATE TABLE IF NOT EXISTS chunk_parents(
+			parent_key TEXT PRIMARY KEY,
+			doc_id TEXT NOT NULL,
+			source_id TEXT,
+			title TEXT,
+			url TEXT,
+			unit_type TEXT,
+			unit_label TEXT,
+			structure_path TEXT,
+			text TEXT NOT NULL,
+			char_count INTEGER NOT NULL,
+			created_at TEXT NOT NULL
+		);
+		""",
+	),
 
 ]
 

@@ -12,6 +12,22 @@ from app.ingestion.parser import parse_pdf, parse_html
 from app.ingestion.normalizer import normalize_text
 from app.ingestion.hashing import hash_content
 
+def build_source_metadata(source: SourceConfig, doc_id: str) -> dict:
+	"""Chunk metadata for a source — the single definition shared by sync and reindex
+	so a re-chunk produces byte-identical metadata to the original index."""
+	return {
+		"doc_id": doc_id,
+		"source_id": source.source_id,
+		"title": source.title,
+		"official_number": source.official_number,
+		"url": source.url,
+		"doc_type": source.doc_type,
+		"category": source.category,
+		"tags": source.tags,
+		"structure": source.structure,
+		"status": source.status,
+	}
+
 def process_source(source: SourceConfig) -> dict:
 	from app.indexing.index_service import index_document
 	fetch_result = fetch_source(source)
@@ -59,18 +75,7 @@ def process_source(source: SourceConfig) -> dict:
 			conn=conn,
 			doc_id=doc_id,
 			text=normalized_text,
-			source_metadata={
-				"doc_id": doc_id,
-				"source_id": source.source_id,
-				"title": source.title,
-				"official_number": source.official_number,
-				"url": source.url,
-				"doc_type": source.doc_type,
-				"category": source.category,
-				"tags": source.tags,
-				"structure": source.structure,
-				"status": source.status,
-			},
+			source_metadata=build_source_metadata(source, doc_id),
 			version_id=version_id
 		)
 		print(f" indexed: {chunk_count} chunks")

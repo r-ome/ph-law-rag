@@ -88,8 +88,12 @@ def answer(question: str, debug: bool | None = None) -> dict:
             debug=debug_enabled
         )
 
+    if settings.parent_expansion_enabled:
+        from app.retriever.parent_expansion import expand_parents
+        reranked = expand_parents(reranked)
+
     context_block, sources = build_context(reranked,)
-    
+
     user_prompt = build_user_prompt(question, context_block)
     try:
         answer_text = generate(SYSTEM_PROMPT, user_prompt)

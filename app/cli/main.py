@@ -49,6 +49,23 @@ def eval():
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
  
+@app.command("reindex")
+def reindex(doc_id: str = typer.Option(None, help="reindex only this doc_id/source_id")):
+	from app.indexing.reindex import reindex as run_reindex
+
+	run_reindex(doc_id)
+
+@app.command("eval-diff")
+def eval_diff(
+	experiment: str,
+	baseline: str = typer.Option(None, help="baseline run tag for delta columns"),
+	out: str = typer.Option(None, help="markdown output path"),
+):
+	from app.evals.diff_report import build_diff_report
+
+	path = build_diff_report(experiment, baseline, out)
+	typer.echo(f"Diff report written to {path}")
+
 @app.command("retrieve")
 def test_retrieve(query: str):
 	from app.retriever.retrieve import retrieve

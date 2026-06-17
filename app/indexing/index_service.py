@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from llama_index.core.schema import TextNode
-from app.indexing.chunker import chunk_texts
+from app.indexing.chunker import chunk_texts, extract_parents
 from app.indexing.bm25_store import build_and_save
 from app.indexing.embedder import embed_texts
 from app.indexing.vector_store import (
@@ -21,6 +21,7 @@ def index_document(
 
 	delete_by_doc_id(client, doc_id)
 	conn.execute("DELETE FROM chunks WHERE doc_id = ?", [doc_id])
+	conn.execute("DELETE FROM chunk_parents WHERE doc_id = ?", [doc_id])
 
 	nodes = chunk_texts(text, source_metadata)
 
@@ -59,6 +60,21 @@ def index_document(
 				json.dumps(node.metadata),
 				now
 			]
+		)
+
+	for p in extract_parents(text, source_metadata):
+		conn.execute(
+			"""
+				INSERT OR REPLACE INTO chunk_parents(
+					parent_key, doc_id, source_id, title, url,
+					unit_type, unit_label, structure_path, text, char_count, created_at
+				) VALUES (?,?,?,?,?,?,?,?,?,?,?);
+			""",
+			[
+				p["parent_key"], doc_id, p["source_id"], p["title"], p["url"],
+				p["unit_type"], p["unit_label"], p["structure_path"],
+				p["text"], p["char_count"], now,
+			],
 		)
 
 	all_rows = conn.execute("SELECT chunk_id, text, metadata_json FROM chunks").fetchall()

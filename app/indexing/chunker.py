@@ -205,11 +205,12 @@ def _sized_nodes(text: str, meta: dict) -> list[TextNode]:
 			for i, sub in enumerate(_splitter().split_text(text))]
 
 
-def _enumeration_nodes(seg: str, u: dict, base: dict) -> list[TextNode]:
-	"""Provision-aware sub-split of an oversized legal unit. Split a marker iff
-	kind != roman AND parent_kind != roman (roman series & anything under a roman parent stay glued)."""
+def _enum_boundaries(seg: str, u: dict) -> list[tuple[int, str, str]]:
+	"""Provision boundaries inside an oversized unit: (char_offset, unit_number, label).
+	Split a marker iff kind != roman AND parent_kind != roman (roman series & anything
+	under a roman parent stay glued). Classifies by SEQUENCE/CONTEXT, never by glyph shape."""
 	stack: list[dict] = []
-	boundaries: list[tuple[int, str, str]] = []  # (char_offset, unit_number, label)
+	boundaries: list[tuple[int, str, str]] = []
 	pos = 0
 	for line in seg.splitlines(keepends=True):
 		body, is_dec = _scan_marker(line)
@@ -219,14 +220,33 @@ def _enumeration_nodes(seg: str, u: dict, base: dict) -> list[TextNode]:
 				unit_number, label = _render(stack, u)
 				boundaries.append((pos, unit_number, label))
 		pos += len(line)
+	return boundaries
 
-	if not boundaries:  # no provisions found → behave like the old size-split
+
+def _parent_key(meta: dict) -> str:
+	"""Stable id for a parent section — source_id + path disambiguates repeated section
+	numbers (e.g. Article III Section 1 vs Article VI Section 1 in the Constitution)."""
+	return "::".join([
+		meta.get("source_id") or "",
+		meta.get("structure_path") or "",
+		meta.get("unit_label") or "",
+	])
+
+
+def _enumeration_nodes(seg: str, u: dict, base: dict) -> list[TextNode]:
+	"""Provision-aware sub-split of an oversized legal unit into fine leaves. Each leaf
+	carries parent_key so post-rerank parent expansion can merge them back to the whole
+	section when enough siblings survive the cutoff."""
+	boundaries = _enum_boundaries(seg, u)
+
+	if not boundaries:  # no provisions found → behave like the old size-split (no parent_key)
 		return _sized_nodes(seg, base)
 
+	pk = _parent_key(base)
 	nodes: list[TextNode] = []
 	head = seg[: boundaries[0][0]].strip()  # chapeau before first provision = the parent item text
 	if head:
-		nodes += _sized_nodes(head, base)
+		nodes += _sized_nodes(head, {**base, "parent_key": pk})
 
 	bounds = boundaries + [(len(seg), "", "")]
 	path = base.get("structure_path") or ""
@@ -235,9 +255,42 @@ def _enumeration_nodes(seg: str, u: dict, base: dict) -> list[TextNode]:
 		if not body_text:
 			continue
 		crumb = f"{path} — {label}" if path else label  # breadcrumb baked INTO the text → self-contained
-		meta = {**base, "unit_number": unit_number, "unit_label": label}
+		meta = {**base, "unit_number": unit_number, "unit_label": label, "parent_key": pk}
 		nodes += _sized_nodes(f"{crumb}\n{body_text}", meta)
 	return nodes
+
+
+def extract_parents(text: str, source_metadata: dict) -> list[dict]:
+	"""Whole-section text for the oversized, enumeration-split units that produce
+	parent_key'd leaves — the merge target for post-rerank parent expansion. Only units
+	that actually fragment get a parent row; size-gated and prose docs return nothing."""
+	hint = source_metadata.get("structure", "auto")
+	if hint == "prose":
+		return []
+	units = _detect_units(text)
+	if not units or (hint != "hierarchical" and not _looks_structural(units)):
+		return []
+
+	parents: list[dict] = []
+	for u in units:
+		seg = text[u["start"]: u["end"]].strip()
+		if len(seg) <= settings.chunk_size * 4:        # fits whole → not split, no parent needed
+			continue
+		if not _enum_boundaries(seg, u):                # oversized but no enumeration → size-split, no parent_key
+			continue
+		meta = {**source_metadata, "unit_label": u["label"], "structure_path": u["path"]}
+		parents.append({
+			"parent_key": _parent_key(meta),
+			"source_id": source_metadata.get("source_id"),
+			"title": source_metadata.get("title"),
+			"url": source_metadata.get("url"),
+			"unit_type": u["type"],
+			"unit_label": u["label"],
+			"structure_path": u["path"],
+			"text": seg,
+			"char_count": len(seg),
+		})
+	return parents
 
 
 def _prose_nodes(text: str, sm: dict) -> list[TextNode]:
