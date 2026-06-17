@@ -22,8 +22,8 @@ class Settings(BaseSettings):
 	dense_top_k: int = 10
 	sparse_top_k: int = 10
 	sparse_overfetch_k: int = 100  # BM25 candidate pool to filter before taking sparse_top_k operative hits
-	rerank_top_n: int = 5
-	rerank_score_margin: float = 3.0  # relative trim: drop chunks scoring more than this below the top reranked chunk (cross-encoder logits aren't comparable across queries, so an absolute floor can't gate). Abstention is the LLM's job, not the reranker's.
+	rerank_top_n: int = 8
+	rerank_score_margin: float = 6.0  # relative trim: drop chunks scoring more than this below the top reranked chunk (cross-encoder logits aren't comparable across queries, so an absolute floor can't gate). Abstention is the LLM's job, not the reranker's. Widened from 5/3.0 (2026-06-17): retrieve-trace evidence showed top8/margin6 re-gathers enumeration fragments lost to provision-aware chunking (e.g. §21(1)/(4)/(8)) without adding net noise.
 	max_distance: float = 0.5
 	min_chunks_for_answer: int = 1
 	retrieval_operative_only: bool = True
