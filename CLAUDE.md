@@ -2,6 +2,13 @@
 
 `docs/project_plan.md` is the source of truth for architecture, data model, config, and stack. Read it before building. Update it when implementation meaningfully diverges. Don't restate plan content here — reference it.
 
+## Response style
+
+- Be terse. No preamble, no postamble, no pleasantries.
+- State the problem and fix directly. No "Great question!" or "Let me help you with that."
+- No casual filler words. Skip recaps of what I asked.
+- Code/commands first, minimal prose.
+
 ## Working rules
 
 - Be concise. Implementation first, minimal explanation unless asked. Plain language over jargon.

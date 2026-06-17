@@ -45,6 +45,7 @@ def _package(
         "answer": answer,
         "sources": sources,
         "contexts": [r.text for r in reranked],
+        "context_sources": [r.metadata.get("source_id", "") for r in reranked],
         "abstained": abstained,
         "error": error
     }

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 	debug: bool = False
 	eval_dataset_path: str = "data/eval_dataset.jsonl"
 	eval_results_dir: str = "data/eval_results"
+	eval_run_label: str = ""  # optional A/B tag baked into eval output filenames
 	ragas_llm_model: str = "claude-haiku-4-5-20251001"
 	ragas_embedding_model: str = "nomic-embed-text"
 	anthropic_api_key: SecretStr = SecretStr("")

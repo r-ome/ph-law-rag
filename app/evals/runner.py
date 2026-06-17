@@ -34,8 +34,14 @@ def run_eval_set() -> tuple[list[dict], Path]:
             "category": item["category"],
             "abstained": resp["abstained"],
             "model": settings.llm_model,
+            "query_decomposition": settings.query_decomposition_enabled,
             "elapsed_s": round(elapsed, 2),
-            "retrieved_sources": [s.get("source_id", "") for s in resp.get("sources", [])]
+            "cited_sources": [s.get("source_id", "") for s in resp.get("sources", [])],
+            "context_sources": resp.get("context_sources", []),
+            # Backward-compatible name for older analysis scripts. This now means
+            # the sources present in final context, not only citations exposed
+            # after generation.
+            "retrieved_sources": resp.get("context_sources", []),
         }
         results.append(row)
         flag = "ABSTAIN" if row["abstained"] else "answered"
@@ -44,7 +50,8 @@ def run_eval_set() -> tuple[list[dict], Path]:
     out_dir = Path(settings.eval_results_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
-    out_path = out_dir /f"run_{model_slug}_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
+    label = f"_{settings.eval_run_label}" if settings.eval_run_label else ""
+    out_path = out_dir /f"run_{model_slug}{label}_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
     with out_path.open("w", encoding="utf-8") as f:
         for r in results:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
