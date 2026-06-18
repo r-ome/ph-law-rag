@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 	# swap them for the whole parent section so generation sees the full enumeration/list (the
 	# within-doc list-span regression from provision-aware chunking). No partial truncation — if the
 	# parent would blow max_chars, fall back to the leaves exactly as retrieved.
-	parent_expansion_enabled: bool = False
+	parent_expansion_enabled: bool = True   # default-on 2026-06-18: clean per-changed-row win (see NOTE below)
 	parent_expansion_min_children: int = 2
 	parent_expansion_max_chars: int = 8000
 	# Operative-law preference: post-rerank, downrank a superseded provision below its operative
@@ -39,6 +39,10 @@ class Settings(BaseSettings):
 	# re-index). Map is provision-level retrieval policy, loaded from provision_supersession_path.
 	prefer_operative_enabled: bool = False
 	provision_supersession_path: str = "sources/provision_supersession.yaml"
+	# NOTE on judging this: parent expansion only changes context on the minority of questions
+	# whose section was fragmented (~11/70 in eval). Judge it on CHANGED-CONTEXT rows
+	# (recall +0.136, faithfulness +0.012, precision −0.014 on those), NOT whole-run aggregate
+	# faithfulness — the untouched majority adds generator noise that swamps the signal.
 	# llm_model: str = "deepseek-r1:8b"
 	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"
