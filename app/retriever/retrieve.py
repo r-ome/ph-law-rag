@@ -28,6 +28,10 @@ def retrieve(query_text: str) -> str:
     hits = hybrid_retriever(query_text)
     top = rerank(query_text, hits)
 
+    if settings.prefer_operative_enabled:
+        from app.retriever.prefer_operative import prefer_operative
+        top = prefer_operative(top)
+
     expanded = False
     if settings.parent_expansion_enabled:
         from app.retriever.parent_expansion import expand_parents

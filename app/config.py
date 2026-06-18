@@ -34,6 +34,11 @@ class Settings(BaseSettings):
 	parent_expansion_enabled: bool = False
 	parent_expansion_min_children: int = 2
 	parent_expansion_max_chars: int = 8000
+	# Operative-law preference: post-rerank, downrank a superseded provision below its operative
+	# (amending) replacement when BOTH are retrieved. Query-time only, reorder-only (no drop, no
+	# re-index). Map is provision-level retrieval policy, loaded from provision_supersession_path.
+	prefer_operative_enabled: bool = False
+	provision_supersession_path: str = "sources/provision_supersession.yaml"
 	# llm_model: str = "deepseek-r1:8b"
 	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"

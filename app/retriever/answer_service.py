@@ -65,7 +65,11 @@ def answer(question: str, debug: bool | None = None) -> dict:
         reranked = rerank(question, retrieved)
     if settings.edge_expansion_enabled:
         reranked = expand_with_edges(question, reranked)
-    
+
+    if settings.prefer_operative_enabled:
+        from app.retriever.prefer_operative import prefer_operative
+        reranked = prefer_operative(reranked)
+
     if len(reranked) < settings.min_chunks_for_answer:
         return _package(
             ABSTAIN_MESSAGE,
