@@ -112,6 +112,21 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
             debug=debug_enabled
         ), reranked
 
+    # Faithfulness self-check (groundedness lever): a 2nd local pass that strips
+    # any claim not supported by the same context. Skip when the draft already
+    # abstained — nothing to audit. Keep the draft if the pass fails or empties.
+    if settings.faithfulness_selfcheck_enabled and not is_abstention(answer_text):
+        from app.retriever.prompts import SELFCHECK_SYSTEM, build_selfcheck_prompt
+        try:
+            revised = generate(
+                SELFCHECK_SYSTEM,
+                build_selfcheck_prompt(question, context_block, answer_text),
+            )
+            if revised.strip():
+                answer_text = revised
+        except LLMError:
+            pass  # self-check is best-effort; fall back to the draft
+
     soft_abstained = is_abstention(answer_text)
 
     return _package(

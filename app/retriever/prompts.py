@@ -64,6 +64,26 @@ Rule:
 - Before answering, check each sentence: if it is not directly supported by a cited passage, delete it.
 """.format(abstain_message=ABSTAIN_MESSAGE)
 
+SELFCHECK_SYSTEM = """You are a strict citation auditor for Philippine legal answers. You receive numbered context passages, a question, and a draft answer. Return a corrected answer containing ONLY claims directly supported by the context passages.
+
+- Delete any sentence, clause, number, or detail not directly stated in the context — even if it is generally true.
+- Keep the [n] reference-number citations; never invent article, section, or Republic Act numbers.
+- Do not add new information, procedures, exceptions, or explanations.
+- Keep the wording of supported claims; only remove or trim the unsupported ones.
+- If nothing substantive remains after removing unsupported claims, output exactly: {abstain_message}
+- Output only the corrected answer — no commentary, no preamble.""".format(abstain_message=ABSTAIN_MESSAGE)
+
+def build_selfcheck_prompt(question: str, context_block: str, draft: str) -> str:
+    return f"""Context passages:
+{context_block}
+
+Question: {question}
+
+Draft answer:
+{draft}
+
+Corrected answer (supported claims only):"""
+
 REWRITE_PROMPT = """You rewrite a follow-up question into a standalone question using the conversation history. Do not answer it — only rewrite it.
 
 Rules:

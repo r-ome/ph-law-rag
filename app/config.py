@@ -68,6 +68,10 @@ class Settings(BaseSettings):
 	# Conversation context (M8): follow-ups are rewritten to standalone queries before retrieval.
 	max_conversation_turns: int = 5       # history window passed to the rewriter
 	enable_query_rewriting: bool = True   # toggle rewriting off for debugging
+	# Faithfulness self-check: optional 2nd local pass that audits the draft answer against the
+	# retrieved context and deletes unsupported claims. Targets the generator groundedness gap
+	# (local mistral drifts from context; cloud doesn't). Off by default; eval before shipping.
+	faithfulness_selfcheck_enabled: bool = False
 
 Category = Literal[
 	"constitutional_law", "statute", "presidential_issuance",

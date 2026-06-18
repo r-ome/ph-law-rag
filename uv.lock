@@ -2300,6 +2300,7 @@ name = "ph-law-rag"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "beautifulsoup4" },
     { name = "datasets" },
     { name = "fastapi" },
@@ -2338,6 +2339,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.107.1" },
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
     { name = "datasets", specifier = ">=5.0.0" },
     { name = "fastapi", specifier = ">=0.136.0" },
