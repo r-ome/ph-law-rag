@@ -25,19 +25,24 @@ def sync():
 	typer.echo(f"\nSync complete: {result}")
 
 @app.command("eval-score")
-def eval_score(run_path: str):
+def eval_score(
+	run_path: str,
+	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
+):
 	from app.evals.runner import run_eval_set, load_dataset
 	from app.evals.ragas_scorer import score
 	from app.evals.report import print_report, save_scored
 
 	results = load_dataset(run_path)
 	run_tag = Path(run_path).stem.replace("run_", "")
-	scored = score(results)
+	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
 
 @app.command("eval")
-def eval():
+def eval(
+	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
+):
 	from app.evals.runner import run_eval_set
 	from app.evals.ragas_scorer import score
 	from app.evals.report import print_report, save_scored
@@ -45,9 +50,32 @@ def eval():
 	results, raw_path = run_eval_set()
 	typer.echo(f"\nRaw results saved to {raw_path}")
 	run_tag = raw_path.stem.replace("run_", "")
-	scored = score(results)
+	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
+
+eval_cache_app = typer.Typer(help="Manage cached RAGAS row scores")
+
+@eval_cache_app.command("seed")
+def eval_cache_seed(run_tag: str):
+	from app.evals.ragas_cache import seed_from_artifacts
+
+	typer.echo(json.dumps(seed_from_artifacts(run_tag), indent=2))
+
+@eval_cache_app.command("stats")
+def eval_cache_stats():
+	from app.evals.ragas_cache import stats
+
+	typer.echo(json.dumps(stats(), indent=2))
+
+@eval_cache_app.command("clear")
+def eval_cache_clear():
+	from app.evals.ragas_cache import clear
+
+	deleted = clear()
+	typer.echo(f"deleted {deleted} cached RAGAS score rows")
+
+app.add_typer(eval_cache_app, name="eval-cache")
  
 @app.command("reindex")
 def reindex(doc_id: str = typer.Option(None, help="reindex only this doc_id/source_id")):
