@@ -48,11 +48,14 @@ def provisions(text: str) -> set[str]:
 
 
 def _chunk_prov(chunk: str) -> set[str]:
-    """Provisions a chunk actually *carries* — parsed from its header/label line
-    only, not the body. A body cross-reference (e.g. '...as defined in Article
-    355...') must NOT count the cited section as retrieved; that false signal was
-    marking fragmented/list-spanning misses as OK."""
-    header = (chunk or "").split("\n", 1)[0][:200]
+    """Provisions a chunk actually *carries* — parsed from its label line only, not
+    the body. A body cross-reference (e.g. '...as defined in Article 355...') must
+    NOT count the cited section as retrieved. Skips a leading 'Source: <title>'
+    attribution line (commit 7da46e9) so the real label on the next line is read."""
+    lines = [ln for ln in (chunk or "").split("\n") if ln.strip()]
+    if lines and lines[0].lstrip().startswith("Source"):
+        lines = lines[1:]
+    header = lines[0][:200] if lines else ""
     return provisions(header)
 
 
