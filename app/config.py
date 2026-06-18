@@ -65,6 +65,9 @@ class Settings(BaseSettings):
 	query_planner_max_subqueries: int = 3
 	subquery_packaging_enabled: bool = False  # per-subquery rerank + reserved slots (isolates the rerank-neck bug)
 	subquery_reserve_n: int = 2  # top chunks reserved per subquery before round-robin merge
+	# Conversation context (M8): follow-ups are rewritten to standalone queries before retrieval.
+	max_conversation_turns: int = 5       # history window passed to the rewriter
+	enable_query_rewriting: bool = True   # toggle rewriting off for debugging
 
 Category = Literal[
 	"constitutional_law", "statute", "presidential_issuance",

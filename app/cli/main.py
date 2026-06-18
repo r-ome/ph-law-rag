@@ -101,9 +101,14 @@ def test_retrieve(query: str):
 	typer.echo(retrieve(query))
 
 @app.command("ask")
-def ask(query: str):
+def ask(query: str, session: str = typer.Option(None, "--session")):
 	from app.retriever.answer_service import answer
-	result = answer(query)
+	from app.conversation.session import session_exists, create_session
+
+	session_id = session
+	if session_id and not session_exists(session_id):
+		create_session(session_id=session_id)  # create with the given ID
+	result = answer(query, session_id=session_id)
 	typer.echo(result["answer"])
 	if result["sources"]:
 		typer.echo("\nSources:")

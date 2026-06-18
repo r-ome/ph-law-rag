@@ -2,8 +2,8 @@ from app.retriever.hybrid_retriever import hybrid_retriever
 from app.retriever.reranker import rerank
 from app.retriever.context_builder import build_context
 from app.retriever.prompts import (
-    SYSTEM_PROMPT, ABSTAIN_MESSAGE,
-    is_abstention, build_user_prompt
+    SYSTEM_PROMPT, ABSTAIN_MESSAGE, GREETING_MESSAGE,
+    is_abstention, is_conversational, build_user_prompt
 )
 from app.retriever.llm_client import generate, LLMError
 from app.retriever.types import RetrievalResult
@@ -54,8 +54,7 @@ def _package(
     return response
 
 
-def answer(question: str, debug: bool | None = None) -> dict:
-    debug_enabled = settings.debug if debug is None else debug
+def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[RetrievalResult]]:
     if settings.subquery_packaging_enabled:
         from app.retriever.subquery_retrieval import packaged_retrieve
         reranked = packaged_retrieve(question)
@@ -79,7 +78,7 @@ def answer(question: str, debug: bool | None = None) -> dict:
             reranked=reranked,
             prompt=None,
             debug=debug_enabled
-        )
+        ), reranked
 
     if settings.answerability_gate_enabled and not is_answerable(question, reranked):
         return _package(
@@ -90,7 +89,7 @@ def answer(question: str, debug: bool | None = None) -> dict:
             reranked=reranked,
             prompt=None,
             debug=debug_enabled
-        )
+        ), reranked
 
     if settings.parent_expansion_enabled:
         from app.retriever.parent_expansion import expand_parents
@@ -111,10 +110,10 @@ def answer(question: str, debug: bool | None = None) -> dict:
             prompt=user_prompt,
             error=True,
             debug=debug_enabled
-        )
+        ), reranked
 
     soft_abstained = is_abstention(answer_text)
-    
+
     return _package(
         answer_text,
         sources=[] if soft_abstained else sources,
@@ -123,4 +122,47 @@ def answer(question: str, debug: bool | None = None) -> dict:
         reranked=reranked,
         prompt=user_prompt,
         debug=debug_enabled
-    )
+    ), reranked
+
+
+def answer(question: str, debug: bool | None = None,
+           session_id: str | None = None) -> dict:
+    debug_enabled = settings.debug if debug is None else debug
+    effective_question = question
+
+    if session_id:
+        from app.conversation.session import session_exists, create_session
+        if not session_exists(session_id):
+            create_session(session_id=session_id)  # guard direct callers (FK safety)
+
+    if is_conversational(question):
+        # Greeting / chitchat — reply conversationally, skip retrieval entirely so
+        # we never dump unrelated context for a non-legal message.
+        response = _package(
+            GREETING_MESSAGE,
+            sources=[],
+            abstained=False,
+            retrieved=[],
+            reranked=[],
+            prompt=None,
+            debug=debug_enabled,
+        )
+        reranked = []
+    else:
+        if session_id:
+            from app.conversation.session import get_history
+            from app.conversation.query_rewriter import rewrite_query
+            history = get_history(session_id, settings.max_conversation_turns)
+            effective_question = rewrite_query(question, history)
+        response, reranked = _run_pipeline(effective_question, debug_enabled)
+
+    if session_id:
+        import json
+        from app.conversation.session import append_turn
+        append_turn(session_id, {
+            "question": question,                       # original, not rewritten
+            "rewritten_question": effective_question,
+            "answer": response["answer"],
+            "retrieved_chunks_json": json.dumps([r.chunk_id for r in reranked]),
+        })
+    return response

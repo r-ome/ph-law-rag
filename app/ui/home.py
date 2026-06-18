@@ -5,6 +5,11 @@ from app.config import settings
 st.set_page_config(page_title="PH Law RAG", layout="wide")
 st.title("PH Law RAG")
 
+if "session_id" not in st.session_state:
+    st.session_state.session_id = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 with st.sidebar:
     st.header("Settings")
     debug = st.toggle("Debug Mode", value=settings.debug)
@@ -12,14 +17,15 @@ with st.sidebar:
     st.caption(f"dense_top_k: {settings.dense_top_k}")
     st.caption(f"rerank_top_n: {settings.rerank_top_n}")
     st.caption(f"min_chunks_for_answer: {settings.min_chunks_for_answer}")
+    if st.button("New conversation"):
+        st.session_state.session_id = None
+        st.session_state.messages = []
+        st.rerun()
 
 chat_tab, sources_tab = st.tabs(["Chat", "Sources"])
 prompt = st.chat_input("Ask a question about Philippine law")
 
 with chat_tab:
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
     for m in st.session_state.messages:
         with st.chat_message(m["role"]):
            st.markdown(m["content"])
@@ -33,11 +39,17 @@ with chat_tab:
                 try:
                     resp = httpx.post(
                         f"{settings.api_base_url}/query/ask",
-                        json={"question": prompt, "debug": debug},
+                        json={
+                            "question": prompt,
+                            "debug": debug,
+                            "session_id": st.session_state.session_id,
+                        },
                         timeout=120,
                     )
                     resp.raise_for_status()
                     result = resp.json()
+                    if result.get("session_id"):
+                        st.session_state.session_id = result["session_id"]
                 except (httpx.HTTPError, ValueError) as exc:
                     result = {
                         "answer": f"API request failed: {exc}",

@@ -10,6 +10,35 @@ def is_abstention(answer_text: str) -> bool:
       correctly treated as an answer, not a refusal."""
       return answer_text.strip().startswith(ABSTAIN_PREFIX)
 
+GREETING_MESSAGE = (
+    "Hello! I'm a Philippine law research assistant. Ask me about Philippine "
+    "statutes, the Constitution, or case law — for example: \"What are the "
+    "grounds for annulment of marriage?\""
+)
+
+# Whole-message greetings / chitchat that are not legal questions. Matched only
+# when the ENTIRE message (minus surrounding punctuation) equals one of these, so
+# a real question that merely opens with "hello" is NOT short-circuited.
+_CONVERSATIONAL = {
+    "hi", "hello", "hey", "heya", "hiya", "yo", "sup", "howdy",
+    "good morning", "good afternoon", "good evening", "good day",
+    "thanks", "thank you", "thank you so much", "ty", "thx",
+    "ok", "okay", "cool", "nice", "great",
+    "test", "testing", "ping",
+    "who are you", "what are you", "what can you do", "what do you do",
+    "help", "hello there",
+}
+
+def is_conversational(text: str) -> bool:
+    """True for a greeting / chitchat that isn't a legal question.
+
+    Conservative on purpose: only fires when the whole message is a known
+    conversational phrase (or empty), so short legal queries like 'estafa?' are
+    never caught. A greeting that prefixes a real question (e.g. 'hi, what is
+    estafa?') does not match and flows to normal retrieval."""
+    t = text.strip().lower().strip("!.?,;:- ")
+    return not t or t in _CONVERSATIONAL
+
 SYSTEM_PROMPT = """You are a legal research assistant for Philippine law. \
 You answer strictly from the numbered context passages provided for you.
 
@@ -34,6 +63,38 @@ Rule:
     remainder is not covered by the indexed corpus. Do not fill the gap from outside knowledge. \
 - Before answering, check each sentence: if it is not directly supported by a cited passage, delete it.
 """.format(abstain_message=ABSTAIN_MESSAGE)
+
+REWRITE_PROMPT = """You rewrite a follow-up question into a standalone question using the conversation history. Do not answer it — only rewrite it.
+
+Rules:
+- Resolve ONLY references to earlier turns: pronouns (it, that, those, them) and ellipsis (e.g. "what about section 5?", "and the penalty?").
+- Preserve every specific term in the follow-up EXACTLY as written — names, abbreviations, acronyms, statute numbers, and figures. Never reinterpret or expand them. ("BP22" is the name of a law, not an amount of money.)
+- If the follow-up names a NEW topic, treat it as a topic change: rewrite it as a standalone question about that new topic. Do NOT merge it with the previous topic.
+- Output only the rewritten question. If it is already standalone, return it unchanged.
+
+Example 1
+History:
+Q: What are the grounds for annulment of marriage?
+Follow-up: what is the prescriptive period for those?
+Standalone question: What is the prescriptive period for the grounds for annulment of marriage?
+
+Example 2
+History:
+Q: What is estafa?
+Follow-up: how about bp22?
+Standalone question: What is BP 22?
+
+Example 3
+History:
+Q: What is estafa?
+Follow-up: What are the elements of theft?
+Standalone question: What are the elements of theft?
+
+Now rewrite.
+History:
+{history}
+Follow-up: {question}
+Standalone question:"""
 
 def build_user_prompt(question: str, context_block: str)-> str:
     return f"""Context passages:

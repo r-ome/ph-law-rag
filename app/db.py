@@ -91,6 +91,29 @@ MIGRATIONS = [
 		);
 		""",
 	),
+	(
+		3,
+		"conversations and conversation turns",
+		"""
+		CREATE TABLE IF NOT EXISTS conversations(
+			session_id TEXT PRIMARY KEY,
+			created_at TEXT NOT NULL,
+			title TEXT
+		);
+
+		CREATE TABLE IF NOT EXISTS conversation_turns(
+			turn_id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			turn_index INTEGER NOT NULL,
+			question TEXT NOT NULL,
+			rewritten_question TEXT,
+			answer TEXT,
+			retrieved_chunks_json TEXT,
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (session_id) REFERENCES conversations(session_id)
+		);
+		""",
+	),
 
 ]
 
