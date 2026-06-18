@@ -8,6 +8,10 @@
 
 Accepted
 
+## Plain English
+
+Legal search needs both meaning and exact words. Dense retrieval helps when users ask in normal language, while BM25 helps when the answer depends on exact legal terms, section numbers, Republic Act numbers, or case identifiers.
+
 ## Context
 
 The corpus is Philippine Laws, retrieval is crucial for this project. Sparse retrieval would have exact text citations and Dense retrieval would retrieve relevant information based on meaning. Dense Retrieval would not be enough to fetch the relevant chunks for a user's query. Hybrid Retrieval combines both techniques which would make the retrieval more precise and accurate.

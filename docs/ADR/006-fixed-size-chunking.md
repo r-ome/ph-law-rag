@@ -8,6 +8,10 @@
 
 Accepted
 
+## Plain English
+
+Start with simple fixed-size chunks because it gives the project a working retrieval baseline quickly. It is not perfect for legal documents, but it is easy to measure and improve from.
+
 ## Context
 
 The corpus needs splitting before embedding. A uniform strategy that works on every document — hierarchy or not — ships a working retrieval baseline without per-document parsing.

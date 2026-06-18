@@ -8,6 +8,10 @@
 
 Accepted
 
+## Plain English
+
+When the system does not have enough evidence, it should say so instead of guessing. For legal questions, a cautious refusal is better than a confident but unsupported answer.
+
 ## Context
 
 This is a legal tool: a confident wrong answer can misguide a real legal decision, which is worse than "I don't know". The system must refuse when the corpus doesn't support a grounded answer.

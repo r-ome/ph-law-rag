@@ -8,6 +8,10 @@
 
 Accepted
 
+## Plain English
+
+Use Mistral as the default local answer model because it is faster and more reliable for this project’s current RAG workflow. DeepSeek and Qwen remain useful experiments, but they should not be the baseline demo model right now.
+
 ## Context
 
 The project uses Ollama for local LLM generation. `llm_model` is configurable, and the current codebase defaults to `mistral`, with `deepseek-r1:8b` and `qwen3:4b` kept as commented alternatives in `app/config.py`.

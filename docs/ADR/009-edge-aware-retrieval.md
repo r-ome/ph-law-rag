@@ -6,7 +6,14 @@
 
 ## Status
 
-Proposed
+Accepted
+
+> Implemented. Doc-level expansion only; provision-level supersession is handled
+> separately by ADR-013 (operative-law preference).
+
+## Plain English
+
+Laws do not stand alone. When a retrieved law is connected to an amendment or implementing rule, the retriever should also look nearby so the answer does not miss the newer or related authority.
 
 ## Context
 
@@ -19,7 +26,7 @@ Add a single-hop expansion step between rerank and context-building. After the s
 - Edges are read from the manifest at query time (in-memory graph, no DB schema change).
 - Doc-level only — edges point document→document. Partial (article-range) supersession is out of scope.
 - `supersedes`/`repeals` are **not** expansion edges; whole-doc suppression is already handled by the status filter (ADR's status-aware retrieval).
-- The final re-rank keeps `rerank_min_score` / `rerank_top_n` in charge, so edge-pulled chunks must earn their place.
+- The final re-rank keeps `rerank_score_margin` / `rerank_top_n` in charge, so edge-pulled chunks must earn their place.
 
 ## Alternatives Considered
 

@@ -8,6 +8,10 @@
 
 Accepted
 
+## Plain English
+
+Use Qdrant because this project is meant to grow beyond a tiny prototype. It adds setup cost, but it gives the project a stronger vector database with metadata filtering, persistence, and a better production path.
+
 ## Context
 
 A RAG project needs vector store to store embeddings. Chroma and Qdrant offers the same features. Chroma is better for lightweight in-process vector store and better for prototyping RAG projects with zero infrastructure needed to maintain. Qdrant is build to run as a service, needs a bit more setup for local-only prototype but stronger in production story, rich in payload filtering, hybrid (dense + sparse) search natively, and scales horizontally.

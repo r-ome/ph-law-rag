@@ -8,6 +8,10 @@ yyyy-mm-dd
 
 Proposed | Accepted | Superseded by ADR-XXX | Deprecated
 
+## Plain English
+
+One or two sentences explaining the decision in everyday language.
+
 ## Context
 
 Should state the problem.

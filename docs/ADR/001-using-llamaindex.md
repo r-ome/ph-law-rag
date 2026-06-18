@@ -8,6 +8,10 @@
 
 Accepted
 
+## Plain English
+
+Use LlamaIndex because this project is mainly about finding, organizing, and retrieving legal text for a RAG system. LangChain can do similar things, but it is more agent/workflow oriented, while LlamaIndex gives this project the retrieval building blocks it needs sooner.
+
 ## Context
 
 This project is for RAG/search a library with an integration of a LLM and external data sources. It will require chunking, embedding, dense + lexical retrieval features. Local-first is currently an option since local open weight models provide the same feature the closed weight models (not the same reasoning power).
