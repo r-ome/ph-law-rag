@@ -2,6 +2,8 @@
 
 `docs/project_plan.md` is the source of truth for architecture, data model, config, and stack. Read it before building. Update it when implementation meaningfully diverges. Don't restate plan content here — reference it.
 
+Devlog: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-devlog.md`. Append or update entries there for meaningful implementation decisions, bugs, fixes, eval results, and deployment-gate findings.
+
 ## Response style
 
 - Be terse. No preamble, no postamble, no pleasantries.
@@ -16,6 +18,7 @@
 - Lazy/in-function imports for optional deps (Qdrant, Ollama, ingestion, indexing) so the CLI never fails at startup when a service or package is missing.
 - Adapters (`app/api`, `app/ui`) hold no business logic.
 - Config field names/defaults come from the plan's Config System section — match exactly.
+- `embedding_backend` is the source of truth for embedding defaults. Do not require separate model/dim exports for the standard Ollama or Bedrock paths; `Settings` derives and validates them.
 - Work the current milestone only; don't pull work forward.
 - The user codes the milestones themselves. Default to showing code or pseudocode in the chat — do NOT write, create, or edit files unless the user explicitly says to (e.g. "write it", "create the file", "update X"). "Give me the code" / "show me" means display it, not apply it.
 - Don't assume. When intent, scope, or approach is ambiguous, ask first rather than acting — unless the user has explicitly told you to proceed.

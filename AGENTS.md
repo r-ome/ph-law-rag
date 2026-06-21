@@ -2,6 +2,10 @@
 
 See `docs/project_plan.md` for the full architecture, data model, and milestone definitions. That file is the source of truth. Update it when implementation meaningfully diverges.
 
+Devlog: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-devlog.md`. Append or update entries there for meaningful implementation decisions, bugs, fixes, eval results, and deployment-gate findings.
+
+Embedding config rule: `embedding_backend` is the source of truth for standard embedding defaults. `Settings` derives and validates model/dim for Ollama and Bedrock; only set `embedding_model` and `embedding_dim` explicitly for intentional custom overrides.
+
 ---
 
 ## Milestone 1: Scaffold and Local Runtime

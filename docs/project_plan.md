@@ -6,7 +6,7 @@ This is the project reference document for `ph-law-rag`.
 - Use this plan as the default source of truth for architecture, scope, and priorities during implementation and review.
 - If the code intentionally differs from this plan, document the reason in review notes or adjacent docs.
 
-See also: `docs/current_status.md`
+See also: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-devlog.md`
 
 ---
 
@@ -218,8 +218,7 @@ ph-law-rag/
 └── docs/
     ├── architecture.md
     ├── tradeoffs.md
-    ├── local_setup.md
-    └── current_status.md
+    └── local_setup.md
 ```
 
 ---
@@ -464,7 +463,9 @@ class Settings(BaseSettings):
     eval_dataset_path: str = "data/eval_dataset.jsonl"
 
     # Models
-    embedding_model: str = "nomic-embed-text"
+    embedding_backend: Literal["ollama", "bedrock"] = "ollama"
+    embedding_model: str | None = None  # backend default when unset
+    embedding_dim: int | None = None     # backend/model default when unset
     llm_model: str = "mistral"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
@@ -1085,3 +1086,58 @@ If the current implementation differs from this plan, note whether the differenc
 - Bug
 - Scope creep
 - Worthwhile improvement
+
+---
+
+## Future Feature: React + Vite Frontend (Corpus Browser)
+
+A polished React frontend to eventually replace the Streamlit UI. Primary Phase-1 goal: a **source/corpus browser** — browse indexed law documents, filter by `doc_type`/`category`, view normalized text + sync status. This is a clean adapter swap: FastAPI is untouched except for one new endpoint; business logic stays out of the frontend.
+
+### Stack (decided)
+
+- **Vite + React + TypeScript** (TS non-negotiable — portfolio signal).
+- **React Router** — list → detail routing.
+- **TanStack Query** — data fetching/caching/loading-states for the GETs.
+- **TanStack Table** — the document list is a filter-by-`doc_type`/`category` table.
+- **Tailwind + shadcn/ui** — Radix primitives copied into the repo; polished tables/inputs fast.
+- **Vite dev proxy** `/api → http://localhost:8000` — sidesteps CORS in dev (no FastAPI middleware). Prod build served static via the compose `ui` service.
+
+shadcn/ui setup notes: needs Tailwind configured **and** path aliases (`@/*`) in both `tsconfig.json` and `vite.config.ts` before `npx shadcn@latest init`. Components copied into `src/components/ui/` on demand; Phase 1 pulls `table button badge input select scroll-area`.
+
+### Backend gap (gating dependency)
+
+The corpus browser needs to view a document, but no endpoint serves the normalized text. Build **`GET /documents/{doc_id}`** (metadata + contents of `document_versions.normalized_path`) first, and `curl`-verify before touching React. The file-read goes in a `db.py`/service function; the route stays a thin adapter. (This endpoint is already listed in the FastAPI Endpoints table but is currently unbuilt.)
+
+### Folder layout
+
+```
+frontend/                      # sibling to app/, own package.json
+  src/
+    api/client.ts              # fetch wrapper + types (Document, DocumentDetail)
+    routes/
+      DocumentsList.tsx        # table + filters + Sync button
+      DocumentDetail.tsx       # metadata header + normalized text pane
+    components/                # shared + components/ui/ (shadcn)
+    App.tsx                    # router
+    main.tsx
+  vite.config.ts               # proxy /api → :8000
+  package.json
+```
+
+### Phasing
+
+- **Phase 1:** corpus browser — list + filters + detail view + Sync button.
+- **Phase 2:** chat + citations on `/query/ask`, then retire Streamlit. **Retire-on-parity, not day-1** — keep Streamlit (which currently also serves chat) alive until the React chat ships, so the demo is never broken. Then repoint the compose `ui` service from Streamlit to the React static build.
+
+### Build order
+
+1. `GET /documents/{doc_id}` + `db.py` reader → curl check.
+2. `npm create vite@latest frontend -- --template react-ts`; install deps; Tailwind + shadcn init; path aliases.
+3. `vite.config.ts` proxy `/api → http://localhost:8000`.
+4. `src/api/client.ts` — typed `Document` / `DocumentDetail` + fetch wrappers.
+5. DocumentsList (TanStack Table + `doc_type`/`category` filters + Sync).
+6. DocumentDetail (metadata header + scrollable text pane).
+
+### Open question / tradeoff (deferred)
+
+A React rebuild competes for time with the bar-exam grader, which is a rarer portfolio differentiator than a frontend. Treat this as polish, sequence it accordingly.

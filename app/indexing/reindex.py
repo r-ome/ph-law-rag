@@ -17,12 +17,13 @@ from app.indexing.index_service import index_document
 
 def _require_services() -> None:
     """Reindex still embeds + upserts, so fail loudly if the backends are down."""
-    from app.api.health_query import ping_url
+    from app.api.health_query import _qdrant_ok, ping_url
 
-    if not ping_url(f"{settings.qdrant_url}/collections"):
-        raise RuntimeError(f"Qdrant not reachable at {settings.qdrant_url} — start it before reindexing.")
-    if not ping_url(f"{settings.ollama_base_url}/api/version"):
-        raise RuntimeError(f"Ollama not reachable at {settings.ollama_base_url} — start it before reindexing.")
+    if not _qdrant_ok():
+        raise RuntimeError(f"Qdrant not reachable at {settings.qdrant_url} - start it before reindexing")
+    if settings.embedding_backend == "ollama":
+        if not ping_url(f"{settings.ollama_base_url}/api/version"):
+            raise RuntimeError(f"Ollama not reachable at {settings.ollama_base_url} — start it before reindexing.")
 
 
 def _latest_version(conn, source_id: str):

@@ -7,12 +7,14 @@ app = typer.Typer()
 
 @app.command("healthcheck")
 def healthcheck():
-	from app.api.health_query import ping_url
+	from app.api.health_query import _qdrant_ok, ping_url
 
-	qdrant_ok = ping_url(f"{settings.qdrant_url}/collections")
-	ollama_ok = ping_url(f"{settings.ollama_base_url}/api/version")
+	qdrant_ok = _qdrant_ok()
+	uses_ollama = settings.embedding_backend == "ollama" or not settings.llm_model.startswith("claude")
+	ollama_ok = ping_url(f"{settings.ollama_base_url}/api/version") if uses_ollama else None
+	healthy = qdrant_ok and (ollama_ok is not False)
 	typer.echo(json.dumps({
-		"status": "ok" if qdrant_ok and ollama_ok else "degraded",
+		"status": "ok" if healthy else "degraded",
 		"qdrant": qdrant_ok,
 		"ollama": ollama_ok,
 	}, indent=2))

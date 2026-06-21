@@ -1,23 +1,48 @@
+import os
 import yaml
 from datetime import date
 from pathlib import Path
 from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel, ConfigDict, SecretStr
+from pydantic import BaseModel, ConfigDict, SecretStr, model_validator
+
+_EMBEDDING_BACKEND_DEFAULTS = {
+	"ollama": {"model": "nomic-embed-text", "dim": 768},
+	"bedrock": {"model": "amazon.titan-embed-text-v2:0", "dim": 1024},
+}
+
+_KNOWN_EMBEDDING_DIMS = {
+	"nomic-embed-text": 768,
+	"amazon.titan-embed-text-v2:0": 1024,
+	"amazon.titan-embed-text-v2:0:8k": 1024,
+}
+
+_OLLAMA_EMBEDDING_MODELS = {"nomic-embed-text"}
+_BEDROCK_EMBEDDING_MODELS = {
+	"amazon.titan-embed-text-v2:0",
+	"amazon.titan-embed-text-v2:0:8k",
+}
 
 class Settings(BaseSettings):
-	model_config = SettingsConfigDict(env_file=".env")
+	model_config = SettingsConfigDict(env_file=os.getenv("RAGLAB_ENV_FILE", ".env"))
 	source_config_path: str = "sources/ph_law_sources.yaml"
 	db_path: str = "data/sqlite/ph-law-rag.db"
 	raw_data_dir: str = "data/raw"
 	normalized_data_dir: str = "data/normalized"
 	request_timeout: int = 30
+	# Qdrant Config
 	qdrant_collection: str = "ph_law"
 	qdrant_url: str = "http://localhost:6333"
+	qdrant_api_key: SecretStr = SecretStr("")
+
 	bm25_path: str = "data/bm25"
 	chunk_size: int = 256
 	chunk_overlap: int = 32
-	embedding_model: str = "nomic-embed-text"
+	# Embeddings Configs
+	embedding_backend: Literal["ollama", "bedrock"] = "ollama"
+	embedding_model: str | None = None
+	embedding_dim: int | None = None
+
 	ollama_base_url: str = "http://localhost:11434"
 	dense_top_k: int = 10
 	sparse_top_k: int = 10
@@ -72,6 +97,47 @@ class Settings(BaseSettings):
 	# retrieved context and deletes unsupported claims. Targets the generator groundedness gap
 	# (local mistral drifts from context; cloud doesn't). Off by default; eval before shipping.
 	faithfulness_selfcheck_enabled: bool = False
+	# AWS config
+	aws_region: str = "us-east-1"
+
+	@model_validator(mode="after")
+	def resolve_embedding_config(self):
+		defaults = _EMBEDDING_BACKEND_DEFAULTS[self.embedding_backend]
+
+		if self.embedding_model is None:
+			self.embedding_model = defaults["model"]
+
+		if self.embedding_backend == "bedrock" and self.embedding_model in _OLLAMA_EMBEDDING_MODELS:
+			raise ValueError(
+				"embedding_backend=bedrock cannot use an Ollama embedding model "
+				f"({self.embedding_model!r}). Unset EMBEDDING_MODEL to use the "
+				f"backend default {defaults['model']!r}, or set a Bedrock model "
+				"with the correct EMBEDDING_DIM."
+			)
+		if self.embedding_backend == "ollama" and self.embedding_model in _BEDROCK_EMBEDDING_MODELS:
+			raise ValueError(
+				"embedding_backend=ollama cannot use a Bedrock embedding model "
+				f"({self.embedding_model!r}). Unset EMBEDDING_MODEL to use the "
+				f"backend default {defaults['model']!r}."
+			)
+
+		expected_dim = _KNOWN_EMBEDDING_DIMS.get(self.embedding_model)
+		if self.embedding_dim is None:
+			if expected_dim is None:
+				raise ValueError(
+					"embedding_dim must be set when embedding_model is not one "
+					"of the known defaults."
+				)
+			self.embedding_dim = expected_dim
+
+		if expected_dim is not None and self.embedding_dim != expected_dim:
+			raise ValueError(
+				f"embedding_model={self.embedding_model!r} expects "
+				f"embedding_dim={expected_dim}, got {self.embedding_dim}."
+			)
+
+		return self
+
 
 Category = Literal[
 	"constitutional_law", "statute", "presidential_issuance",

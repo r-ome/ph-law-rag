@@ -1,44 +1,79 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
 	Distance, VectorParams, PointStruct,
-	Filter, FieldCondition, MatchValue, MatchAny
+	Filter, FieldCondition, MatchValue, MatchAny,
+	PayloadSchemaType,
 )
 
 # Denylist (fail-open): keep only in-force law. "unknown" is intentionally allowed
 # through; "not_yet_effective" is excluded so future law isn't surfaced as current authority.
 NON_OPERATIVE = ["superseded", "repealed", "not_yet_effective"]
+FILTER_PAYLOAD_FIELDS = ("doc_id", "source_id", "status")
 from llama_index.core.schema import TextNode
 from app.config import settings
 
 def get_qdrant_client() -> QdrantClient:
-	return QdrantClient(url=settings.qdrant_url)
+	key = settings.qdrant_api_key.get_secret_value()
+	return QdrantClient(url=settings.qdrant_url, api_key=key or None)
+
+def _vector_size(collection_info) -> int:
+	vectors = collection_info.config.params.vectors
+	return vectors.size if hasattr(vectors, "size") else next(iter(vectors.values())).size
+
+def _ensure_filter_payload_indexes(client: QdrantClient) -> None:
+	collection_info = client.get_collection(settings.qdrant_collection)
+	payload_schema = collection_info.payload_schema or {}
+	for field in FILTER_PAYLOAD_FIELDS:
+		if field in payload_schema:
+			continue
+		client.create_payload_index(
+			collection_name=settings.qdrant_collection,
+			field_name=field,
+			field_schema=PayloadSchemaType.KEYWORD,
+			wait=True,
+		)
 
 def ensure_collection(client: QdrantClient) -> None:
 	existing = [c.name for c in client.get_collections().collections]
 	if settings.qdrant_collection not in existing:
 		client.create_collection(
 			collection_name=settings.qdrant_collection,
-			vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+			vectors_config=VectorParams(
+				size=settings.embedding_dim,
+				distance=Distance.COSINE,
+			),
 		)
+	else:
+		collection_info = client.get_collection(settings.qdrant_collection)
+		current = _vector_size(collection_info)
+		if current != settings.embedding_dim:
+			raise RuntimeError(
+				f"Collection '{settings.qdrant_collection}' is currently {current}-dim, "
+				f"EMBEDDING_DIM={settings.embedding_dim}. Use a new QDRANT_COLLECTION "
+				f"or delete the existing one before reindex."
+			)
+
+	_ensure_filter_payload_indexes(client)
 
 def upsert_nodes(
 	client: QdrantClient,
 	nodes: list[TextNode],
-	vectors: list[list[float]]
+	vectors: list[list[float]],
+	batch_size: int = 128,
 ) -> None:
 	points = [
 		PointStruct(
 			id=node.node_id,
 			vector=vector,
-			payload={**node.metadata, "text": node.text}
+			payload={**node.metadata, "text": node.text},
 		)
 		for node, vector in zip(nodes, vectors)
 	]
-	
-	client.upsert(
-		collection_name=settings.qdrant_collection,
-		points=points
-	)
+	for i in range(0, len(points), batch_size):
+		client.upsert(
+			collection_name=settings.qdrant_collection,
+			points=points[i:i + batch_size],
+		)
 
 def delete_by_doc_id(client: QdrantClient, doc_id: str) -> None:
 	client.delete(

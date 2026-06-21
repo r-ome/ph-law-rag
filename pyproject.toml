@@ -32,6 +32,8 @@ dependencies = [
  "typing>=3.10.0.0",
  "uvicorn>=0.46.0",
  "anthropic>=0.107.1",
+ "llama-index-embeddings-bedrock>=0.8.0",
+ "boto3>=1.40.61",
 ]
 
 [project.scripts]

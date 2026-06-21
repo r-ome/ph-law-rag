@@ -207,7 +207,9 @@ All config lives in `.env` and is loaded via `app/config.py`. Key settings:
 
 ```env
 llm_model=mistral
-embedding_model=nomic-embed-text
+embedding_backend=ollama
+# embedding_model and embedding_dim are derived from the backend unless
+# explicitly overridden together.
 ollama_base_url=http://localhost:11434
 qdrant_url=http://localhost:6333
 chunk_size=256
