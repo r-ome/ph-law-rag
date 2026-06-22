@@ -9,19 +9,18 @@ and prebuilt SQLite/BM25 artifacts baked into the container image.
 ```mermaid
 %%{init: {"theme": "dark", "themeVariables": {"background": "#111827", "primaryColor": "#1f2937", "primaryTextColor": "#f9fafb", "primaryBorderColor": "#60a5fa", "lineColor": "#93c5fd", "secondaryColor": "#111827", "tertiaryColor": "#374151"}}}%%
 flowchart LR
-    user["User or hiring manager"] -->|HTTPS| alb["Application Load Balancer"]
+    user["User or hiring manager"] -->|HTTPS phlaw.jeromeagapay.com| alb["Application Load Balancer"]
 
-    alb -->|UI route| ui["ECS Fargate task - Streamlit UI"]
-    alb -->|API route| api["ECS Fargate task - FastAPI"]
+    alb -->|UI only| ui["ECS Fargate task - Streamlit UI"]
 
-    ui -->|HTTP API calls| api
+    ui -->|Service Connect http://api:8000| api["ECS Fargate task - FastAPI (internal only)"]
 
     api -->|Embed user query| titan["Amazon Bedrock - Titan Text Embeddings v2"]
     api -->|Generate grounded answer| anthropic["Anthropic API - Claude Haiku"]
     api -->|Dense vector search| qdrant["Qdrant Cloud - vector collection"]
     api -->|Read metadata| sqlite["Seeded SQLite DB - baked into image"]
     api -->|Sparse keyword search| bm25["BM25 index files - baked into image"]
-    api -->|Read secrets| secrets["AWS Secrets Manager - Qdrant and Anthropic keys"]
+    api -->|Read secrets| secrets["AWS Secrets Manager - Qdrant key/URL + Anthropic key"]
     api -->|IAM auth| taskRole["ECS task role - Bedrock access"]
 
     subgraph aws["AWS account"]
@@ -93,15 +92,19 @@ sequenceDiagram
 
 ## Deployment Notes
 
-- Phase 4 is not implemented yet. This document is the target topology for the
-  CDK stack.
-- ECS Fargate runs the API and UI containers.
-- The stack uses one ALB, not two. Route `/query/*`, `/documents*`, and
-  `/health*` to the FastAPI target group; route the default `/` path to the
-  Streamlit target group.
-- HTTPS is a deployment decision, not an assumption. Either provision an ACM
-  certificate, HTTPS listener, HTTP-to-HTTPS redirect, and optional Route 53
-  record, or deliberately expose an HTTP-only demo URL and update the diagram.
+- Phase 4 is implemented and live at `https://phlaw.jeromeagapay.com` (Python
+  CDK, see `infra/`). It is normally torn down between demos (`cdk destroy
+  PhlawAppStack`) and restored in minutes with `cdk deploy PhlawAppStack`.
+- ECS Fargate runs the API and UI containers (ARM64).
+- The ALB fronts the **UI only**. The API is **not** an ALB target — the UI
+  reaches it server-side over ECS Service Connect at `http://api:8000` (the
+  short Service Connect `dns_name`, not `api.local`). The API has a public IP
+  for egress only; its security group allows inbound solely from the UI, so it
+  is unreachable from the internet. No ALB path rules are needed.
+- HTTPS is provisioned: an ACM cert for `phlaw.jeromeagapay.com` (DNS-validated
+  in a delegated Route 53 child zone, NS-delegated once from Spaceship), an
+  HTTPS:443 listener, and an HTTP:80 -> 443 redirect. A Route 53 alias (A/AAAA)
+  points the subdomain at the ALB, so the URL is stable across deploy/destroy.
 - Qdrant Cloud stores vectors, so no Qdrant container runs in AWS.
 - Bedrock Titan v2 replaces Ollama for runtime embeddings.
 - Generation stays on the first-party Anthropic API because the `generate()`
@@ -117,7 +120,8 @@ sequenceDiagram
 
 ## Deployment Gate
 
-Do not write CDK or touch ECS until the app passes the local zero-Ollama gate:
+Before any CDK was written, the app had to pass the local zero-Ollama gate
+(passed 2026-06-21 — recorded here as the prerequisite that was met):
 
 1. Configure AWS credentials and enable Bedrock access for Titan Text Embeddings
    v2 (`amazon.titan-embed-text-v2:0`) in `us-east-1`.
@@ -125,7 +129,7 @@ Do not write CDK or touch ECS until the app passes the local zero-Ollama gate:
 3. Load cloud runtime settings locally with `RAGLAB_ENV_FILE=.env.cloud-gate`.
    The profile sets `EMBEDDING_BACKEND=bedrock`, `QDRANT_URL`,
    `QDRANT_API_KEY`, `QDRANT_COLLECTION=ph_law-titan1024`,
-   `LLM_MODEL=claude-haiku-4-5`, `ANTHROPIC_API_KEY`, and
+   `LLM_MODEL=claude-haiku-4-5-20251001`, `ANTHROPIC_API_KEY`, and
    `AWS_REGION=us-east-1`. The app derives Titan v2
    (`amazon.titan-embed-text-v2:0`) and dimension `1024` from the backend.
 4. Disable optional local-model paths for the gate:
@@ -154,7 +158,7 @@ Anthropic, and Qdrant are small at demo volume.
 | Fargate – API                | ARM64, 0.5 vCPU / 2 GB, reranker + torch room | ~$17                 |
 | Fargate – UI                 | ARM64, 0.25 vCPU / 0.5 GB, Streamlit          | ~$7                  |
 | ECR                          | ~3 GB image storage                           | ~$0.50               |
-| Secrets Manager              | 1–2 secrets                                   | ~$0.80               |
+| Secrets Manager              | 3 secrets (qdrant key/url, anthropic key)     | ~$1.20               |
 | CloudWatch Logs              | low volume                                    | ~$1–2                |
 | Bedrock Titan v2 (embed)     | indexing one-time + ~50 tok/query             | <$1                  |
 | Anthropic Claude Haiku (gen) | ~2–4K in + ~500 out per query, light traffic  | ~$1–3                |
@@ -186,7 +190,8 @@ NAT, same functionality for a demo. Bake this into the CDK stack from day one.
 3. **Right-size the API task** — the cross-encoder reranker + torch is what forces
    2 GB. Dropping the reranker (or a lighter retrieval path) in the deployed demo
    fits 0.25 vCPU / 0.5 GB and lowers the API task toward ~$18/mo total.
-4. **One ALB, path-routed** to both services — not two.
+4. **One ALB fronting the UI only** — the API is internal via Service Connect,
+   so there is no second ALB and no public API target group.
 
 ### Teardown behavior
 
