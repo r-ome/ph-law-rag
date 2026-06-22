@@ -3,7 +3,7 @@ name: ph-law-rag-cloud
 ## Run: docker compose -f docker-compose.cloud.yaml up --build
 services:
   api:
-    platform: linux/amd64
+    platform: linux/arm64
     build:
       context: .
       dockerfile: dockerfile
@@ -17,7 +17,7 @@ services:
       - ${HOME}/.aws:/root/.aws:ro
 
   ui:
-    platform: linux/amd64
+    platform: linux/arm64
     image: ph-law-rag:cloud
     depends_on: [api]
     command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501

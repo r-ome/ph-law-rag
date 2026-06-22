@@ -16,6 +16,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
 COPY . .
+ RUN test -f data/sqlite/ph-law-rag.db && test -f data/bm25/params.index.json \
+      || (echo "ERROR: seed artifacts missing — run raglab sync/reindex before build" && exit 1)
 RUN uv sync --frozen --no-dev
 
 # Pre-bake the reranker cross-encoder so it never downloads at runtime

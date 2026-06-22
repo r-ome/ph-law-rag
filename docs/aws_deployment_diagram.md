@@ -93,7 +93,15 @@ sequenceDiagram
 
 ## Deployment Notes
 
+- Phase 4 is not implemented yet. This document is the target topology for the
+  CDK stack.
 - ECS Fargate runs the API and UI containers.
+- The stack uses one ALB, not two. Route `/query/*`, `/documents*`, and
+  `/health*` to the FastAPI target group; route the default `/` path to the
+  Streamlit target group.
+- HTTPS is a deployment decision, not an assumption. Either provision an ACM
+  certificate, HTTPS listener, HTTP-to-HTTPS redirect, and optional Route 53
+  record, or deliberately expose an HTTP-only demo URL and update the diagram.
 - Qdrant Cloud stores vectors, so no Qdrant container runs in AWS.
 - Bedrock Titan v2 replaces Ollama for runtime embeddings.
 - Generation stays on the first-party Anthropic API because the `generate()`
@@ -103,6 +111,9 @@ sequenceDiagram
   if persistence becomes important.
 - A full re-index is required when changing embedding providers or vector
   dimensions.
+- The ECR image is ARM64. CDK task definitions must set
+  `runtimePlatform.cpuArchitecture` to `ARM64`; local cloud-smoke compose also
+  pins `linux/arm64` so it cannot accidentally build an amd64 image.
 
 ## Deployment Gate
 
@@ -130,23 +141,25 @@ answer, and `/health` is `ok` with `ollama: null`.
 
 ## Cost Estimate
 
-Approximate, `us-east-1`, single ALB + 2 Fargate tasks (api + ui), Bedrock for
-embeddings, first-party Anthropic for generation, Qdrant Cloud free tier. Verify final numbers in the AWS Pricing
-Calculator — pricing varies by region and usage. The dominant cost is **ALB +
-Fargate**; Bedrock, Anthropic, and Qdrant are small at demo volume.
+Approximate, `us-east-1`, single ALB + 2 ARM64 Fargate tasks (api + ui),
+Bedrock for embeddings, first-party Anthropic for generation, Qdrant Cloud free
+tier. Verify final numbers in the AWS Pricing Calculator — pricing varies by
+region and usage. The dominant cost is **ALB + Fargate + public IPv4**; Bedrock,
+Anthropic, and Qdrant are small at demo volume.
 
-| Component                    | Basis                                        | ~Monthly (always-on) |
-| ---------------------------- | -------------------------------------------- | -------------------- |
-| ALB                          | $0.0225/hr + light LCU                       | ~$18                 |
-| Fargate – API                | 0.5 vCPU / 2 GB (room for reranker + torch)  | ~$21                 |
-| Fargate – UI                 | 0.25 vCPU / 0.5 GB (Streamlit)               | ~$9                  |
-| ECR                          | ~3 GB image storage                          | ~$0.50               |
-| Secrets Manager              | 1–2 secrets                                  | ~$0.80               |
-| CloudWatch Logs              | low volume                                   | ~$1–2                |
-| Bedrock Titan v2 (embed)     | indexing one-time + ~50 tok/query            | <$1                  |
-| Anthropic Claude Haiku (gen) | ~2–4K in + ~500 out per query, light traffic | ~$1–3                |
-| Qdrant Cloud                 | free tier (1 GB, 1 node)                     | $0                   |
-| **Always-on total**          |                                              | **~$50/mo**          |
+| Component                    | Basis                                         | ~Monthly (always-on) |
+| ---------------------------- | --------------------------------------------- | -------------------- |
+| ALB                          | $0.0225/hr + light LCU                        | ~$18                 |
+| Public IPv4                  | ALB addresses + 2 task public IPs             | ~$14–15              |
+| Fargate – API                | ARM64, 0.5 vCPU / 2 GB, reranker + torch room | ~$17                 |
+| Fargate – UI                 | ARM64, 0.25 vCPU / 0.5 GB, Streamlit          | ~$7                  |
+| ECR                          | ~3 GB image storage                           | ~$0.50               |
+| Secrets Manager              | 1–2 secrets                                   | ~$0.80               |
+| CloudWatch Logs              | low volume                                    | ~$1–2                |
+| Bedrock Titan v2 (embed)     | indexing one-time + ~50 tok/query             | <$1                  |
+| Anthropic Claude Haiku (gen) | ~2–4K in + ~500 out per query, light traffic  | ~$1–3                |
+| Qdrant Cloud                 | free tier (1 GB, 1 node)                      | $0                   |
+| **Always-on total**          |                                               | **~$60/mo**          |
 
 ### The NAT Gateway trap
 
@@ -158,11 +171,12 @@ NAT, same functionality for a demo. Bake this into the CDK stack from day one.
 
 ### What you actually pay depends on idle behavior
 
-- **24/7 always-on:** ~$50/mo (public subnets, per table above).
+- **24/7 always-on:** ~$60/mo (public subnets, per table above).
 - **ALB up, Fargate scaled to 0 except demos:** ~$20–25/mo (ALB is the stubborn
-  fixed cost — it cannot scale to zero behind a service).
+  fixed cost and public IPv4 still applies to ALB addresses).
 - **`cdk destroy` / full teardown between demos:** ~$1–5/mo (just ECR + Secrets +
-  a few Bedrock pennies). Redeploy in minutes when needed.
+  a few Bedrock pennies) only if ECR and Secrets are retained or managed outside
+  the ephemeral stack. Redeploy in minutes when needed.
 
 ### Levers to cut cost
 
@@ -173,3 +187,11 @@ NAT, same functionality for a demo. Bake this into the CDK stack from day one.
    2 GB. Dropping the reranker (or a lighter retrieval path) in the deployed demo
    fits 0.25 vCPU / 0.5 GB and lowers the API task toward ~$18/mo total.
 4. **One ALB, path-routed** to both services — not two.
+
+### Teardown behavior
+
+The near-zero idle pattern depends on deliberate retention boundaries. If ECR
+and Secrets Manager are created in the demo stack and destroyed with it, secrets
+will disappear and a non-empty ECR repository can block stack deletion. For the
+portfolio workflow, either import existing ECR/secrets into the CDK stack, keep
+them in a small foundation stack, or apply explicit retain/removal behavior.
