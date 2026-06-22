@@ -16,8 +16,14 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
 COPY . .
- RUN test -f data/sqlite/ph-law-rag.db && test -f data/bm25/params.index.json \
-      || (echo "ERROR: seed artifacts missing — run raglab sync/reindex before build" && exit 1)
+# Cloud image bakes the seed artifacts; fail fast if they're missing. Local dev
+# builds (compose mounts ./data and syncs after startup) leave REQUIRE_SEED=false
+# so a fresh clone can build before any sync has run.
+ARG REQUIRE_SEED=false
+RUN if [ "$REQUIRE_SEED" = "true" ]; then \
+      test -f data/sqlite/ph-law-rag.db && test -f data/bm25/params.index.json \
+      || (echo "ERROR: seed artifacts missing — run raglab sync/reindex before build" && exit 1); \
+    fi
 RUN uv sync --frozen --no-dev
 
 # Pre-bake the reranker cross-encoder so it never downloads at runtime

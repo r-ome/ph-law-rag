@@ -1,6 +1,6 @@
 # Overview
 
-- A RAG Pipeline with the Philippine law as its corpus. A personal project that I want to work and experiment on. Currently, it runs using Streamlit as the UI and FastAPI as the API. You can ask questions related to the Philippine law and the model will answer your question and cite the sources, articles, etc where it's located in the Philippine Law. Only 4 documents are indexed and will index more later.
+- A RAG Pipeline with the Philippine law as its corpus. A personal project that I want to work and experiment on. Currently, it runs using Streamlit as the UI and FastAPI as the API. You can ask questions related to the Philippine law and the model will answer your question and cite the sources, articles, etc where it's located in the Philippine Law. 23 Philippine-law primary sources are indexed (the allowlist in `sources/ph_law_sources.yaml`).
 
 # System Diagram
 

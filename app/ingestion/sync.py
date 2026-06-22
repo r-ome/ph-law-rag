@@ -59,6 +59,7 @@ def process_source(source: SourceConfig) -> dict:
 		prev_hash = get_latest_content_hash(conn, doc_id)
 
 		if prev_hash == content_hash:
+			conn.commit()  # persist the manifest-metadata refresh from find_or_create_document
 			print(f"[SKIP] {source.source_id} — unchanged")
 			return {"url": url, "status": "unchanged"}
 
@@ -94,7 +95,11 @@ def run_sync() -> dict:
 
 	for source in sources:
 		counts["scanned"] += 1
-		result = process_source(source)
+		try:
+			result = process_source(source)
+		except Exception as e:  # never let one source abort the whole sync (sync_runs must be written)
+			print(f"[FAIL] {source.source_id} — {e}")
+			result = {"status": "failed"}
 		if result["status"] == "failed":
 			counts["failed"] += 1
 		elif result["status"] == "unchanged":

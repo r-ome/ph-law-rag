@@ -24,13 +24,31 @@ def save_normalized_document(url: str, content: str) -> str:
 	return str(file_path)
 
 def find_or_create_document(conn, source: SourceConfig) -> tuple[str, bool]:
-	row = conn.execute("SELECT doc_id FROM documents WHERE url = ?;",[source.url]).fetchone()
+	# Match on the stable source_id, not the mutable url: if a source's url changes
+	# in the YAML it's still the same document (a change), not a new one.
+	now = datetime.now(timezone.utc).isoformat()
+	row = conn.execute("SELECT doc_id FROM documents WHERE source_id = ?;", [source.source_id]).fetchone()
 
 	if row:
+		# Refresh mutable manifest metadata even when content is unchanged, so a
+		# url/title/tags/enabled edit in the YAML propagates to the documents table.
+		# (Chunk metadata_json only refreshes on re-index, i.e. a content change.)
+		conn.execute(
+			"""
+			UPDATE documents
+			SET url = ?, title = ?, doc_type = ?, file_format = ?,
+				category = ?, tags_json = ?, enabled = ?, updated_at = ?
+			WHERE doc_id = ?;
+			""",
+			[
+				source.url, source.title, source.doc_type, source.file_format,
+				source.category, json.dumps(source.tags), source.enabled, now,
+				row["doc_id"],
+			],
+		)
 		return row["doc_id"], False
 
 	doc_id = str(uuid4())
-	now = datetime.now(timezone.utc).isoformat()
 
 	conn.execute(
 	"""

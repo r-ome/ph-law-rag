@@ -19,7 +19,8 @@ def index_document(
 	client = get_qdrant_client()
 	ensure_collection(client)
 
-	delete_by_doc_id(client, doc_id)
+	# SQLite deletes are uncommitted here (they roll back with the transaction if
+	# anything below raises — process_source commits only after this returns).
 	conn.execute("DELETE FROM chunks WHERE doc_id = ?", [doc_id])
 	conn.execute("DELETE FROM chunk_parents WHERE doc_id = ?", [doc_id])
 
@@ -28,6 +29,13 @@ def index_document(
 	texts = [node.text for node in nodes]
 	vectors = embed_texts(texts)
 
+	# Dual-store writes are NOT atomic (SQLite + Qdrant). Keep the Qdrant
+	# delete+upsert here, adjacent and after chunk/embed, so the common failure
+	# (chunk or embed raising) leaves Qdrant at its prior state — consistent with
+	# the SQLite transaction that will roll back. A failure strictly between the
+	# delete and upsert self-heals on the next sync (this same delete+upsert reruns
+	# from the prior content_hash). Full atomicity would need an outbox/2PC.
+	delete_by_doc_id(client, doc_id)
 	upsert_nodes(client, nodes, vectors)
 
 	now = datetime.now(timezone.utc).isoformat()

@@ -129,3 +129,62 @@ def test_failed_fetch_writes_no_version(sync_env, monkeypatch):
 
     assert counts["failed"] == 1
     assert _query(db_path, "SELECT * FROM document_versions") == []
+
+
+def test_indexing_exception_is_isolated_and_run_recorded(sync_env, monkeypatch):
+    # An exception while indexing one source must not abort run_sync, and the
+    # sync_runs row must still be written (constraint: never raise inside run_sync).
+    _, db_path = sync_env
+
+    def boom(**kwargs):
+        raise RuntimeError("qdrant exploded")
+
+    monkeypatch.setattr("app.indexing.index_service.index_document", boom)
+
+    counts = run_sync()  # must not raise
+
+    assert counts["scanned"] == 1
+    assert counts["failed"] == 1
+    assert counts["changed"] == 0
+    rows = _query(db_path, "SELECT scanned_count, failed_count, status FROM sync_runs")
+    assert len(rows) == 1
+    assert rows[0] == (1, 1, "completed")
+    # the failed source left no partial document behind (rolled back on close)
+    assert _query(db_path, "SELECT * FROM documents") == []
+
+
+def test_url_change_keeps_same_document(sync_env, monkeypatch):
+    # Same source_id with a changed url is the SAME document (a change), not a new
+    # one — identity is keyed on source_id, not the mutable url.
+    state, db_path = sync_env
+    run_sync()
+
+    changed = _source()
+    changed.url = "https://www.example.test/civil-code-v2"
+    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    state["text"] = "Article 1318 (relocated). Updated requisites."
+
+    counts = run_sync()
+
+    assert counts["changed"] == 1
+    assert len(_query(db_path, "SELECT doc_id FROM documents")) == 1
+
+
+def test_metadata_refresh_persists_on_unchanged_content(sync_env, monkeypatch):
+    # A url/title change with identical content is "unchanged" for versioning, but
+    # the mutable manifest metadata must still be persisted to the documents row.
+    _, db_path = sync_env
+    run_sync()
+
+    changed = _source()
+    changed.url = "https://www.example.test/civil-code-RELOCATED"
+    changed.title = "Civil Code (relocated)"
+    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+
+    counts = run_sync()  # content identical -> unchanged
+
+    assert counts["unchanged"] == 1
+    rows = _query(db_path, "SELECT url, title FROM documents")
+    assert len(rows) == 1
+    assert rows[0][0] == "https://www.example.test/civil-code-RELOCATED"
+    assert rows[0][1] == "Civil Code (relocated)"

@@ -33,9 +33,11 @@ def test_empty_input_returns_empty_string():
 	assert normalize_text("   \n\t  ") == ""
 
 
-# --- Divergences from CLAUDE.md spec (documented, not yet fixed) ---
-# These tests pin the CURRENT behavior. If you decide the spec wins,
-# change normalizer.py and update these.
+# --- Divergences from the Milestone 2 spec (intended behaviour, pinned) ---
+# These tests pin the CURRENT behaviour, which is treated as the spec. Changing
+# normalize_text changes every content_hash and forces a FULL re-index (incl. the
+# cloud Qdrant collection via the Bedrock rate limit) — so only change it
+# deliberately, with a re-index. See normalizer.py for the rationale.
 
 def test_DIVERGENCE_does_not_collapse_intra_line_whitespace_runs():
 	# Spec says "collapse intra-line whitespace", but the implementation
