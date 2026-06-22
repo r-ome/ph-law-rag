@@ -59,23 +59,23 @@ It should:
 
 ## Recommended Stack
 
-| Concern | Tool | Reason |
-|---|---|---|
-| RAG orchestration | LlamaIndex | Purpose-built for document retrieval pipelines; first-class hybrid retrieval, reranking, and eval support |
-| LLM | Ollama (mistral or llama3) | Local, free, model-swappable via config |
-| Embeddings | Ollama `nomic-embed-text` | Local, high-quality 768-dim embeddings; swap via config |
-| Vector store | Qdrant (local Docker) | Native hybrid search (dense + sparse in one query), metadata filtering, concurrent-safe |
-| Sparse index | LlamaIndex BM25Retriever | Exact-match keyword retrieval; pairs with dense for hybrid |
-| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Query-time cross-encoder rescoring; significantly improves ranking quality |
-| PDF ingestion | `pdfplumber` via LlamaIndex | Better table and layout handling than PyPDF2 |
-| HTML ingestion | `trafilatura` | Strips navigation boilerplate better than BeautifulSoup |
-| Evals | RAGAS | Semantic eval scoring: faithfulness, answer relevance, context precision, context recall |
-| Frontend | Streamlit | Fast, Python-native, enough for a portfolio demo UI |
-| API | FastAPI | Same service modules as Streamlit; thin adapter |
-| Config | pydantic-settings | `.env`-driven config with type validation and defaults |
-| Metadata / versioning | SQLite | Zero-setup, ships with Python, sufficient for the workload |
-| Dependency management | uv | Fast, lockfile-based |
-| Testing | pytest | Standard |
+| Concern               | Tool                                   | Reason                                                                                                    |
+| --------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| RAG orchestration     | LlamaIndex                             | Purpose-built for document retrieval pipelines; first-class hybrid retrieval, reranking, and eval support |
+| LLM                   | Ollama (mistral or llama3)             | Local, free, model-swappable via config                                                                   |
+| Embeddings            | Ollama `nomic-embed-text`              | Local, high-quality 768-dim embeddings; swap via config                                                   |
+| Vector store          | Qdrant (local Docker)                  | Native hybrid search (dense + sparse in one query), metadata filtering, concurrent-safe                   |
+| Sparse index          | LlamaIndex BM25Retriever               | Exact-match keyword retrieval; pairs with dense for hybrid                                                |
+| Reranker              | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Query-time cross-encoder rescoring; significantly improves ranking quality                                |
+| PDF ingestion         | `pdfplumber` via LlamaIndex            | Better table and layout handling than PyPDF2                                                              |
+| HTML ingestion        | `trafilatura`                          | Strips navigation boilerplate better than BeautifulSoup                                                   |
+| Evals                 | RAGAS                                  | Semantic eval scoring: faithfulness, answer relevance, context precision, context recall                  |
+| Frontend              | Streamlit                              | Fast, Python-native, enough for a portfolio demo UI                                                       |
+| API                   | FastAPI                                | Same service modules as Streamlit; thin adapter                                                           |
+| Config                | pydantic-settings                      | `.env`-driven config with type validation and defaults                                                    |
+| Metadata / versioning | SQLite                                 | Zero-setup, ships with Python, sufficient for the workload                                                |
+| Dependency management | uv                                     | Fast, lockfile-based                                                                                      |
+| Testing               | pytest                                 | Standard                                                                                                  |
 
 ---
 
@@ -150,6 +150,7 @@ Keep the hash-based incremental sync pattern from the original project. It's the
 ### Grounded Generation with Abstention
 
 The LLM must only answer from provided context. Abstention is enforced by two mechanisms:
+
 1. Hard gate: if fewer than `min_chunks_for_answer` chunks survive the distance filter, skip generation and return an explicit "insufficient evidence" response.
 2. Prompt instruction: the system prompt explicitly instructs the LLM to say it doesn't know when evidence is thin.
 
@@ -230,6 +231,7 @@ ph-law-rag/
 Goal: project boots cleanly, all entry points work.
 
 Build:
+
 - Repo structure and `pyproject.toml`
 - `config.py` with pydantic-settings
 - `db.py` with SQLite bootstrap and migration table
@@ -239,6 +241,7 @@ Build:
 - `raglab init` creates data directories and bootstraps DB
 
 Definition of done:
+
 - CLI runs without error
 - FastAPI starts
 - Streamlit starts
@@ -252,6 +255,7 @@ Definition of done:
 Goal: sync fetches, normalizes, and versions documents.
 
 Build:
+
 - `sources/ph_law_sources.yaml` with ~25–40 curated sources
 - `fetcher.py` — httpx downloader with timeout, user-agent, basic retry
 - `pdf_parser.py` — pdfplumber extraction with fallback for scanned pages
@@ -263,6 +267,7 @@ Build:
 - SQLite `documents`, `document_versions`, `sync_runs` tables
 
 Definition of done:
+
 - `raglab sync` fetches all enabled sources
 - Changed vs. unchanged is tracked and reported
 - Re-running sync on unchanged corpus skips all downstream processing
@@ -274,6 +279,7 @@ Definition of done:
 Goal: changed documents are chunked, embedded, and stored in Qdrant and BM25.
 
 Build:
+
 - `chunker.py` — LlamaIndex `SentenceSplitter` with configurable size and overlap
 - `embedder.py` — Ollama embedding client (`nomic-embed-text`)
 - `vector_store.py` — Qdrant wrapper: collection init, upsert, delete-by-doc, dense query
@@ -282,6 +288,7 @@ Build:
 - Qdrant running locally via Docker
 
 Definition of done:
+
 - `raglab sync` triggers indexing for new/changed documents
 - Qdrant holds dense vectors; BM25 index is persisted to disk
 - Re-running on unchanged docs skips indexing entirely
@@ -293,6 +300,7 @@ Definition of done:
 Goal: `raglab ask` returns grounded answers with citations.
 
 Build:
+
 - `dense_retriever.py` — Qdrant top-k dense retrieval with distance filter
 - `sparse_retriever.py` — BM25 top-k retrieval
 - `hybrid_retriever.py` — RRF fusion of dense and sparse result lists
@@ -304,6 +312,7 @@ Build:
 - Debug mode: exposes retrieved chunks, distances, rerank scores, prompt length
 
 Definition of done:
+
 - `raglab ask "..."` returns a grounded answer with numbered citations
 - Out-of-scope questions trigger the abstention response
 - Debug mode shows the full retrieval trace
@@ -315,6 +324,7 @@ Definition of done:
 Goal: interactive UI works; API is usable.
 
 Build:
+
 - `app/ui/app.py` — Streamlit chat interface:
   - Query input with submit
   - Answer display with inline citation links
@@ -328,6 +338,7 @@ Build:
 - Both Streamlit and FastAPI call the same shared service modules
 
 Definition of done:
+
 - Streamlit app runs and returns answers in a browser
 - FastAPI `/query/ask` returns the same response programmatically
 - No business logic lives in either adapter
@@ -339,6 +350,7 @@ Definition of done:
 Goal: eval pipeline produces meaningful semantic scores.
 
 Build:
+
 - `data/eval_dataset.jsonl` — 40–60 questions across:
   - Factual lookup (specific article, section, or RA number)
   - Paraphrase (same meaning, different wording)
@@ -355,6 +367,7 @@ Build:
 - CLI `raglab eval` runs the full cycle
 
 Definition of done:
+
 - `raglab eval` produces per-question RAGAS scores and a category summary
 - Results are saved as JSONL for manual review
 
@@ -363,6 +376,7 @@ Definition of done:
 ### Milestone 7: Polish and GitHub Readiness
 
 Build:
+
 - `README.md` with setup instructions, demo commands, example output
 - `docs/architecture.md` — system design, data flow, package breakdown
 - `docs/tradeoffs.md` — design decisions and reasoning
@@ -376,16 +390,19 @@ Build:
 Three services run in containers; Ollama runs natively on the host so it keeps Apple Silicon GPU access via Metal (containers run in a Linux VM with no Metal/GPU passthrough — a containerized Ollama would be CPU-only and slow). Qdrant/FastAPI/Streamlit are CPU+RAM only and do not use the GPU.
 
 Services:
+
 - `qdrant` — image `qdrant/qdrant`, ports `6333:6333` / `6334:6334`, volume for `/qdrant/storage` so vectors persist across restarts.
 - `api` — FastAPI (uvicorn), port `8000:8000`, depends_on `qdrant`.
 - `ui` — Streamlit, port `8501:8501`, depends_on `api`.
 
 Networking rules (Compose puts services on a shared network where the **service name is the hostname**):
+
 - `ui` → `api` at `http://api:8000` (not `localhost`).
 - `api` → `qdrant` at `http://qdrant:6333` (not `localhost`).
 - `api` → host-native Ollama at `http://host.docker.internal:11434`. Add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `api` service so this resolves on Colima and Docker Desktop alike.
 
 Host prerequisites (document in README):
+
 - Ollama installed natively, models pulled (`ollama pull nomic-embed-text`, `ollama pull mistral`).
 - Ollama must listen on all interfaces so containers can reach it: `OLLAMA_HOST=0.0.0.0:11434 ollama serve` (default `127.0.0.1` binding rejects container traffic).
 - Works on Colima (`colima start --cpu 4 --memory 8`) without Docker Desktop.
@@ -394,19 +411,37 @@ Host prerequisites (document in README):
 
 These are existing `Settings` fields (`app/config.py`); override via environment in the compose file's `api` service, not by editing defaults. Local (non-Docker) runs keep the `localhost` defaults.
 
-| Config field | Local default | docker-compose value (set on `api` service) |
-|---|---|---|
-| `qdrant_url` | `http://localhost:6333` | `http://qdrant:6333` |
-| `ollama_base_url` | `http://localhost:11434` | `http://host.docker.internal:11434` |
+| Config field      | Local default            | docker-compose value (set on `api` service) |
+| ----------------- | ------------------------ | ------------------------------------------- |
+| `qdrant_url`      | `http://localhost:6333`  | `http://qdrant:6333`                        |
+| `ollama_base_url` | `http://localhost:11434` | `http://host.docker.internal:11434`         |
 
 The Streamlit `ui` service needs the FastAPI base URL pointed at `http://api:8000` (via whatever env var the UI adapter uses for the API endpoint). Document each override in `.env.example` with a comment noting the Docker vs. local distinction.
 
 Definition of done:
+
 - Repo is presentation-ready
 - A reviewer can clone, follow README, and have a working system in under 15 minutes
 - `docker compose up` starts Qdrant + FastAPI + Streamlit; with host Ollama running, the Streamlit demo answers an end-to-end query
 
 ---
+
+#### Cloud deployment (AWS)
+
+The local compose above is for development. The production topology is different — **no local Qdrant, no Ollama** —
+and is documented separately in [`docs/aws_deployment_diagram.md`](aws_deployment_diagram.md). Summary:
+
+- **Embeddings** → AWS Bedrock Titan Text Embeddings v2 (`amazon.titan-embed-text-v2:0`, 1024-dim, `us-east-1`);
+  selected by `embedding_backend=bedrock`.
+- **Generation** → first-party Anthropic API (Claude Haiku).
+- **Vectors** → Qdrant Cloud (collection `ph_law-titan1024`); SQLite + BM25 baked into the image as seed artifacts.
+- **Runtime** → one image, two entrypoints (FastAPI `api` + Streamlit `ui`) on Fargate behind an ALB; secrets via
+  Secrets Manager / task role, never baked.
+- **Local cloud-smoke** → `docker compose -f docker-compose.cloud.yaml up --build` with
+  `RAGLAB_ENV_FILE=.env.cloud-gate` and AWS creds mounted.
+
+Staged rollout (Phase 1 cloud seams → Phase 2 zero-Ollama gate → Phase 3 Dockerfile + ECR → Phase 4 CDK) is tracked in
+`docs/aws_deployment_diagram.md`.
 
 ## Step-by-Step Implementation Order
 
@@ -500,95 +535,95 @@ class Settings(BaseSettings):
 
 One row per logical source document.
 
-| Field | Type | Notes |
-|---|---|---|
-| `doc_id` | TEXT PK | Derived from source_id + URL hash |
-| `source_id` | TEXT | From YAML `source_id` field |
-| `title` | TEXT | From YAML or extracted from document |
-| `url` | TEXT | Source URL |
-| `doc_type` | TEXT | `statute`, `sc_decision`, `constitution`, `other` |
-| `file_format` | TEXT | `html`, `pdf` |
-| `category` | TEXT | e.g., `civil_law`, `criminal_law`, `constitutional` |
-| `tags_json` | TEXT | JSON array of tags |
-| `enabled` | INTEGER | 1 = active source |
-| `created_at` | TEXT | ISO8601 |
-| `updated_at` | TEXT | ISO8601 |
+| Field         | Type    | Notes                                               |
+| ------------- | ------- | --------------------------------------------------- |
+| `doc_id`      | TEXT PK | Derived from source_id + URL hash                   |
+| `source_id`   | TEXT    | From YAML `source_id` field                         |
+| `title`       | TEXT    | From YAML or extracted from document                |
+| `url`         | TEXT    | Source URL                                          |
+| `doc_type`    | TEXT    | `statute`, `sc_decision`, `constitution`, `other`   |
+| `file_format` | TEXT    | `html`, `pdf`                                       |
+| `category`    | TEXT    | e.g., `civil_law`, `criminal_law`, `constitutional` |
+| `tags_json`   | TEXT    | JSON array of tags                                  |
+| `enabled`     | INTEGER | 1 = active source                                   |
+| `created_at`  | TEXT    | ISO8601                                             |
+| `updated_at`  | TEXT    | ISO8601                                             |
 
 ### `document_versions`
 
 One row per fetched version of a document.
 
-| Field | Type | Notes |
-|---|---|---|
-| `version_id` | TEXT PK | UUID |
-| `doc_id` | TEXT FK | → documents |
-| `fetched_at` | TEXT | ISO8601 |
-| `http_status` | INTEGER | HTTP response code |
-| `content_hash` | TEXT | SHA-256 of normalized text |
-| `content_length` | INTEGER | Char count of normalized text |
-| `raw_path` | TEXT | Path under `data/raw/` |
-| `normalized_path` | TEXT | Path under `data/normalized/` |
-| `extraction_method` | TEXT | `trafilatura`, `pdfplumber`, `beautifulsoup` |
-| `changed_from_previous` | INTEGER | 1 if content changed |
+| Field                   | Type    | Notes                                        |
+| ----------------------- | ------- | -------------------------------------------- |
+| `version_id`            | TEXT PK | UUID                                         |
+| `doc_id`                | TEXT FK | → documents                                  |
+| `fetched_at`            | TEXT    | ISO8601                                      |
+| `http_status`           | INTEGER | HTTP response code                           |
+| `content_hash`          | TEXT    | SHA-256 of normalized text                   |
+| `content_length`        | INTEGER | Char count of normalized text                |
+| `raw_path`              | TEXT    | Path under `data/raw/`                       |
+| `normalized_path`       | TEXT    | Path under `data/normalized/`                |
+| `extraction_method`     | TEXT    | `trafilatura`, `pdfplumber`, `beautifulsoup` |
+| `changed_from_previous` | INTEGER | 1 if content changed                         |
 
 ### `chunks`
 
 One row per chunk version.
 
-| Field | Type | Notes |
-|---|---|---|
-| `chunk_id` | TEXT PK | UUID |
-| `doc_id` | TEXT FK | → documents |
-| `version_id` | TEXT FK | → document_versions |
-| `chunk_index` | INTEGER | Position in document |
-| `text` | TEXT | Chunk content |
-| `char_count` | INTEGER | |
-| `token_estimate` | INTEGER | Rough estimate |
-| `qdrant_id` | TEXT | Qdrant point ID for deletion |
-| `metadata_json` | TEXT | title, url, doc_type, category, tags, chunk_index |
-| `created_at` | TEXT | ISO8601 |
+| Field            | Type    | Notes                                             |
+| ---------------- | ------- | ------------------------------------------------- |
+| `chunk_id`       | TEXT PK | UUID                                              |
+| `doc_id`         | TEXT FK | → documents                                       |
+| `version_id`     | TEXT FK | → document_versions                               |
+| `chunk_index`    | INTEGER | Position in document                              |
+| `text`           | TEXT    | Chunk content                                     |
+| `char_count`     | INTEGER |                                                   |
+| `token_estimate` | INTEGER | Rough estimate                                    |
+| `qdrant_id`      | TEXT    | Qdrant point ID for deletion                      |
+| `metadata_json`  | TEXT    | title, url, doc_type, category, tags, chunk_index |
+| `created_at`     | TEXT    | ISO8601                                           |
 
 ### `sync_runs`
 
-| Field | Type |
-|---|---|
-| `sync_run_id` | TEXT PK |
-| `started_at` | TEXT |
-| `completed_at` | TEXT |
-| `status` | TEXT |
-| `scanned_count` | INTEGER |
-| `changed_count` | INTEGER |
+| Field             | Type    |
+| ----------------- | ------- |
+| `sync_run_id`     | TEXT PK |
+| `started_at`      | TEXT    |
+| `completed_at`    | TEXT    |
+| `status`          | TEXT    |
+| `scanned_count`   | INTEGER |
+| `changed_count`   | INTEGER |
 | `unchanged_count` | INTEGER |
-| `failed_count` | INTEGER |
+| `failed_count`    | INTEGER |
 
 ### `conversations`
 
-| Field | Type | Notes |
-|---|---|---|
-| `session_id` | TEXT PK | UUID |
-| `created_at` | TEXT | ISO8601 |
-| `title` | TEXT | Optional label |
+| Field        | Type    | Notes          |
+| ------------ | ------- | -------------- |
+| `session_id` | TEXT PK | UUID           |
+| `created_at` | TEXT    | ISO8601        |
+| `title`      | TEXT    | Optional label |
 
 ### `conversation_turns`
 
-| Field | Type | Notes |
-|---|---|---|
-| `turn_id` | TEXT PK | UUID |
-| `session_id` | TEXT FK | → conversations |
-| `turn_index` | INTEGER | Position in session (0-based) |
-| `question` | TEXT | Original user question |
-| `rewritten_question` | TEXT | Rewritten standalone query (may equal question) |
-| `answer` | TEXT | Generated answer |
-| `retrieved_chunks_json` | TEXT | JSON array of chunk IDs used |
-| `created_at` | TEXT | ISO8601 |
+| Field                   | Type    | Notes                                           |
+| ----------------------- | ------- | ----------------------------------------------- |
+| `turn_id`               | TEXT PK | UUID                                            |
+| `session_id`            | TEXT FK | → conversations                                 |
+| `turn_index`            | INTEGER | Position in session (0-based)                   |
+| `question`              | TEXT    | Original user question                          |
+| `rewritten_question`    | TEXT    | Rewritten standalone query (may equal question) |
+| `answer`                | TEXT    | Generated answer                                |
+| `retrieved_chunks_json` | TEXT    | JSON array of chunk IDs used                    |
+| `created_at`            | TEXT    | ISO8601                                         |
 
 ### `schema_migrations`
 
-| Field | Type |
-|---|---|
-| `version` | INTEGER PK |
-| `applied_at` | TEXT |
-| `description` | TEXT |
+| Field         | Type       |
+| ------------- | ---------- |
+| `version`     | INTEGER PK |
+| `applied_at`  | TEXT       |
+| `description` | TEXT       |
 
 ---
 
@@ -666,12 +701,12 @@ After RRF fusion, the top 20 merged candidates are re-scored by a cross-encoder:
 
 ### Why This Matters for Legal Text
 
-| Query type | Dense handles | BM25 handles |
-|---|---|---|
-| "What are the elements of estafa?" | ✓ (semantic) | ✗ |
-| "Republic Act 10173 section 16" | ✗ | ✓ (exact match) |
-| "G.R. No. 12345" | ✗ | ✓ (exact match) |
-| "rights of an accused person" | ✓ (semantic) | partial |
+| Query type                         | Dense handles | BM25 handles    |
+| ---------------------------------- | ------------- | --------------- |
+| "What are the elements of estafa?" | ✓ (semantic)  | ✗               |
+| "Republic Act 10173 section 16"    | ✗             | ✓ (exact match) |
+| "G.R. No. 12345"                   | ✗             | ✓ (exact match) |
+| "rights of an accused person"      | ✓ (semantic)  | partial         |
 
 ---
 
@@ -700,6 +735,7 @@ information from the available sources to answer this question."
 ```
 
 Response structure:
+
 - Direct answer
 - Inline citations by reference number
 - Sources section listing title, URL, article/section where applicable
@@ -714,22 +750,22 @@ Abstention gate: if fewer than `min_chunks_for_answer` chunks survive the `max_d
 
 The tracked eval dataset currently has 70 questions across categories. Keep the out-of-scope slice stable when expanding the corpus so abstention metrics remain comparable across runs.
 
-| Category | Count | Description |
-|---|---|---|
-| Factual | 34 | Specific article, section, or RA lookup |
-| Paraphrase | 8 | Same meaning as a factual query, different wording |
-| Synthesis | 10 | Requires combining context from 2+ sources |
-| Ambiguous | 6 | May be partially answerable |
-| Out-of-scope | 12 | Should trigger abstention |
+| Category     | Count | Description                                        |
+| ------------ | ----- | -------------------------------------------------- |
+| Factual      | 34    | Specific article, section, or RA lookup            |
+| Paraphrase   | 8     | Same meaning as a factual query, different wording |
+| Synthesis    | 10    | Requires combining context from 2+ sources         |
+| Ambiguous    | 6     | May be partially answerable                        |
+| Out-of-scope | 12    | Should trigger abstention                          |
 
 ### RAGAS Metrics
 
-| Metric | What it measures |
-|---|---|
-| Faithfulness | Is the answer supported by the retrieved context? |
-| Answer relevance | Does the answer actually address the question? |
-| Context precision | Are the top-ranked chunks relevant to the question? |
-| Context recall | Does the retrieved context cover the ground-truth answer? |
+| Metric            | What it measures                                          |
+| ----------------- | --------------------------------------------------------- |
+| Faithfulness      | Is the answer supported by the retrieved context?         |
+| Answer relevance  | Does the answer actually address the question?            |
+| Context precision | Are the top-ranked chunks relevant to the question?       |
+| Context recall    | Does the retrieved context cover the ground-truth answer? |
 
 ### Eval Dataset Format
 
@@ -737,7 +773,9 @@ The tracked eval dataset currently has 70 questions across categories. Keep the 
 {
   "question": "What is the prescriptive period for filing a criminal case for estafa?",
   "ground_truth": "Under Article 90 of the Revised Penal Code, the prescriptive period for estafa depends on the penalty attached to the offense.",
-  "expected_sources": ["revised_penal_code"],
+  "expected_sources": [
+    "revised_penal_code"
+  ],
   "category": "factual"
 }
 ```
@@ -747,15 +785,18 @@ The tracked eval dataset currently has 70 questions across categories. Keep the 
 ## Streamlit UI Design
 
 ### Chat Tab
+
 - Text input for questions
 - Answer display with cited sources as clickable links
 - Expandable "Debug" section showing retrieved chunks, distances, rerank scores
 
 ### Sources Tab
+
 - Table of all indexed documents (title, doc_type, category, last synced, status)
 - Filter by doc_type and category
 
 ### Settings Sidebar
+
 - LLM model selector (reads available Ollama models)
 - top-k and rerank_top_n sliders
 - Debug mode toggle
@@ -765,13 +806,13 @@ The tracked eval dataset currently has 70 questions across categories. Keep the 
 
 ## FastAPI Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/health` | Health check; verifies Qdrant and Ollama are reachable |
-| POST | `/query/ask` | Ask a question; returns answer + citations |
-| GET | `/documents` | List all documents with sync status |
-| GET | `/documents/{doc_id}` | Single document metadata |
-| POST | `/sync` | Trigger sync as background task |
+| Method | Path                  | Description                                            |
+| ------ | --------------------- | ------------------------------------------------------ |
+| GET    | `/health`             | Health check; verifies Qdrant and Ollama are reachable |
+| POST   | `/query/ask`          | Ask a question; returns answer + citations             |
+| GET    | `/documents`          | List all documents with sync status                    |
+| GET    | `/documents/{doc_id}` | Single document metadata                               |
+| POST   | `/sync`               | Trigger sync as background task                        |
 
 ---
 
@@ -841,26 +882,31 @@ Goal: multi-turn conversations work end-to-end — follow-up questions are resol
 Build:
 
 **New SQLite tables (new migration in `db.py`):**
+
 - `conversations` — `session_id` (PK), `created_at`, `title` (optional label)
 - `conversation_turns` — `turn_id` (PK), `session_id` (FK), `turn_index`, `question`, `rewritten_question`, `answer`, `retrieved_chunks_json`, `created_at`
 
 **New config fields in `app/config.py`:**
+
 ```python
 max_conversation_turns: int = 5       # history window passed to rewriter
 enable_query_rewriting: bool = True   # toggle rewriting off for debugging
 ```
 
 **New module `app/conversation/`:**
+
 - `session.py` — `create_session(conn) -> str`, `get_history(conn, session_id, limit) -> list[dict]`, `append_turn(conn, session_id, turn_data) -> str`
 - `query_rewriter.py` — `rewrite_query(question: str, history: list[dict]) -> str`: calls Ollama LLM with a short prompt that resolves pronouns and ellipsis ("what about that?", "and section 5?") into a self-contained query; returns original question unchanged if `enable_query_rewriting = False` or history is empty
 
 **Changes to existing files:**
+
 - `answer_service.py` — accept optional `session_id: str | None`; if provided, load history, rewrite query, run pipeline on rewritten query, persist turn to `conversation_turns`
 - `app/cli/main.py` — `raglab ask` gains `--session TEXT` option; if omitted, creates a new session each invocation (stateless); if provided, loads and continues that session
 - `app/api/main.py` — `POST /query/ask` request body gains optional `session_id`; response includes `session_id` so clients can thread turns
 - `app/ui/app.py` — maintain `session_id` in `st.session_state`; display full conversation history in the chat tab; "New conversation" button resets state
 
 **Query rewriting prompt (in `prompts.py`):**
+
 ```
 Given the following conversation history and a follow-up question, rewrite
 the follow-up as a standalone question that can be understood without the
@@ -875,6 +921,7 @@ Standalone question:
 ```
 
 Definition of done:
+
 - `raglab ask --session abc "what about section 5?"` correctly resolves "section 5" against prior turns in session `abc`
 - Streamlit chat tab maintains conversation state across turns in the browser
 - `POST /query/ask` with `session_id` returns a threaded response
@@ -882,6 +929,7 @@ Definition of done:
 - `max_conversation_turns` caps how much history is passed to the rewriter
 
 Key constraints:
+
 - Rewriting is a separate LLM call before retrieval — keep it short (use a fast/small model or the same Ollama model with a low token budget)
 - Never pass raw history into the retrieval prompt — only the rewritten standalone query goes to the retriever
 - History is stored in SQLite, not in-memory — sessions survive process restarts
@@ -965,12 +1013,21 @@ Example rubric shape:
   "question_id": "bar_2025_pil_prior_restraint_abc_news",
   "max_score": 10,
   "criteria": [
-    {"name": "Identifies prior restraint / freedom of press issue", "points": 2},
-    {"name": "States the presumption against prior restraint", "points": 2},
-    {"name": "Discusses narrow exceptions / clear and present danger", "points": 2},
-    {"name": "Applies doctrine to DOJ prohibition and violence facts", "points": 2},
-    {"name": "Reaches and explains the correct conclusion", "points": 1},
-    {"name": "Clear bar-style structure", "points": 1}
+    {
+      "name": "Identifies prior restraint / freedom of press issue",
+      "points": 2
+    },
+    { "name": "States the presumption against prior restraint", "points": 2 },
+    {
+      "name": "Discusses narrow exceptions / clear and present danger",
+      "points": 2
+    },
+    {
+      "name": "Applies doctrine to DOJ prohibition and violence facts",
+      "points": 2
+    },
+    { "name": "Reaches and explains the correct conclusion", "points": 1 },
+    { "name": "Clear bar-style structure", "points": 1 }
   ]
 }
 ```
@@ -1081,6 +1138,7 @@ When reviewing code:
 6. Prefer explicit retrieval trace in debug mode over silent failures
 
 If the current implementation differs from this plan, note whether the difference is:
+
 - Acceptable simplification
 - Technical debt
 - Bug

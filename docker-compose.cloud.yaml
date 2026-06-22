@@ -1,0 +1,27 @@
+name: ph-law-rag-cloud
+## Local smoke of the cloud image. Talks to Qdrant Cloud + Bedrock + Anthropic.
+## Run: docker compose -f docker-compose.cloud.yaml up --build
+services:
+  api:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: ph-law-rag:cloud
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports: ["8000:8000"]
+    env_file: [.env.cloud-gate]
+    environment:
+      AWS_PROFILE: ph-law-rag-dev
+    volumes:
+      - ${HOME}/.aws:/root/.aws:ro
+
+  ui:
+    platform: linux/amd64
+    image: ph-law-rag:cloud
+    depends_on: [api]
+    command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501
+    ports: ["8501:8501"]
+    environment:
+      api_base_url: http://api:8000
+      llm_model: claude-haiku-4-5

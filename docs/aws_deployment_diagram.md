@@ -113,7 +113,7 @@ Do not write CDK or touch ECS until the app passes the local zero-Ollama gate:
 2. Create a Qdrant Cloud cluster and API key.
 3. Load cloud runtime settings locally with `RAGLAB_ENV_FILE=.env.cloud-gate`.
    The profile sets `EMBEDDING_BACKEND=bedrock`, `QDRANT_URL`,
-   `QDRANT_API_KEY`, `QDRANT_COLLECTION=ph_law_titan1024`,
+   `QDRANT_API_KEY`, `QDRANT_COLLECTION=ph_law-titan1024`,
    `LLM_MODEL=claude-haiku-4-5`, `ANTHROPIC_API_KEY`, and
    `AWS_REGION=us-east-1`. The app derives Titan v2
    (`amazon.titan-embed-text-v2:0`) and dimension `1024` from the backend.
@@ -125,7 +125,7 @@ Do not write CDK or touch ECS until the app passes the local zero-Ollama gate:
    `/health`.
 
 The gate passes only when `raglab reindex` populates the 1024-dim
-`ph_law_titan1024` collection in Qdrant Cloud, `raglab ask` returns a grounded
+`ph_law-titan1024` collection in Qdrant Cloud, `raglab ask` returns a grounded
 answer, and `/health` is `ok` with `ollama: null`.
 
 ## Cost Estimate
@@ -135,18 +135,18 @@ embeddings, first-party Anthropic for generation, Qdrant Cloud free tier. Verify
 Calculator — pricing varies by region and usage. The dominant cost is **ALB +
 Fargate**; Bedrock, Anthropic, and Qdrant are small at demo volume.
 
-| Component | Basis | ~Monthly (always-on) |
-|---|---|---|
-| ALB | $0.0225/hr + light LCU | ~$18 |
-| Fargate – API | 0.5 vCPU / 2 GB (room for reranker + torch) | ~$21 |
-| Fargate – UI | 0.25 vCPU / 0.5 GB (Streamlit) | ~$9 |
-| ECR | ~3 GB image storage | ~$0.50 |
-| Secrets Manager | 1–2 secrets | ~$0.80 |
-| CloudWatch Logs | low volume | ~$1–2 |
-| Bedrock Titan v2 (embed) | indexing one-time + ~50 tok/query | <$1 |
-| Anthropic Claude Haiku (gen) | ~2–4K in + ~500 out per query, light traffic | ~$1–3 |
-| Qdrant Cloud | free tier (1 GB, 1 node) | $0 |
-| **Always-on total** | | **~$50/mo** |
+| Component                    | Basis                                        | ~Monthly (always-on) |
+| ---------------------------- | -------------------------------------------- | -------------------- |
+| ALB                          | $0.0225/hr + light LCU                       | ~$18                 |
+| Fargate – API                | 0.5 vCPU / 2 GB (room for reranker + torch)  | ~$21                 |
+| Fargate – UI                 | 0.25 vCPU / 0.5 GB (Streamlit)               | ~$9                  |
+| ECR                          | ~3 GB image storage                          | ~$0.50               |
+| Secrets Manager              | 1–2 secrets                                  | ~$0.80               |
+| CloudWatch Logs              | low volume                                   | ~$1–2                |
+| Bedrock Titan v2 (embed)     | indexing one-time + ~50 tok/query            | <$1                  |
+| Anthropic Claude Haiku (gen) | ~2–4K in + ~500 out per query, light traffic | ~$1–3                |
+| Qdrant Cloud                 | free tier (1 GB, 1 node)                     | $0                   |
+| **Always-on total**          |                                              | **~$50/mo**          |
 
 ### The NAT Gateway trap
 

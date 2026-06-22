@@ -1,8 +1,18 @@
 .venv
 venv
-data
 .git
 __pycache__
 *.pyc
-.env
 .pytest_cache
+
+# env: keep all env files out, allow only templates
+.env*
+!.env.example
+!.env.*.example
+
+# exclude all data, then re-include only the seed artifact dirs + contents
+data/*
+!data/sqlite/
+!data/sqlite/**
+!data/bm25/
+!data/bm25/**

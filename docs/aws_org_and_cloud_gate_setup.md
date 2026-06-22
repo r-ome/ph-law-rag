@@ -286,10 +286,10 @@ Runtime settings needed later:
 ```bash
 export QDRANT_URL=https://YOUR_QDRANT_CLUSTER_URL:6333
 export QDRANT_API_KEY=YOUR_QDRANT_API_KEY
-export QDRANT_COLLECTION=ph_law_titan1024
+export QDRANT_COLLECTION=ph_law-titan1024
 ```
 
-`ph_law_titan1024` is a fresh collection name for Titan v2 embeddings so the app
+`ph_law-titan1024` is a fresh collection name for Titan v2 embeddings so the app
 does not accidentally reuse an old 768-dim local/Ollama collection.
 
 ## Bedrock Titan v2
