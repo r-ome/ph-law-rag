@@ -270,7 +270,25 @@ Definition of done:
 
 - `raglab sync` fetches all enabled sources
 - Changed vs. unchanged is tracked and reported
-- Re-running sync on unchanged corpus skips all downstream processing
+- Re-running sync on unchanged corpus skips re-fetch versioning AND re-embedding
+
+Metadata-only reconcile (added 2026-06-23): when content is unchanged but a manifest
+field changed, the unchanged path still reconciles the derived stores instead of a blind
+skip — because some manifest fields (notably `status`) are retrieval filters or are baked
+into chunk text. Two tiers:
+
+- Tier A (`status, url, tags, category, doc_type` — not baked): in-place Qdrant
+  `set_payload` + chunk `metadata_json` merge + `chunk_parents.url` + BM25 rebuild, no
+  re-embed. Reported `[META]`.
+- Tier B (`title, official_number` baked into chunk text; `structure` changes boundaries;
+  or zero existing chunks): re-chunk + re-embed under the existing `version_id`, no new
+  `document_versions` row. Reported `[REINDEX]`.
+
+Failures (e.g. Qdrant down) are counted `failed` with no commit — never a silent stale
+skip. `sync_runs` has no columns for these; metadata-only reconciles are folded into
+`unchanged_count` (granular `refreshed`/`reindexed_meta` counts live in the run return
+dict). Known gap: disabling/removing a source leaves its indexed chunks orphaned
+(`load_allowed_sources` skips disabled sources) — needs a separate all-source reconcile.
 
 ---
 

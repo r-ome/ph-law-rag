@@ -44,13 +44,42 @@ def sync_env(tmp_path, monkeypatch):
             error=None
         )
         
+    # index_document is faked to write one realistic chunk row (with per-chunk metadata
+    # keys) so the metadata-refresh path has chunks to reconcile, without touching Qdrant.
+    def fake_index(conn, doc_id, text, source_metadata, version_id):
+        import json as _json
+        conn.execute("DELETE FROM chunks WHERE doc_id = ?", [doc_id])
+        conn.execute("DELETE FROM chunk_parents WHERE doc_id = ?", [doc_id])
+        conn.execute(
+            """INSERT INTO chunks(chunk_id, doc_id, version_id, chunk_index, text,
+                char_count, token_estimate, qdrant_id, metadata_json, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            [f"{doc_id}-0", doc_id, version_id, 0, text, len(text), len(text) // 4,
+             f"{doc_id}-0",
+             _json.dumps({**source_metadata, "is_structural": False, "part_index": 0}),
+             "now"],
+        )
+        conn.execute(
+            """INSERT INTO chunk_parents(parent_key, doc_id, source_id, title, url,
+                unit_type, unit_label, structure_path, text, char_count, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            [f"{doc_id}-p", doc_id, source_metadata.get("source_id"),
+             source_metadata.get("title"), source_metadata.get("url"),
+             None, None, None, text, len(text), "now"],
+        )
+        return 1
+
     monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [_source()])
     monkeypatch.setattr(sync_module, "fetch_source", fake_fetch)
     monkeypatch.setattr(sync_module, "parse_html", lambda content, url: content.decode("utf-8"))
     monkeypatch.setattr(sync_module, "save_raw_fetch", lambda *a, **k: "data/raw/civil_code.html")
     monkeypatch.setattr(sync_module, "save_normalized_document", lambda *a, **k: "data/normalized/civil_code.html")
-    monkeypatch.setattr("app.indexing.index_service.index_document", lambda **k: 0)
-    
+    monkeypatch.setattr("app.indexing.index_service.index_document", fake_index)
+    # Insulate the Tier A in-place refresh from real Qdrant / BM25.
+    monkeypatch.setattr("app.indexing.index_service.get_qdrant_client", lambda: object())
+    monkeypatch.setattr("app.indexing.index_service.refresh_doc_payload", lambda *a, **k: None)
+    monkeypatch.setattr("app.indexing.index_service.build_and_save", lambda *a, **k: None)
+
     return state, db_path
 
 def _query(db_path, sql, params=()):
@@ -181,10 +210,102 @@ def test_metadata_refresh_persists_on_unchanged_content(sync_env, monkeypatch):
     changed.title = "Civil Code (relocated)"
     monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
 
-    counts = run_sync()  # content identical -> unchanged
+    counts = run_sync()  # content identical; title baked into text -> Tier B re-index
 
-    assert counts["unchanged"] == 1
+    assert counts["reindexed_meta"] == 1
+    assert counts["changed"] == 0
+    # no spurious version row from a metadata-only reconcile
+    assert len(_query(db_path, "SELECT version_id FROM document_versions")) == 1
     rows = _query(db_path, "SELECT url, title FROM documents")
-    assert len(rows) == 1
     assert rows[0][0] == "https://www.example.test/civil-code-RELOCATED"
     assert rows[0][1] == "Civil Code (relocated)"
+
+
+def test_tier_a_url_change_refreshes_in_place(sync_env, monkeypatch):
+    # url is not baked into chunk text -> in-place payload refresh, NO re-embed and NO
+    # new version. Chunk metadata + chunk_parents.url update; per-chunk keys preserved.
+    import json
+    _, db_path = sync_env
+    run_sync()
+
+    captured = {}
+    monkeypatch.setattr(
+        "app.indexing.index_service.refresh_doc_payload",
+        lambda client, doc_id, fields: captured.update({"doc_id": doc_id, "fields": fields}),
+    )
+    # index_document must NOT be called on the Tier A path
+    monkeypatch.setattr(
+        "app.indexing.index_service.index_document",
+        lambda **k: (_ for _ in ()).throw(AssertionError("re-embed on Tier A")),
+    )
+
+    changed = _source()
+    changed.url = "https://www.example.test/civil-code-NEW"
+    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+
+    counts = run_sync()
+
+    assert counts["refreshed"] == 1
+    assert captured["fields"] == {"url": "https://www.example.test/civil-code-NEW"}
+    assert len(_query(db_path, "SELECT version_id FROM document_versions")) == 1
+    meta = json.loads(_query(db_path, "SELECT metadata_json FROM chunks")[0][0])
+    assert meta["url"] == "https://www.example.test/civil-code-NEW"
+    assert meta["part_index"] == 0  # per-chunk key preserved
+    assert "is_structural" in meta
+    assert _query(db_path, "SELECT url FROM chunk_parents")[0][0] == "https://www.example.test/civil-code-NEW"
+
+
+def test_metadata_reconcile_folded_into_sync_runs_unchanged(sync_env, monkeypatch):
+    # sync_runs has no metadata-only columns; a Tier A refresh must be folded into
+    # unchanged_count so scanned = changed + unchanged + failed still holds.
+    _, db_path = sync_env
+    run_sync()
+
+    changed = _source()
+    changed.url = "https://www.example.test/civil-code-FOLD"
+    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+
+    counts = run_sync()
+
+    assert counts["refreshed"] == 1
+    row = _query(
+        db_path,
+        "SELECT scanned_count, changed_count, unchanged_count, failed_count "
+        "FROM sync_runs ORDER BY rowid DESC LIMIT 1",
+    )[0]
+    scanned, changed_c, unchanged_c, failed_c = row
+    assert unchanged_c == 1
+    assert scanned == changed_c + unchanged_c + failed_c
+
+
+def test_no_metadata_change_skips(sync_env):
+    _, db_path = sync_env
+    run_sync()
+    counts = run_sync()
+    assert counts["unchanged"] == 1
+    assert counts["refreshed"] == 0
+    assert counts["reindexed_meta"] == 0
+
+
+def test_tier_a_qdrant_failure_counts_failed_no_commit(sync_env, monkeypatch):
+    # If the in-place Qdrant refresh fails, the source is counted failed and the chunk
+    # metadata is NOT committed (no partial cross-store drift).
+    import json
+    _, db_path = sync_env
+    run_sync()
+    before = json.loads(_query(db_path, "SELECT metadata_json FROM chunks")[0][0])["url"]
+
+    def boom(*a, **k):
+        raise RuntimeError("qdrant down")
+
+    monkeypatch.setattr("app.indexing.index_service.refresh_doc_payload", boom)
+    changed = _source()
+    changed.url = "https://www.example.test/should-not-stick"
+    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+
+    counts = run_sync()  # must not raise
+
+    assert counts["failed"] == 1
+    assert counts["refreshed"] == 0
+    after = json.loads(_query(db_path, "SELECT metadata_json FROM chunks")[0][0])["url"]
+    assert after == before  # rolled back, no partial write persisted

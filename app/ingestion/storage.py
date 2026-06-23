@@ -98,6 +98,21 @@ def get_latest_content_hash(conn, doc_id:str) -> str | None:
 	if row:
 		return row["content_hash"] if row else None
 
+def get_latest_version_id(conn, doc_id: str) -> str | None:
+	# Latest version for a doc, used by metadata-only refresh to re-index in place
+	# (re-chunk under the existing version) without inserting a new document_versions row.
+	row = conn.execute(
+		"""
+		SELECT version_id
+		FROM document_versions
+		WHERE doc_id = ?
+		ORDER BY fetched_at DESC
+		LIMIT 1;
+		""",
+		[doc_id],
+	).fetchone()
+	return row["version_id"] if row else None
+
 def insert_version(
 	conn,
 	doc_id: str,

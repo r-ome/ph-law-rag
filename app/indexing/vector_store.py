@@ -86,6 +86,20 @@ def delete_by_doc_id(client: QdrantClient, doc_id: str) -> None:
 		)
 	)
 			
+def refresh_doc_payload(client: QdrantClient, doc_id: str, payload_fields: dict) -> None:
+	# In-place metadata refresh, NO re-embed: set only the changed payload keys on every
+	# point for this doc, selected by the doc_id filter. set_payload merges (other keys,
+	# including the baked "text" and the vector, are untouched). Only safe for fields not
+	# embedded into chunk text — title/official_number must go through full re-index instead.
+	client.set_payload(
+		collection_name=settings.qdrant_collection,
+		payload=payload_fields,
+		points=Filter(
+			must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+		),
+		wait=True,
+	)
+
 def operative_filter(source_id: str | None = None) -> Filter | None:
 	must = (
 		[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
