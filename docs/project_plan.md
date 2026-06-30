@@ -682,6 +682,34 @@ Prioritize sources that represent the core of Philippine law:
 
 Target: ~30 sources in V1.
 
+### Corpus Expansion Roadmap (criminal law)
+
+Corpus growth is phased and controlled — not "all criminal law forever." Each phase is a deliberate, bounded expansion with its own eval/OOS-moat review, because adding sources turns previously out-of-scope eval questions in-scope and can silently shift abstention/leak numbers.
+
+**Principle — manifest truth vs. retrieval behavior.** `amends`/`repeals`/`status` are manifest facts. They do *not* automatically change what the retriever prefers:
+- Edge expansion uses only `amends` and `implements` (`app/retriever/edges.py`); `repeals` is recorded metadata only.
+- "Prefer the newer wording" happens solely through `sources/provision_supersession.yaml` (provision-level reorder, off by default via `prefer_operative`), and only when both base and operative chunks already retrieve.
+- `status: repealed`/`superseded` chunks are filtered from retrieval when `retrieval_operative_only=true`, so a demoted law is indexed-but-not-surfaced.
+
+So the rule when adding an amended penal law: add the amendment too, and add a supersession rule (post-sync, retrieval-trace-gated) only for high-risk provisions.
+
+**Phase A — Core criminal law + common SPLs (current expansion).**
+- RPC (Act 3815) + key amendments (RA 10951)
+- Sentencing modifiers: ISL (Act 4103), Probation (PD 968 + RA 10707), Juvenile Justice (RA 9344 + RA 10630)
+- Common SPLs: drugs (RA 9165 + RA 10640), VAWC (RA 9262), cybercrime (RA 10175), BP 22, child abuse (RA 7610), trafficking (RA 9208 + RA 10364 + RA 11862), anti-graft (RA 3019 + RA 10910), plunder (RA 7080), firearms (RA 10591), carnapping (RA 10883), hazing (RA 8049 + RA 11053), child pornography → OSAEC (RA 9775 `repealed` → RA 11930), Safe Spaces (RA 11313), statutory rape (RA 11648)
+- Current-law correctness sources: RA 9346 (death-penalty prohibition — global penalty modifier, standalone + curated supersession rules)
+- Deferred within A: RA 7658 / RA 9231 (child-labor amendments — drift toward fenced labor/social-legislation territory)
+
+**Phase B — Public-order / national-security crimes.** Anti-Terrorism Act, rebellion/sedition special laws, Human Security Act predecessors.
+
+**Phase C — Financial / commercial penal laws.** AMLA, banking secrecy, securities-regulation offenses.
+
+**Phase D — Election, tax, customs, environmental, local-government offenses.** Omnibus Election Code offenses, NIRC/Customs penal provisions, environmental penal laws, LGC offenses.
+
+**Phase E — Historical predecessors and repeal chains.** Older repealed predecessors and deeper amendment chains for jurisprudential/temporal-retrieval value.
+
+Phases B–E are explicitly out of the current OOS moat's in-scope set; expanding into them requires re-baselining the eval suite. The current expansion is Phase A only.
+
 ---
 
 ## Hybrid Retrieval Design

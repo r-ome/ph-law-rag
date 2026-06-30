@@ -179,7 +179,7 @@ sources:
     availability: available
     category: statute
     doc_type: republic_act
-    tags: [cybercrime, computer_offenses, online_libel]
+    tags: [cybercrime, computer_offenses, online_libel, criminal_law]
     title: "Cybercrime Prevention Act of 2012"
     official_number: "Republic Act No. 10175"
     approval_date: 2012-09-12
@@ -194,7 +194,7 @@ sources:
     availability: available
     category: statute
     doc_type: republic_act
-    tags: [vawc, violence_against_women, protection_orders]
+    tags: [vawc, violence_against_women, protection_orders, criminal_law]
     title: "Anti-Violence Against Women and Their Children Act of 2004"
     official_number: "Republic Act No. 9262"
     approval_date: 2004-03-08
@@ -209,7 +209,7 @@ sources:
     availability: available
     category: statute
     doc_type: republic_act
-    tags: [dangerous_drugs, controlled_substances, pdea]
+    tags: [dangerous_drugs, controlled_substances, pdea, criminal_law]
     title: "Comprehensive Dangerous Drugs Act of 2002"
     official_number: "Republic Act No. 9165"
     approval_date: 2002-06-07
@@ -306,6 +306,353 @@ sources:
     approval_date: 2021-07-30
     status: operative
     amends: [judiciary_reorganization_act]
+    source_index: lawphil
+    structure: hierarchical
+
+  # ── Criminal law expansion — Phase A (core SPLs, sentencing adjuncts, current-law corrections) ──
+  # Core special penal laws
+  - source_id: child_abuse_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1992/ra_7610_1992.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, child_abuse, child_protection]
+    title: "Special Protection of Children Against Abuse, Exploitation and Discrimination Act"
+    official_number: "Republic Act No. 7610"
+    approval_date: 1992-06-17
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_trafficking
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2003/ra_9208_2003.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, trafficking, human_trafficking]
+    title: "Anti-Trafficking in Persons Act of 2003"
+    official_number: "Republic Act No. 9208"
+    approval_date: 2003-05-26
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_trafficking_expanded_2013
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2013/ra_10364_2013.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, trafficking, human_trafficking]
+    title: "Expanded Anti-Trafficking in Persons Act of 2012"
+    official_number: "Republic Act No. 10364"
+    approval_date: 2013-02-06
+    status: operative
+    amends: [anti_trafficking]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_graft
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1960/ra_3019_1960.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, anti_graft, corruption, public_officers]
+    title: "Anti-Graft and Corrupt Practices Act"
+    official_number: "Republic Act No. 3019"
+    approval_date: 1960-08-17
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: plunder_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1991/ra_7080_1991.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, plunder, corruption, public_officers]
+    title: "An Act Defining and Penalizing the Crime of Plunder"
+    official_number: "Republic Act No. 7080"
+    approval_date: 1991-07-12
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  # Sentencing / procedure adjuncts (cross-document RPC penalty modifiers)
+  - source_id: indeterminate_sentence_law
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/acts/act1933/act_4103_1933.html"
+    availability: available
+    category: statute
+    doc_type: act
+    tags: [criminal_law, sentencing, penalties, indeterminate_sentence]
+    title: "The Indeterminate Sentence Law"
+    official_number: "Act No. 4103"
+    approval_date: 1933-12-05
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: probation_law
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/presdecs/pd1976/pd_968_1976.html"
+    availability: available
+    category: presidential_issuance
+    doc_type: presidential_decree
+    tags: [criminal_law, sentencing, probation]
+    title: "Probation Law of 1976"
+    official_number: "Presidential Decree No. 968"
+    approval_date: 1976-07-24
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: probation_amendments_2015
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2015/ra_10707_2015.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, sentencing, probation]
+    title: "An Act Amending Presidential Decree No. 968 (Probation Law of 1976)"
+    official_number: "Republic Act No. 10707"
+    approval_date: 2015-11-26
+    status: operative
+    amends: [probation_law]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: juvenile_justice
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2006/ra_9344_2006.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, juvenile_justice, minors, sentencing]
+    title: "Juvenile Justice and Welfare Act of 2006"
+    official_number: "Republic Act No. 9344"
+    approval_date: 2006-04-28
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: juvenile_justice_amendments_2013
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2013/ra_10630_2013.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, juvenile_justice, minors]
+    title: "An Act Strengthening the Juvenile Justice System in the Philippines"
+    official_number: "Republic Act No. 10630"
+    approval_date: 2013-10-03
+    status: operative
+    amends: [juvenile_justice]
+    source_index: lawphil
+    structure: hierarchical
+
+  # Other common special penal laws
+  - source_id: firearms_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2013/ra_10591_2013.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, firearms, ammunition]
+    title: "Comprehensive Firearms and Ammunition Regulation Act"
+    official_number: "Republic Act No. 10591"
+    approval_date: 2013-05-29
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_carnapping
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2016/ra_10883_2016.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, carnapping, motor_vehicle]
+    title: "New Anti-Carnapping Act of 2016"
+    official_number: "Republic Act No. 10883"
+    approval_date: 2016-07-17
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_hazing
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1995/ra_8049_1995.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, hazing]
+    title: "Anti-Hazing Act of 1995"
+    official_number: "Republic Act No. 8049"
+    approval_date: 1995-06-07
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_hazing_amendments_2018
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2018/ra_11053_2018.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, hazing]
+    title: "Anti-Hazing Act of 2018"
+    official_number: "Republic Act No. 11053"
+    approval_date: 2018-06-29
+    status: operative
+    amends: [anti_hazing]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_child_pornography
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2009/ra_9775_2009.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, child_pornography, child_protection]
+    title: "Anti-Child Pornography Act of 2009"
+    official_number: "Republic Act No. 9775"
+    approval_date: 2009-11-17
+    status: repealed
+    source_index: lawphil
+    structure: hierarchical
+    notes: "Repealed by RA 11930 (OSAEC/CSAEM Act). Kept for historical retrieval; filtered from normal retrieval when retrieval_operative_only=true."
+
+  - source_id: safe_spaces_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2019/ra_11313_2019.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, gender_based_harassment, safe_spaces]
+    title: "Safe Spaces Act"
+    official_number: "Republic Act No. 11313"
+    approval_date: 2019-04-17
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+
+  # Current-law correction sources
+  - source_id: death_penalty_prohibition
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2006/ra_9346_2006.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, penalties, death_penalty, sentencing]
+    title: "An Act Prohibiting the Imposition of Death Penalty in the Philippines"
+    official_number: "Republic Act No. 9346"
+    approval_date: 2006-06-24
+    status: operative
+    source_index: lawphil
+    structure: hierarchical
+    notes: "Cross-cutting penalty modifier: prohibits imposition of death penalty and substitutes reclusion perpetua (RPC) or life imprisonment (non-RPC) where applicable. Does not repeal the offenses themselves."
+
+  - source_id: anti_trafficking_amendments_2022
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2022/ra_11862_2022.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, trafficking, human_trafficking]
+    title: "Expanded Anti-Trafficking in Persons Act of 2022"
+    official_number: "Republic Act No. 11862"
+    approval_date: 2022-06-23
+    status: operative
+    amends: [anti_trafficking, anti_trafficking_expanded_2013]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: osaec_csaem_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2022/ra_11930_2022.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, child_pornography, child_protection, osaec]
+    title: "Anti-Online Sexual Abuse or Exploitation of Children (OSAEC) and Anti-Child Sexual Abuse or Exploitation Materials (CSAEM) Act"
+    official_number: "Republic Act No. 11930"
+    approval_date: 2022-07-30
+    status: operative
+    repeals: [anti_child_pornography]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_graft_amendments_2016
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2016/ra_10910_2016.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, special_penal_law, anti_graft, corruption, public_officers, prescription]
+    title: "An Act Increasing the Prescriptive Period for Violations of Republic Act No. 3019"
+    official_number: "Republic Act No. 10910"
+    approval_date: 2016-07-21
+    status: operative
+    amends: [anti_graft]
+    source_index: lawphil
+    structure: hierarchical
+
+  - source_id: anti_rape_law_1997
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1997/ra_8353_1997.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, rape, sexual_assault, crimes_against_persons]
+    title: "The Anti-Rape Law of 1997"
+    official_number: "Republic Act No. 8353"
+    approval_date: 1997-09-30
+    status: operative
+    amends: [revised_penal_code]
+    source_index: lawphil
+    structure: hierarchical
+    notes: "Reclassified rape from a crime against chastity (Art. 335) to a crime against persons (Art. 266-A et seq.) and added sexual-assault paragraph. Missing keystone bridging old Art. 335 to current Art. 266-A; RA 11648 carries the later statutory-rape-age amendment to Art. 266-A."
+
+  - source_id: statutory_rape_amendments_2022
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra2022/ra_11648_2022.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, statutory_rape, child_protection, age_of_consent]
+    title: "An Act Providing for Stronger Protection Against Rape and Sexual Exploitation and Abuse, Increasing the Age for Determining Statutory Rape"
+    official_number: "Republic Act No. 11648"
+    approval_date: 2022-03-04
+    status: operative
+    amends: [revised_penal_code, anti_rape_law_1997, child_abuse_act]
     source_index: lawphil
     structure: hierarchical
 
