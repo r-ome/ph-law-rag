@@ -689,9 +689,9 @@ Corpus growth is phased and controlled — not "all criminal law forever." Each 
 **Principle — manifest truth vs. retrieval behavior.** `amends`/`repeals`/`status` are manifest facts. They do *not* automatically change what the retriever prefers:
 - Edge expansion uses only `amends` and `implements` (`app/retriever/edges.py`); `repeals` is recorded metadata only.
 - "Prefer the newer wording" happens solely through `sources/provision_supersession.yaml` (provision-level reorder, off by default via `prefer_operative`), and only when both base and operative chunks already retrieve.
-- `status: repealed`/`superseded` chunks are filtered from retrieval when `retrieval_operative_only=true`, so a demoted law is indexed-but-not-surfaced.
+- Retrieval suppression is driven by a single field, `operability_action` (`hide`/`show`/`flag`), computed at index time and filtered on by both retrieval arms (`vector_store.operative_filter`, `sparse_retriever`). Its default is derived from the **document** `status` (so `repealed`/`superseded` whole documents are hidden), and it can be overridden **per provision** via `sources/provision_status.yaml` for whole-provision repeal/reclassification (e.g. RPC Art 335 → RA 8353 Art 266-A) — the only mechanism that suppresses a dead provision inside an otherwise-operative document. Document `status` is never overwritten by an override; provision state lives in `provision_status`/`operability_action` beside it. Edits to `provision_status.yaml` are applied at index time and require `raglab reindex`.
 
-So the rule when adding an amended penal law: add the amendment too, and add a supersession rule (post-sync, retrieval-trace-gated) only for high-risk provisions.
+So the rule when adding an amended penal law: add the amendment too; for a *wholly* dead base provision add a `provision_status.yaml` override (whole-provision only — not partial penalty/age amendments); add a `provision_supersession` reorder rule only for high-risk both-retrieved pairs (trace-gated).
 
 **Phase A — Core criminal law + common SPLs (current expansion).**
 - RPC (Act 3815) + key amendments (RA 10951)

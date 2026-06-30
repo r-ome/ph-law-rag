@@ -32,24 +32,31 @@ def _load_parents(keys: set[str]) -> dict[str, dict]:
         conn.close()
 
 
-def _parent_result(row: dict, child_count: int, score: float) -> RetrievalResult:
+def _parent_result(row: dict, child_count: int, score: float, child_meta: dict) -> RetrievalResult:
+    metadata = {
+        "expanded_from_parent": True,
+        "parent_key": row["parent_key"],
+        "child_count": child_count,
+        "doc_id": row["doc_id"],
+        "source_id": row["source_id"],
+        "title": row["title"],
+        "url": row["url"],
+        "is_structural": True,
+        "unit_type": row["unit_type"],
+        "unit_label": row["unit_label"],
+        "structure_path": row["structure_path"],
+    }
+    # chunk_parents has no operability columns; carry them from the triggering child so debug
+    # traces/citations keep the provision identity (a parent = one provision at v1 granularity).
+    # Suppression already happened upstream in retrieval, so this never re-surfaces a hidden chunk.
+    for key in ("provision_id", "provision_status", "operability_action", "operability_basis_source_id"):
+        if key in child_meta:
+            metadata[key] = child_meta[key]
     return RetrievalResult(
         chunk_id=row["parent_key"],
         text=row["text"],
         score=score,                       # carry the best child's score; nothing reorders downstream
-        metadata={
-            "expanded_from_parent": True,
-            "parent_key": row["parent_key"],
-            "child_count": child_count,
-            "doc_id": row["doc_id"],
-            "source_id": row["source_id"],
-            "title": row["title"],
-            "url": row["url"],
-            "is_structural": True,
-            "unit_type": row["unit_type"],
-            "unit_label": row["unit_label"],
-            "structure_path": row["structure_path"],
-        },
+        metadata=metadata,
     )
 
 
@@ -85,7 +92,7 @@ def expand_parents(results: list[RetrievalResult]) -> list[RetrievalResult]:
             continue
         row = parents.get(pk)
         if row and budget + row["char_count"] <= settings.parent_expansion_max_chars:
-            out.append(_parent_result(row, counts[pk], r.score))
+            out.append(_parent_result(row, counts[pk], r.score, r.metadata))
             budget += row["char_count"]
             covered.add(pk)
             continue

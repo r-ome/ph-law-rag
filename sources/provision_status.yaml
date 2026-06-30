@@ -1,0 +1,20 @@
+# Provision-level operability overrides — whole-provision repeal/reclassification only.
+#
+# Each entry marks a single base provision as no longer current law, so retrieval suppresses
+# it (operability_action: hide) even though its parent document is operative. This routes
+# around the "amendment-label wall": we only need the BASE provision's provision_id, never the
+# replacement's (amendment provisions are unlabeled). Keyed on the canonical provision_id emitted
+# by the chunker (source_id:unit_type:unit_number, lowercased).
+#
+# SCOPE: whole-provision death ONLY (repealed / reclassified / renumbered). Do NOT use for partial
+# amendments (changed penalties/ages/inserted clauses) — those provisions stay operative.
+# status of the document is NEVER changed here; only provision_status + operability_action.
+# Applied at INDEX time — edits require `raglab reindex` (sync will not detect override drift).
+
+overrides:
+  - provision_id: revised_penal_code:article:335
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_rape_law_1997
+    effective_date: "1997-10-22"   # recorded for audit; UNUSED by v1 retrieval
+    note: "Rape reclassified from a crime against chastity (Art. 335) to a crime against persons (Art. 266-A to 266-D) by RA 8353."

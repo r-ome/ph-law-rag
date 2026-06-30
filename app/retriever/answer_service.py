@@ -140,8 +140,11 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
     ), reranked
 
 
-def answer(question: str, debug: bool | None = None,
-           session_id: str | None = None) -> dict:
+def answer(
+    question: str,
+    debug: bool | None = None,
+    session_id: str | None = None
+    ) -> dict:
     debug_enabled = settings.debug if debug is None else debug
     effective_question = question
 

@@ -6,8 +6,10 @@ from app.indexing.bm25_store import build_and_save
 from app.indexing.embedder import embed_texts
 from app.indexing.vector_store import (
 	get_qdrant_client, ensure_collection,
-	upsert_nodes, delete_by_doc_id, refresh_doc_payload
+	upsert_nodes, delete_by_doc_id, refresh_doc_payload,
+	operability_action_for, set_chunk_payload,
 )
+from app.indexing.provision_status import load_provision_overrides, apply_overrides
 
 # Doc-level metadata fields that are NOT embedded into chunk text, so a manifest edit
 # can be pushed into the derived stores by patching payload/metadata only — no re-embed.
@@ -33,6 +35,13 @@ def index_document(
 	conn.execute("DELETE FROM chunk_parents WHERE doc_id = ?", [doc_id])
 
 	nodes = chunk_texts(text, source_metadata)
+
+	# Stamp provision-level operability overrides onto matching chunks (whole-provision repeal/
+	# reclassification). No-op for chunks without a matching provision_id. Sets operability_action
+	# (the retrieval switch) + provision_status/basis; never the doc-level status.
+	overrides = load_provision_overrides()
+	for node in nodes:
+		apply_overrides(node.metadata, overrides)
 
 	texts = [node.text for node in nodes]
 	vectors = embed_texts(texts)
@@ -163,11 +172,23 @@ def refresh_document_metadata(
 	client = get_qdrant_client()
 	refresh_doc_payload(client, doc_id, changed)
 
+	# operability_action is DERIVED from doc status, so a status change must re-derive it — but
+	# PER CHUNK, because provision overrides pin some chunks to a different action than the doc
+	# default. It is therefore NOT carried in the doc-wide `changed` dict (which would clobber
+	# overridden chunks); recompute per row and write per chunk. Override-file edits are not
+	# detected here (unchanged content + unchanged manifest = skip) — they require `raglab reindex`.
+	recompute_action = "status" in changed
+	overrides = load_provision_overrides() if recompute_action else {}
+
 	# Merge changed doc-level fields into each chunk's metadata, preserving per-chunk keys
-	# (is_structural, unit_label, structure_path, parent_key, part_index, ...).
+	# (is_structural, unit_label, structure_path, parent_key, part_index, provision_id, ...).
 	for row in rows:
 		meta = json.loads(row["metadata_json"])
 		meta.update(changed)
+		if recompute_action:
+			meta["operability_action"] = operability_action_for(meta.get("status"))
+			apply_overrides(meta, overrides)  # re-pin overridden provisions
+			set_chunk_payload(client, row["chunk_id"], {"operability_action": meta["operability_action"]})
 		conn.execute(
 			"UPDATE chunks SET metadata_json = ? WHERE chunk_id = ?",
 			[json.dumps(meta), row["chunk_id"]],

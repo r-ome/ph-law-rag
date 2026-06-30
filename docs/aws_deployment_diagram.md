@@ -15,10 +15,11 @@ flowchart LR
 
     ui -->|Service Connect http://api:8000| api["ECS Fargate task - FastAPI (internal only)"]
 
-    api -->|Embed user query| titan["Amazon Bedrock - Titan Text Embeddings v2"]
+    api -->|Read metadata, create sessions, persist turns| sqlite["SQLite DB - seeded docs + conversation tables"]
+    api -->|Rewrite follow-up question| anthropic
+    api -->|Embed standalone query| titan["Amazon Bedrock - Titan Text Embeddings v2"]
     api -->|Generate grounded answer| anthropic["Anthropic API - Claude Haiku"]
     api -->|Dense vector search| qdrant["Qdrant Cloud - vector collection"]
-    api -->|Read metadata| sqlite["Seeded SQLite DB - baked into image"]
     api -->|Sparse keyword search| bm25["BM25 index files - baked into image"]
     api -->|Read secrets| secrets["AWS Secrets Manager - Qdrant key/URL + Anthropic key"]
     api -->|IAM auth| taskRole["ECS task role - Bedrock access"]
@@ -67,15 +68,20 @@ sequenceDiagram
     actor User
     participant UI as Streamlit UI
     participant API as FastAPI
+    participant Conv as SQLite conversation tables
     participant Titan as Bedrock Titan
     participant Qdrant as Qdrant Cloud
     participant BM25 as Local BM25
-    participant DB as Local SQLite
+    participant DB as SQLite metadata tables
     participant Claude as Anthropic Claude
 
     User->>UI: Ask a legal question
-    UI->>API: POST query ask
-    API->>Titan: Embed the user question
+    UI->>API: POST query ask with optional session_id
+    API->>Conv: Create session or load recent turns
+    Conv-->>API: Conversation history
+    API->>Claude: Rewrite follow-up into standalone query
+    Claude-->>API: Standalone query
+    API->>Titan: Embed the standalone query
     Titan-->>API: Query vector
     API->>Qdrant: Dense vector search
     Qdrant-->>API: Matching chunks
@@ -86,7 +92,8 @@ sequenceDiagram
     DB-->>API: Titles and URLs
     API->>Claude: Generate grounded answer via Anthropic API
     Claude-->>API: Answer with citations
-    API-->>UI: Answer and sources
+    API->>Conv: Persist question, rewritten question, answer, chunk IDs
+    API-->>UI: Answer, sources, and session_id
     UI-->>User: Display answer and citations
 ```
 

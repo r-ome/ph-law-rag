@@ -1,16 +1,24 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
 	Distance, VectorParams, PointStruct,
-	Filter, FieldCondition, MatchValue, MatchAny,
+	Filter, FieldCondition, MatchValue,
 	PayloadSchemaType,
 )
+from llama_index.core.schema import TextNode
+from app.config import settings
 
 # Denylist (fail-open): keep only in-force law. "unknown" is intentionally allowed
 # through; "not_yet_effective" is excluded so future law isn't surfaced as current authority.
+# NON_OPERATIVE no longer feeds the retrieval filter directly — it derives operability_action
+# (the sole retrieval switch). Retrieval filters on operability_action == "hide".
 NON_OPERATIVE = ["superseded", "repealed", "not_yet_effective"]
-FILTER_PAYLOAD_FIELDS = ("doc_id", "source_id", "status")
-from llama_index.core.schema import TextNode
-from app.config import settings
+FILTER_PAYLOAD_FIELDS = ("doc_id", "source_id", "operability_action")
+
+
+def operability_action_for(status: str | None) -> str:
+	"""Default retrieval action derived from a chunk's DOCUMENT status. Provision-level
+	overrides may replace this per chunk; the filter reads operability_action, never status."""
+	return "hide" if status in NON_OPERATIVE else "show"
 
 def get_qdrant_client() -> QdrantClient:
 	key = settings.qdrant_api_key.get_secret_value()
@@ -100,14 +108,27 @@ def refresh_doc_payload(client: QdrantClient, doc_id: str, payload_fields: dict)
 		wait=True,
 	)
 
+def set_chunk_payload(client: QdrantClient, chunk_id: str, payload_fields: dict) -> None:
+	# Per-point payload merge (no re-embed), selected by point id. Used by the refresh path for
+	# fields that are NOT doc-uniform — e.g. operability_action, which differs on provision-
+	# overridden chunks and so cannot go through the doc-wide refresh_doc_payload.
+	client.set_payload(
+		collection_name=settings.qdrant_collection,
+		payload=payload_fields,
+		points=[chunk_id],
+		wait=True,
+	)
+
 def operative_filter(source_id: str | None = None) -> Filter | None:
 	must = (
 		[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
 		if source_id else []
 	)
-	# fail-open: only chunks explicitly marked non-operative are excluded
+	# fail-open: only chunks explicitly marked operability_action="hide" are excluded
+	# (chunks lacking the field — e.g. pre-reindex — are kept). operability_action is the sole
+	# retrieval switch; it is derived from doc status by default and overridden per provision.
 	must_not = (
-		[FieldCondition(key="status", match=MatchAny(any=NON_OPERATIVE))]
+		[FieldCondition(key="operability_action", match=MatchValue(value="hide"))]
 		if settings.retrieval_operative_only else []
 	)
 

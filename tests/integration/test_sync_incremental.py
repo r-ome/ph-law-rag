@@ -278,6 +278,43 @@ def test_metadata_reconcile_folded_into_sync_runs_unchanged(sync_env, monkeypatc
     assert scanned == changed_c + unchanged_c + failed_c
 
 
+def test_status_change_recomputes_operability_per_chunk(sync_env, monkeypatch):
+    # status is Tier A (not baked into text), so a flip to superseded is an in-place refresh.
+    # operability_action is DERIVED from status, so it must be recomputed and written PER CHUNK
+    # (set_chunk_payload), not via the doc-wide payload helper — so provision overrides aren't
+    # clobbered. Here civil_code has no override, so it falls to the doc default: hide.
+    import json
+    _, db_path = sync_env
+    run_sync()
+
+    chunk_writes = []
+    monkeypatch.setattr(
+        "app.indexing.index_service.set_chunk_payload",
+        lambda client, chunk_id, fields: chunk_writes.append((chunk_id, fields)),
+    )
+    # index_document must NOT be called — status is Tier A (in-place), not a re-embed.
+    monkeypatch.setattr(
+        "app.indexing.index_service.index_document",
+        lambda **k: (_ for _ in ()).throw(AssertionError("re-embed on Tier A status change")),
+    )
+
+    changed = _source()
+    changed.status = "superseded"
+    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+
+    counts = run_sync()
+
+    assert counts["refreshed"] == 1
+    assert len(_query(db_path, "SELECT version_id FROM document_versions")) == 1
+    # per-chunk Qdrant write set operability_action=hide
+    assert chunk_writes and all(f == {"operability_action": "hide"} for _, f in chunk_writes)
+    # SQLite chunk metadata: status flipped, operability_action recomputed, per-chunk key kept
+    meta = json.loads(_query(db_path, "SELECT metadata_json FROM chunks")[0][0])
+    assert meta["status"] == "superseded"
+    assert meta["operability_action"] == "hide"
+    assert meta["part_index"] == 0
+
+
 def test_no_metadata_change_skips(sync_env):
     _, db_path = sync_env
     run_sync()

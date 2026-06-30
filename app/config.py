@@ -64,6 +64,11 @@ class Settings(BaseSettings):
 	# re-index). Map is provision-level retrieval policy, loaded from provision_supersession_path.
 	prefer_operative_enabled: bool = False
 	provision_supersession_path: str = "sources/provision_supersession.yaml"
+	# Provision-level operability overrides (whole-provision repeal/reclassification). Applied at
+	# INDEX time: stamps operability_action onto matching provision chunks so retrieval suppresses
+	# dead base provisions (e.g. RPC Art 335 -> RA 8353 Art 266-A) without needing the amendment
+	# labeled. Distinct from provision_supersession (a query-time reorder). Edits require reindex.
+	provision_status_path: str = "sources/provision_status.yaml"
 	# NOTE on judging this: parent expansion only changes context on the minority of questions
 	# whose section was fragmented (~11/70 in eval). Judge it on CHANGED-CONTEXT rows
 	# (recall +0.136, faithfulness +0.012, precision −0.014 on those), NOT whole-run aggregate

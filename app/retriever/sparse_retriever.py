@@ -1,7 +1,6 @@
 from typing import cast
 from app.retriever.types import RetrievalResult
 from app.indexing.bm25_store import load
-from app.indexing.vector_store import NON_OPERATIVE
 from app.config import settings
 
 def sparse_retriever(query_text: str) -> list[RetrievalResult]:
@@ -28,5 +27,6 @@ def sparse_retriever(query_text: str) -> list[RetrievalResult]:
         for n in nodes
     ]
     if settings.retrieval_operative_only:
-        results = [r for r in results if r.metadata.get("status") not in NON_OPERATIVE][:k]
+        # mirror the dense filter: drop only chunks explicitly marked hide (fail-open).
+        results = [r for r in results if r.metadata.get("operability_action") != "hide"][:k]
     return results

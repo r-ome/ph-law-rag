@@ -1,0 +1,100 @@
+import pytest
+
+from app.indexing.chunker import _provision_id, chunk_texts
+from app.indexing.vector_store import operability_action_for, operative_filter
+from app.indexing.provision_status import ProvisionOverride, apply_overrides
+
+pytestmark = pytest.mark.unit
+
+
+# ── provision_id derivation ────────────────────────────────────────────────
+def test_provision_id_article_uses_source_prefix():
+	assert _provision_id("revised_penal_code", "article", "335", "") == "revised_penal_code:article:335"
+
+
+def test_provision_id_section_folds_in_path():
+	# section numbers reset per parent, so the structure_path disambiguates
+	assert _provision_id("constitution_1987", "section", "1", "ARTICLE III") == \
+		"constitution_1987:article-iii:section:1"
+
+
+def test_provision_id_none_without_source():
+	assert _provision_id(None, "article", "1", "") is None
+
+
+def test_structural_chunks_carry_provision_id_prose_does_not():
+	text = (
+		"AN ACT defining things.\n"
+		"Article 1. The first rule states a principle of general application.\n"
+		"Article 2. The second rule states another principle of general application.\n"
+		"Article 3. The third rule states yet another principle of general application.\n"
+		"Article 4. The fourth rule states a further principle of general application.\n"
+		"Article 5. The fifth rule states a final principle of general application.\n"
+	)
+	sm = {"source_id": "demo_act", "title": "Demo", "structure": "hierarchical"}
+	nodes = chunk_texts(text, sm)
+	structural = [n for n in nodes if n.metadata.get("is_structural")]
+	prose = [n for n in nodes if not n.metadata.get("is_structural")]
+	assert {n.metadata["provision_id"] for n in structural} >= {"demo_act:article:1", "demo_act:article:5"}
+	assert all("provision_id" not in n.metadata for n in prose)
+
+
+# ── operability_action default ─────────────────────────────────────────────
+@pytest.mark.parametrize("status,expected", [
+	("operative", "show"),
+	("unknown", "show"),
+	("superseded", "hide"),
+	("repealed", "hide"),
+	("not_yet_effective", "hide"),
+])
+def test_operability_action_for(status, expected):
+	assert operability_action_for(status) == expected
+
+
+# ── apply_overrides ────────────────────────────────────────────────────────
+def _overrides():
+	return {"revised_penal_code:article:335": ProvisionOverride(
+		provision_id="revised_penal_code:article:335",
+		provision_status="superseded",
+		operability_action="hide",
+		basis_source_id="anti_rape_law_1997",
+		effective_date="1997-10-22",
+		note="reclassified",
+	)}
+
+
+def test_apply_overrides_stamps_without_touching_status():
+	meta = {"provision_id": "revised_penal_code:article:335", "status": "operative", "operability_action": "show"}
+	apply_overrides(meta, _overrides())
+	assert meta["status"] == "operative"            # document status untouched
+	assert meta["provision_status"] == "superseded"
+	assert meta["operability_action"] == "hide"
+	assert meta["operability_basis_source_id"] == "anti_rape_law_1997"
+
+
+def test_apply_overrides_no_match_is_noop():
+	meta = {"provision_id": "civil_code:article:19", "status": "operative", "operability_action": "show"}
+	apply_overrides(meta, _overrides())
+	assert meta == {"provision_id": "civil_code:article:19", "status": "operative", "operability_action": "show"}
+
+
+def test_apply_overrides_skips_chunks_without_provision_id():
+	meta = {"is_structural": False, "operability_action": "show"}
+	apply_overrides(meta, _overrides())
+	assert "provision_status" not in meta
+
+
+# ── retrieval filter repoint ───────────────────────────────────────────────
+def test_operative_filter_excludes_hide(monkeypatch):
+	from app.config import settings
+	monkeypatch.setattr(settings, "retrieval_operative_only", True)
+	f = operative_filter()
+	cond = f.must_not[0]
+	assert cond.key == "operability_action"
+	assert cond.match.value == "hide"
+
+
+def test_operative_filter_off_returns_none(monkeypatch):
+	from app.config import settings
+	monkeypatch.setattr(settings, "retrieval_operative_only", False)
+	assert operative_filter() is None

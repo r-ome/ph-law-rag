@@ -118,6 +118,24 @@ def _unit(start: int, utype: str, number: str, label: str, parents: dict) -> dic
 	return {"start": start, "type": utype, "number": number, "label": label, "path": path}
 
 
+def _slug(s: str) -> str:
+	return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+
+
+def _provision_id(source_id: str | None, unit_type: str, unit_number: str, structure_path: str) -> str | None:
+	"""Canonical, stable join key for a legal provision (e.g. 'revised_penal_code:article:335').
+	Uses the real source_id as prefix (no vanity-name table). Articles are globally unique within
+	a source, so they need no path; section/rule numbers RESET per parent, so the structure_path is
+	folded in to disambiguate — mirroring _parent_key/_locator. Oversized units split into
+	enumeration leaves inherit the PARENT unit's provision_id (set once on the base dict), so an
+	override on the article hides all its leaves."""
+	if not source_id:
+		return None
+	if unit_type in ("section", "rule") and structure_path:
+		return f"{source_id}:{_slug(structure_path)}:{unit_type}:{unit_number}".lower()
+	return f"{source_id}:{unit_type}:{unit_number}".lower()
+
+
 def _looks_structural(units: list[dict]) -> bool:
 	"""Cautious auto-detect: need a long ASCENDING run, not just many markers.
 	Defeats prose decisions that quote scattered sections (e.g. 'Sec. 16' then 'Sec. 15')."""
@@ -150,6 +168,7 @@ def _structural_nodes(text: str, units: list[dict], sm: dict) -> list[TextNode]:
 			"unit_number": u["number"],
 			"unit_label": u["label"],
 			"structure_path": u["path"],
+			"provision_id": _provision_id(sm.get("source_id"), u["type"], u["number"], u["path"]),
 		}
 		if len(seg) <= settings.chunk_size * 4:  # ~4 chars/token; whole unit fits
 			nodes.append(TextNode(text=_with_source_context(seg, base), metadata=base))

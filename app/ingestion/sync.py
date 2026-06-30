@@ -15,6 +15,7 @@ from app.ingestion.hashing import hash_content
 def build_source_metadata(source: SourceConfig, doc_id: str) -> dict:
 	"""Chunk metadata for a source — the single definition shared by sync and reindex
 	so a re-chunk produces byte-identical metadata to the original index."""
+	from app.indexing.vector_store import operability_action_for  # lazy: avoids qdrant at CLI startup
 	return {
 		"doc_id": doc_id,
 		"source_id": source.source_id,
@@ -26,6 +27,9 @@ def build_source_metadata(source: SourceConfig, doc_id: str) -> dict:
 		"tags": source.tags,
 		"structure": source.structure,
 		"status": source.status,
+		# Default retrieval action from DOCUMENT status; provision overrides may replace it
+		# per chunk at index time. status itself stays untouched (doc-level).
+		"operability_action": operability_action_for(source.status),
 	}
 
 def process_source(source: SourceConfig) -> dict:

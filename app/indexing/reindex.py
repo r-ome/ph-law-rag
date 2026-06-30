@@ -13,6 +13,25 @@ from app.config import settings, load_allowed_sources
 from app.db import get_connection
 from app.ingestion.sync import build_source_metadata
 from app.indexing.index_service import index_document
+from app.indexing.provision_status import load_provision_overrides
+
+
+def _warn_unmatched_overrides(conn) -> None:
+    """Zero-match guard: a provision_status override keyed on a provision_id that no chunk
+    carries is a silent dead rule (typo / renumbered / unsynced source). Warn after a full
+    reindex so a bad override is visible rather than quietly inert."""
+    overrides = load_provision_overrides()
+    if not overrides:
+        return
+    rows = conn.execute(
+        "SELECT DISTINCT json_extract(metadata_json, '$.provision_id') AS pid FROM chunks"
+    ).fetchall()
+    present = {r["pid"] for r in rows if r["pid"]}
+    missing = [pid for pid in overrides if pid not in present]
+    if missing:
+        print(f"[WARN] {len(missing)} provision override(s) matched ZERO chunks "
+              f"(typo/renumber/unsynced): {', '.join(missing)}")
+    print(f"[overrides] {len(overrides) - len(missing)}/{len(overrides)} provision overrides matched ≥1 chunk")
 
 
 def _require_services() -> None:
@@ -75,6 +94,9 @@ def reindex(doc_id: str | None = None) -> list[dict]:
             conn.commit()
             print(f"[OK] {source.source_id} indexed {chunks} chunks, {parents} parents")
             results.append({"source_id": source.source_id, "chunks": chunks, "parents": parents})
+
+        if doc_id is None:  # full reindex → check every override resolved to real chunks
+            _warn_unmatched_overrides(conn)
     finally:
         conn.close()
 
