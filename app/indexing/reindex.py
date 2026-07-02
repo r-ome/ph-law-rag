@@ -31,7 +31,7 @@ def _warn_unmatched_overrides(conn) -> None:
     if missing:
         print(f"[WARN] {len(missing)} provision override(s) matched ZERO chunks "
               f"(typo/renumber/unsynced): {', '.join(missing)}")
-    for pid in sorted(overrides):
+    for pid, rules in sorted(overrides.items()):
         rows = conn.execute(
             """
             SELECT DISTINCT json_extract(metadata_json, '$.source_id') AS source_id
@@ -41,12 +41,42 @@ def _warn_unmatched_overrides(conn) -> None:
             [pid],
         ).fetchall()
         source_ids = sorted(r["source_id"] for r in rows if r["source_id"])
-        if len(source_ids) > 1:
+        if len(source_ids) > 1 and any(rule.source_id is None for rule in rules):
             print(
                 f"[WARN] provision_status override {pid} matches chunks from multiple "
-                f"source_id values ({', '.join(source_ids)}); same-id collisions must use "
-                "provision_supersession.yaml, never provision_status.yaml"
+                f"source_id values ({', '.join(source_ids)}); set source_id on the rule or use "
+                "provision_supersession.yaml for same-id collisions"
             )
+        for rule in rules:
+            if not rule.unit_labels:
+                continue
+            if rule.source_id:
+                label_rows = conn.execute(
+                    """
+                    SELECT DISTINCT json_extract(metadata_json, '$.unit_label') AS unit_label
+                    FROM chunks
+                    WHERE json_extract(metadata_json, '$.provision_id') = ?
+                      AND json_extract(metadata_json, '$.source_id') = ?
+                    """,
+                    [pid, rule.source_id],
+                ).fetchall()
+            else:
+                label_rows = conn.execute(
+                    """
+                    SELECT DISTINCT json_extract(metadata_json, '$.unit_label') AS unit_label
+                    FROM chunks
+                    WHERE json_extract(metadata_json, '$.provision_id') = ?
+                    """,
+                    [pid],
+                ).fetchall()
+            present_labels = {r["unit_label"] for r in label_rows if r["unit_label"]}
+            missing_labels = [label for label in rule.unit_labels if label not in present_labels]
+            if missing_labels:
+                source_note = f" source_id={rule.source_id}" if rule.source_id else ""
+                print(
+                    f"[WARN] provision_status override {pid}{source_note} unit_labels matched "
+                    f"ZERO chunks: {', '.join(missing_labels)}"
+                )
     print(f"[overrides] {len(overrides) - len(missing)}/{len(overrides)} provision overrides matched ≥1 chunk")
 
 

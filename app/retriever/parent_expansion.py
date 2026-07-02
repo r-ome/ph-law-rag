@@ -64,8 +64,13 @@ def expand_parents(results: list[RetrievalResult]) -> list[RetrievalResult]:
     if not settings.parent_expansion_enabled:
         return results
 
+    # parent_has_hidden_leaves means the parent text contains leaves hidden by a
+    # provision_status override. Swapping that parent in would resurrect superseded text;
+    # deliberate v1 trade: keep fragments rather than leak stale text.
     counts = Counter(
-        r.metadata.get("parent_key") for r in results if r.metadata.get("parent_key")
+        r.metadata.get("parent_key")
+        for r in results
+        if r.metadata.get("parent_key") and not r.metadata.get("parent_has_hidden_leaves")
     )
     eligible = {
         pk for pk, n in counts.items()

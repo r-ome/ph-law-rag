@@ -4,8 +4,10 @@
 # it (operability_action: hide) even though its parent document is operative. Keyed on the
 # canonical provision_id emitted by the chunker (source_id:unit_type:unit_number, lowercased).
 #
-# SCOPE: whole-provision death ONLY (repealed / reclassified / renumbered). Do NOT use for partial
-# amendments (changed penalties/ages/inserted clauses) — those provisions stay operative.
+# SCOPE: whole-provision death via bare entries, OR partial amendments via unit_labels + source_id
+# (exact label match, never prefix), only when the replacement text is indexed and operative
+# (basis_source_id). Whole-provision entries remain forbidden for partials. Leaf-scoped entries also
+# stamp parent_has_hidden_leaves on surviving siblings.
 # HARD RULE: if an amendment inserts a same-id replacement that collides with a base provision_id,
 # add a curated rule to provision_supersession.yaml instead. Same-id collisions must never become
 # provision_status.yaml overrides because overrides match bare provision_id across source_id values.
@@ -19,3 +21,16 @@ overrides:
     basis_source_id: anti_rape_law_1997
     effective_date: "1997-10-22"   # recorded for audit; UNUSED by v1 retrieval
     note: "Rape reclassified from a crime against chastity (Art. 335) to a crime against persons (Art. 266-A to 266-D) by RA 8353."
+
+  - provision_id: dangerous_drugs_act:article-ii:section:21
+    source_id: dangerous_drugs_act
+    unit_labels:
+      - "Section 21"          # chapeau — rewritten by RA 10640
+      - "Section 21(1)"
+      - "Section 21(2)"
+      - "Section 21(3)"
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: dangerous_drugs_amendments_2014
+    effective_date: "2014-07-15"
+    note: "RA 10640 rewrote §21's chapeau and items (1)-(3) ('x x x.' partial restatement); items (4)-(8) remain operative."

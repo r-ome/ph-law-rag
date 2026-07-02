@@ -56,14 +56,29 @@ def test_operability_action_for(status, expected):
 
 # ── apply_overrides ────────────────────────────────────────────────────────
 def _overrides():
-	return {"revised_penal_code:article:335": ProvisionOverride(
+	return {"revised_penal_code:article:335": (ProvisionOverride(
 		provision_id="revised_penal_code:article:335",
+		source_id=None,
+		unit_labels=None,
 		provision_status="superseded",
 		operability_action="hide",
 		basis_source_id="anti_rape_law_1997",
 		effective_date="1997-10-22",
 		note="reclassified",
-	)}
+	),)}
+
+
+def _section_21_overrides(labels=("Section 21", "Section 21(1)", "Section 21(2)", "Section 21(3)")):
+	return {"dangerous_drugs_act:article-ii:section:21": (ProvisionOverride(
+		provision_id="dangerous_drugs_act:article-ii:section:21",
+		source_id="dangerous_drugs_act",
+		unit_labels=tuple(labels),
+		provision_status="superseded",
+		operability_action="hide",
+		basis_source_id="dangerous_drugs_amendments_2014",
+		effective_date="2014-07-15",
+		note="partial restatement",
+	),)}
 
 
 def test_apply_overrides_stamps_without_touching_status():
@@ -85,6 +100,132 @@ def test_apply_overrides_skips_chunks_without_provision_id():
 	meta = {"is_structural": False, "operability_action": "show"}
 	apply_overrides(meta, _overrides())
 	assert "provision_status" not in meta
+
+
+def test_apply_overrides_leaf_match_hides_exact_unit_label():
+	meta = {
+		"provision_id": "dangerous_drugs_act:article-ii:section:21",
+		"source_id": "dangerous_drugs_act",
+		"unit_label": "Section 21(1)",
+	}
+	apply_overrides(meta, _section_21_overrides())
+	assert meta["provision_status"] == "superseded"
+	assert meta["operability_action"] == "hide"
+	assert meta["operability_basis_source_id"] == "dangerous_drugs_amendments_2014"
+	assert "parent_has_hidden_leaves" not in meta
+
+
+def test_apply_overrides_leaf_sibling_is_flagged_but_not_hidden():
+	meta = {
+		"provision_id": "dangerous_drugs_act:article-ii:section:21",
+		"source_id": "dangerous_drugs_act",
+		"unit_label": "Section 21(4)",
+	}
+	apply_overrides(meta, _section_21_overrides())
+	assert meta["parent_has_hidden_leaves"] == 1
+	assert "operability_action" not in meta
+
+
+def test_apply_overrides_leaf_labels_are_exact_not_prefix_matches():
+	item = {
+		"provision_id": "dangerous_drugs_act:article-ii:section:21",
+		"source_id": "dangerous_drugs_act",
+		"unit_label": "Section 21(1)",
+	}
+	apply_overrides(item, _section_21_overrides(labels=("Section 21",)))
+	assert "operability_action" not in item
+	assert item["parent_has_hidden_leaves"] == 1
+
+	chapeau = {
+		"provision_id": "dangerous_drugs_act:article-ii:section:21",
+		"source_id": "dangerous_drugs_act",
+		"unit_label": "Section 21",
+	}
+	apply_overrides(chapeau, _section_21_overrides(labels=("Section 21(1)",)))
+	assert "operability_action" not in chapeau
+	assert chapeau["parent_has_hidden_leaves"] == 1
+
+
+def test_apply_overrides_source_id_mismatch_is_complete_noop():
+	meta = {
+		"provision_id": "dangerous_drugs_act:article-ii:section:21",
+		"source_id": "dangerous_drugs_amendments_2014",
+		"unit_label": "Section 21(1)",
+	}
+	apply_overrides(meta, _section_21_overrides())
+	assert meta == {
+		"provision_id": "dangerous_drugs_act:article-ii:section:21",
+		"source_id": "dangerous_drugs_amendments_2014",
+		"unit_label": "Section 21(1)",
+	}
+
+
+def test_apply_overrides_legacy_whole_provision_hides_without_flag():
+	meta = {"provision_id": "revised_penal_code:article:335", "unit_label": "Article 335"}
+	apply_overrides(meta, _overrides())
+	assert meta["operability_action"] == "hide"
+	assert "parent_has_hidden_leaves" not in meta
+
+
+def test_apply_overrides_hide_beats_prior_leaf_survivor_flag():
+	pid = "dangerous_drugs_act:article-ii:section:21"
+	overrides = {pid: (
+		ProvisionOverride(
+			provision_id=pid,
+			source_id="dangerous_drugs_act",
+			unit_labels=("Section 21(1)",),
+			provision_status="superseded",
+			operability_action="hide",
+			basis_source_id="dangerous_drugs_amendments_2014",
+			effective_date="2014-07-15",
+			note=None,
+		),
+		ProvisionOverride(
+			provision_id=pid,
+			source_id="dangerous_drugs_act",
+			unit_labels=("Section 21(4)",),
+			provision_status="superseded",
+			operability_action="hide",
+			basis_source_id="dangerous_drugs_amendments_2014",
+			effective_date="2014-07-15",
+			note=None,
+		),
+	)}
+	meta = {"provision_id": pid, "source_id": "dangerous_drugs_act", "unit_label": "Section 21(4)"}
+	apply_overrides(meta, overrides)
+	assert meta["operability_action"] == "hide"
+	assert "parent_has_hidden_leaves" not in meta
+
+
+def test_apply_overrides_synthetic_section_21_chunk_set_and_amendment_pid_sanity():
+	labels = ["Section 21"] + [f"Section 21({i})" for i in range(1, 9)]
+	chunks = [
+		{
+			"provision_id": "dangerous_drugs_act:article-ii:section:21",
+			"source_id": "dangerous_drugs_act",
+			"unit_label": label,
+		}
+		for label in labels
+	]
+	for chunk in chunks:
+		apply_overrides(chunk, _section_21_overrides())
+
+	hidden = [c for c in chunks if c.get("operability_action") == "hide"]
+	flagged = [c for c in chunks if c.get("parent_has_hidden_leaves") == 1]
+	assert [c["unit_label"] for c in hidden] == ["Section 21", "Section 21(1)", "Section 21(2)", "Section 21(3)"]
+	assert [c["unit_label"] for c in flagged] == ["Section 21(4)", "Section 21(5)", "Section 21(6)", "Section 21(7)", "Section 21(8)"]
+
+	amendment = {
+		"provision_id": "dangerous_drugs_act:section:21",
+		"source_id": "dangerous_drugs_amendments_2014",
+		"unit_label": "Section 21",
+	}
+	apply_overrides(amendment, _section_21_overrides())
+	assert amendment == {
+		"provision_id": "dangerous_drugs_act:section:21",
+		"source_id": "dangerous_drugs_amendments_2014",
+		"unit_label": "Section 21",
+	}
 
 
 # ── retrieval filter repoint ───────────────────────────────────────────────
