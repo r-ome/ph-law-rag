@@ -213,3 +213,11 @@ def test_unquoted_article_in_amendment_mode_is_inserted():
 
 	assert article.metadata["inserted_into"] == "revised_penal_code"
 	assert article.metadata["provision_id"] == "revised_penal_code:article:100"
+
+
+def test_partial_ellipsis_detected_when_quoted_and_punctuated():
+	# RA 10640 ends its partial restatement with a quoted, punctuated ellipsis line:
+	# "x x x." — the flag must fire without bare whitespace around the x's.
+	base = {**SOURCE_METADATA, "source_id": "amendment", "amends": ["target_act"]}
+	node = chunk_texts('"Section 21. Custody rules.\nRestated items.\n"x x x."', base)[0]
+	assert node.metadata["provision_partial"] is True

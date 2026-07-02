@@ -20,7 +20,10 @@ QUOTED_ARTICLE_RE = re.compile(
 QUOTED_SECTION_RE = re.compile(
 	rf"^\s*{_QUOTE}\s*(?:SEC(?:TION)?|Sec(?:tion)?)\.?\s+(\d+(?:-[A-Z])?)\b"
 )
-PARTIAL_ELLIPSIS_RE = re.compile(r"(?:^|\s)x\s+x\s+x(?:\s|$)", re.IGNORECASE)
+# PH legal ellipsis for omitted unchanged text; often quoted+punctuated ("x x x.")
+PARTIAL_ELLIPSIS_RE = re.compile(
+	r"(?:^|[\s\"“‘'])x\s+x\s+x(?:[\s.\"”’']|$)", re.IGNORECASE
+)
 
 MIN_UNITS = 5  # auto-detect: minimum length of a monotonic ascending run to call a doc structural
 
