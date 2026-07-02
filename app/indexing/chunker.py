@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from typing import cast
 from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
@@ -26,6 +27,19 @@ PARTIAL_ELLIPSIS_RE = re.compile(
 )
 
 MIN_UNITS = 5  # auto-detect: minimum length of a monotonic ascending run to call a doc structural
+
+
+@dataclass(frozen=True)
+class ProvisionSpan:
+	start: int
+	end: int
+	provision_id: str | None
+	unit_type: str
+	unit_number: str
+	unit_label: str
+	inserted: bool
+	partial: bool
+
 
 # ── Enumeration markers (line-start, scanned only inside an oversized unit) ──
 _PAREN   = re.compile(r"^\s*\(([a-z]{1,4}|\d{1,3})\)\s")   # (a) (iv) (aa) (12) — {1,4} catches (iii)/(viii)
@@ -100,6 +114,50 @@ def chunk_texts(text: str, source_metadata: dict) -> list[TextNode]:
 	# hint == "auto": only go structural if the units look real (cautious).
 	return _structural_nodes(text, units, source_metadata) if _looks_structural(units) \
 		else _prose_nodes(text, source_metadata)
+
+
+def provision_spans(text: str, source_metadata: dict) -> list[ProvisionSpan]:
+	"""Return the exact Article/Section spans seen by the structural chunker.
+
+	This is a public, read-only view over the chunker's marker grammar for
+	derivations like mechanical consolidation. Keep it thin: unit detection still
+	lives in _detect_units/_amendment_units so span consumers cannot drift from
+	indexing behavior.
+	"""
+	if source_metadata.get("amends"):
+		units = _amendment_units(text)
+	else:
+		hint = source_metadata.get("structure", "auto")
+		if hint == "prose":
+			return []
+		units = _detect_units(text)
+		if hint != "hierarchical" and not _looks_structural(units):
+			return []
+
+	spans: list[ProvisionSpan] = []
+	target = _amendment_target(source_metadata) if source_metadata.get("amends") else None
+	for u in units:
+		seg = text[u["start"]: u["end"]]
+		inserted = bool(u.get("inserted"))
+		if inserted:
+			provision_id = f"{target}:{u['type']}:{u['number']}".lower() if target else None
+		else:
+			provision_id = _provision_id(
+				source_metadata.get("source_id"), u["type"], u["number"], u["path"]
+			)
+		spans.append(
+			ProvisionSpan(
+				start=u["start"],
+				end=u["end"],
+				provision_id=provision_id,
+				unit_type=u["type"],
+				unit_number=u["number"],
+				unit_label=u["label"],
+				inserted=inserted,
+				partial=bool(PARTIAL_ELLIPSIS_RE.search(seg)),
+			)
+		)
+	return spans
 
 
 def _detect_units(text: str) -> list[dict]:

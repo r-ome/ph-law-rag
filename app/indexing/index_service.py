@@ -1,7 +1,10 @@
 import json
 from datetime import datetime, timezone
 from llama_index.core.schema import TextNode
-from app.indexing.chunker import chunk_texts, extract_parents
+from app.indexing.chunker import chunk_texts, extract_parents, provision_spans
+from app.indexing.consolidation import (
+	SplicePlan, consolidate, load_amendment_texts,
+)
 from app.indexing.bm25_store import build_and_save
 from app.indexing.embedder import embed_texts
 from app.indexing.vector_store import (
@@ -24,10 +27,21 @@ def index_document(
 	doc_id: str,
 	text: str,
 	source_metadata: dict,
-	version_id: str
+	version_id: str,
+	splice_plan: SplicePlan | None = None,
 ) -> int:
 	client = get_qdrant_client()
 	ensure_collection(client)
+
+	source_id = source_metadata.get("source_id")
+	splices = splice_plan.splices_by_base_doc.get(source_id, ()) if splice_plan else ()
+	if splices:
+		text = consolidate(
+			base_text=text,
+			base_spans=provision_spans(text, source_metadata),
+			splices=splices,
+			amendment_texts=load_amendment_texts(conn, splices),
+		)
 
 	# SQLite deletes are uncommitted here (they roll back with the transaction if
 	# anything below raises — process_source commits only after this returns).
@@ -38,12 +52,18 @@ def index_document(
 	if source_metadata.get("amends"):
 		report_amendment_indexing(conn, source_metadata, nodes)
 
+	_stamp_consolidated_nodes(nodes, splices)
+
 	# Stamp provision-level operability overrides onto matching chunks (whole-provision repeal/
 	# reclassification). No-op for chunks without a matching provision_id. Sets operability_action
 	# (the retrieval switch) + provision_status/basis; never the doc-level status.
 	overrides = load_provision_overrides()
 	for node in nodes:
 		apply_overrides(node.metadata, overrides)
+	_stamp_hidden_consolidated_insertions(
+		nodes,
+		set(splice_plan.hidden_keys_by_amendment.get(source_id, ())) if splice_plan else set(),
+	)
 
 	texts = [node.text for node in nodes]
 	vectors = embed_texts(texts)
@@ -107,6 +127,36 @@ def index_document(
 	_rebuild_bm25(conn)
 
 	return len(nodes)
+
+
+def _stamp_consolidated_nodes(nodes: list[TextNode], splices: tuple) -> None:
+	by_key = {splice.key: splice for splice in splices}
+	if not by_key:
+		return
+	for node in nodes:
+		splice = by_key.get(node.metadata.get("provision_id"))
+		if splice is None:
+			continue
+		node.metadata.update({
+			"consolidated": 1,
+			"amended_by": [splice.amendment_source_id],
+			"amendment_official_number": splice.amendment_official_number,
+			"amendment_approval_date": splice.amendment_approval_date,
+			"consolidation_basis": "single_full_restatement",
+		})
+
+
+def _stamp_hidden_consolidated_insertions(nodes: list[TextNode], hidden_keys: set[str]) -> None:
+	if not hidden_keys:
+		return
+	for node in nodes:
+		if not node.metadata.get("inserted_into"):
+			continue
+		if node.metadata.get("provision_id") not in hidden_keys:
+			continue
+		node.metadata["operability_action"] = "hide"
+		node.metadata["provision_status"] = "consolidated"
+		node.metadata["operability_basis"] = "consolidated"
 
 
 def report_amendment_indexing(conn, source_metadata: dict, nodes: list[TextNode]) -> None:

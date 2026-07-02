@@ -14,6 +14,10 @@ from app.db import get_connection
 from app.ingestion.sync import build_source_metadata
 from app.indexing.index_service import index_document
 from app.indexing.provision_status import load_provision_overrides
+from app.indexing.consolidation import (
+    build_splice_plan,
+    check_consolidation_coherence,
+)
 
 
 def _warn_unmatched_overrides(conn) -> None:
@@ -162,12 +166,15 @@ def reindex(doc_id: str | None = None) -> list[dict]:
     results: list[dict] = []
     conn = get_connection()
     try:
-        for source in load_allowed_sources():
+        sources = load_allowed_sources()
+        splice_plan = build_splice_plan(conn)
+        target_source_ids = _expanded_reindex_scope(conn, sources, doc_id, splice_plan) if doc_id else None
+        for source in sources:
             row = _latest_version(conn, source.source_id)
             if row is None:
                 print(f"[SKIP] {source.source_id} — no indexed version (run sync first)")
                 continue
-            if doc_id and doc_id not in (row["doc_id"], source.source_id):
+            if target_source_ids is not None and source.source_id not in target_source_ids:
                 continue
 
             path = Path(row["normalized_path"])
@@ -182,6 +189,7 @@ def reindex(doc_id: str | None = None) -> list[dict]:
                 text=text,
                 source_metadata=build_source_metadata(source, row["doc_id"]),
                 version_id=row["version_id"],
+                splice_plan=splice_plan,
             )
             parents = conn.execute(
                 "SELECT COUNT(*) AS c FROM chunk_parents WHERE doc_id = ?", [row["doc_id"]]
@@ -193,9 +201,37 @@ def reindex(doc_id: str | None = None) -> list[dict]:
         if doc_id is None:  # full reindex → check every override/resolution warning corpus-wide
             _warn_unmatched_overrides(conn)
             _warn_amendment_aggregate(conn)
+            check_consolidation_coherence(conn, splice_plan)
     finally:
         conn.close()
 
     if doc_id and not results:
         print(f"[WARN] no source matched '{doc_id}'")
     return results
+
+
+def _expanded_reindex_scope(conn, sources, doc_id: str | None, splice_plan) -> set[str]:
+    requested: set[str] = set()
+    for source in sources:
+        row = _latest_version(conn, source.source_id)
+        if row is not None and doc_id in (row["doc_id"], source.source_id):
+            requested.add(source.source_id)
+
+    expanded = set(requested)
+    pair_messages: set[tuple[str, str]] = set()
+    for base_source_id, splices in splice_plan.splices_by_base_doc.items():
+        for splice in splices:
+            pair = (base_source_id, splice.amendment_source_id)
+            if base_source_id in requested and splice.amendment_source_id not in expanded:
+                expanded.add(splice.amendment_source_id)
+                pair_messages.add(pair)
+            if splice.amendment_source_id in requested and base_source_id not in expanded:
+                expanded.add(base_source_id)
+                pair_messages.add(pair)
+
+    for base_source_id, amendment_source_id in sorted(pair_messages):
+        print(
+            f"[consolidation] {base_source_id} <-> {amendment_source_id} "
+            "reindexed together"
+        )
+    return expanded

@@ -167,6 +167,15 @@ def timeline(
 				f"ratio={ratio}\tlabels({len(entry.unit_labels)})={labels}"
 			)
 
+@app.command("consolidate-report")
+def consolidate_report():
+	from app.db import get_connection
+	from app.indexing.consolidation import build_splice_plan, plan_report
+
+	with get_connection() as conn:
+		report = plan_report(build_splice_plan(conn))
+	typer.echo(json.dumps(report, indent=2))
+
 @app.command("show-config")
 def show_config():
 	typer.echo(json.dumps(settings.model_dump(mode="json"), indent=2))
