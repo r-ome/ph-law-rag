@@ -117,6 +117,56 @@ def ask(query: str, session: str = typer.Option(None, "--session")):
 		for s in result["sources"]:
 			typer.echo(f"[{s['ref']}] {s['title']} - {s['url']}")
 
+@app.command("timeline")
+def timeline(
+	fragment: str = typer.Argument(None, help="provision_id or source_id fragment to search"),
+	summary: bool = typer.Option(False, "--summary", help="print corpus timeline totals"),
+):
+	from app.db import get_connection
+	from app.indexing.amendment_timeline import build_timelines
+
+	if not summary and not fragment:
+		raise typer.BadParameter("provide <fragment> or --summary")
+
+	with get_connection() as conn:
+		result = build_timelines(conn)
+
+	if summary:
+		total_keys = len(result.timelines)
+		multi_entry = sum(1 for t in result.timelines.values() if len(t.entries) >= 2)
+		chains = sum(1 for t in result.timelines.values() if len(t.entries) >= 3)
+		partial_entries = sum(
+			1
+			for t in result.timelines.values()
+			for entry in t.entries
+			if entry.provision_partial
+		)
+		typer.echo(json.dumps({
+			"total_keys": total_keys,
+			"keys_with_2_or_more_entries": multi_entry,
+			"chains_3_or_more_entries": chains,
+			"partial_flagged_entries": partial_entries,
+			"ambiguous_insertions": len(result.ambiguous_insertions),
+			"same_date_conflicts": len(result.same_date_conflicts),
+			"missing_dates": len(result.missing_dates),
+		}, indent=2))
+		return
+
+	needle = fragment.lower()
+	for key in sorted(result.timelines):
+		timeline = result.timelines[key]
+		source_ids = {entry.source_id for entry in timeline.entries}
+		if needle not in key.lower() and not any(needle in s.lower() for s in source_ids):
+			continue
+		for entry in timeline.entries:
+			ratio = "" if entry.length_ratio is None else f"{entry.length_ratio:.3f}"
+			labels = ", ".join(entry.unit_labels)
+			typer.echo(
+				f"{timeline.key}\t{entry.approval_date}\t{entry.source_id}\t"
+				f"insertion={entry.is_insertion}\tpartial={entry.provision_partial}\t"
+				f"ratio={ratio}\tlabels({len(entry.unit_labels)})={labels}"
+			)
+
 @app.command("show-config")
 def show_config():
 	typer.echo(json.dumps(settings.model_dump(mode="json"), indent=2))
