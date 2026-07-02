@@ -33,6 +33,10 @@ COMPETING = [
     {"dangerous_drugs_act", "dangerous_drugs_amendments_2014"},
     {"judiciary_reorganization_act", "judiciary_reorganization_amendments_2021"},
     {"revised_penal_code", "rpc_penalty_amendments_2017"},
+    {"revised_penal_code", "anti_rape_law_1997", "statutory_rape_amendments_2022"},
+    {"revised_penal_code", "death_penalty_prohibition"},
+    {"anti_trafficking", "anti_trafficking_expanded_2013", "anti_trafficking_amendments_2022"},
+    {"probation_law", "probation_amendments_2015"},
 ]
 
 # Ground truth: "Section 13, Article III" | chunk header: "SECTION 13" / "Section 4(c)(4)".
@@ -73,7 +77,7 @@ def _only_fragments(need: set[str], got: set[str]) -> bool:
 
 def _cross_source(exp: set[str], got: set[str]) -> bool:
     for pair in COMPETING:
-        if len(pair & got) >= 2 and not pair.issubset(exp):
+        if len(pair & got) >= 2 and (pair & got) - exp:
             return True
     return False
 
