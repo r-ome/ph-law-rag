@@ -31,7 +31,72 @@ def _warn_unmatched_overrides(conn) -> None:
     if missing:
         print(f"[WARN] {len(missing)} provision override(s) matched ZERO chunks "
               f"(typo/renumber/unsynced): {', '.join(missing)}")
+    for pid in sorted(overrides):
+        rows = conn.execute(
+            """
+            SELECT DISTINCT json_extract(metadata_json, '$.source_id') AS source_id
+            FROM chunks
+            WHERE json_extract(metadata_json, '$.provision_id') = ?
+            """,
+            [pid],
+        ).fetchall()
+        source_ids = sorted(r["source_id"] for r in rows if r["source_id"])
+        if len(source_ids) > 1:
+            print(
+                f"[WARN] provision_status override {pid} matches chunks from multiple "
+                f"source_id values ({', '.join(source_ids)}); same-id collisions must use "
+                "provision_supersession.yaml, never provision_status.yaml"
+            )
     print(f"[overrides] {len(overrides) - len(missing)}/{len(overrides)} provision overrides matched ≥1 chunk")
+
+
+def _warn_amendment_aggregate(conn) -> None:
+    rows = conn.execute(
+        """
+        SELECT
+            json_extract(metadata_json, '$.provision_id') AS provision_id,
+            json_extract(metadata_json, '$.source_id') AS source_id,
+            json_extract(metadata_json, '$.inserted_into') AS inserted_into,
+            json_extract(metadata_json, '$.unit_type') AS unit_type,
+            json_extract(metadata_json, '$.unit_number') AS unit_number
+        FROM chunks
+        WHERE json_extract(metadata_json, '$.provision_id') IS NOT NULL
+        """
+    ).fetchall()
+    by_pid: dict[str, dict[str, set[str]]] = {}
+    inserted_sections: set[tuple[str, str, str, str]] = set()
+    target_pids: dict[str, set[str]] = {}
+    for row in rows:
+        pid = row["provision_id"]
+        source_id = row["source_id"]
+        inserted_into = row["inserted_into"]
+        if not pid or not source_id:
+            continue
+        target_pids.setdefault(source_id, set()).add(pid)
+        bucket = by_pid.setdefault(pid, {"inserted": set(), "base": set()})
+        if inserted_into:
+            bucket["inserted"].add(source_id)
+            if row["unit_type"] == "section" and row["unit_number"]:
+                inserted_sections.add((source_id, inserted_into, row["unit_number"], pid))
+        else:
+            bucket["base"].add(source_id)
+
+    for pid, bucket in sorted(by_pid.items()):
+        for amendment_source_id in sorted(bucket["inserted"]):
+            for base_source_id in sorted(bucket["base"] - {amendment_source_id}):
+                print(
+                    f"[SUPERSESSION-CANDIDATE] {pid}: inserted by {amendment_source_id} "
+                    f"collides with indexed base provision in {base_source_id}"
+                )
+
+    for amendment_source_id, target, number, pid in sorted(inserted_sections):
+        for base_pid in sorted(target_pids.get(target, set())):
+            pathless = f"{target}:section:{number}".lower()
+            if base_pid != pathless and base_pid.endswith(f":section:{number}".lower()):
+                print(
+                    f"[WARN] {amendment_source_id}: inserted path-less section id {pid} may not join "
+                    f"path-scoped target section id {base_pid}"
+                )
 
 
 def _require_services() -> None:
@@ -95,8 +160,9 @@ def reindex(doc_id: str | None = None) -> list[dict]:
             print(f"[OK] {source.source_id} indexed {chunks} chunks, {parents} parents")
             results.append({"source_id": source.source_id, "chunks": chunks, "parents": parents})
 
-        if doc_id is None:  # full reindex → check every override resolved to real chunks
+        if doc_id is None:  # full reindex → check every override/resolution warning corpus-wide
             _warn_unmatched_overrides(conn)
+            _warn_amendment_aggregate(conn)
     finally:
         conn.close()
 

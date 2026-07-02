@@ -1,6 +1,17 @@
+import ssl
 import httpx
 from dataclasses import dataclass
 from app.config import settings, SourceConfig
+
+
+def _ssl_verify() -> ssl.SSLContext | bool:
+	"""OS trust store when available: government sites (elibrary.judiciary.gov.ph) serve
+	incomplete cert chains that certifi can't build but the OS resolves via AIA fetching."""
+	try:
+		import truststore
+		return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+	except ImportError:
+		return True
 
 @dataclass
 class FetchResult:
@@ -18,7 +29,8 @@ def fetch_source(source: SourceConfig) -> FetchResult:
 		response = httpx.get(
 			url,
 			timeout=settings.request_timeout,
-			headers={"User-Agent": "ph-law-rag/1.0"}
+			headers={"User-Agent": "ph-law-rag/1.0"},
+			verify=_ssl_verify(),
 		)
 		response.raise_for_status()
 		return FetchResult(

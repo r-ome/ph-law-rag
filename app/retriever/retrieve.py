@@ -18,6 +18,10 @@ def _format_result(index: int, result: RetrievalResult) -> str:
         f"    source={source_id}",
         f"    title={title}",
     ]
+    if metadata.get("unit_label"):
+        lines.append(f"    unit_label={metadata.get('unit_label')}")
+    if metadata.get("provision_id"):
+        lines.append(f"    provision_id={metadata.get('provision_id')}")
     if url:
         lines.append(f"    url={url}")
     lines.append(f"    preview={preview}")

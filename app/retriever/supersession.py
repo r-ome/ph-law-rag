@@ -17,9 +17,9 @@ from app.config import settings
 @dataclass(frozen=True)
 class SupersessionRule:
     base_source_id: str
-    base_provisions: tuple[str, ...]
+    base_provision_ids: tuple[str, ...]
     operative_source_id: str
-    operative_provisions: tuple[str, ...]
+    operative_provision_ids: tuple[str, ...]
     kind: str
 
 
@@ -32,18 +32,17 @@ def load_supersessions() -> tuple[SupersessionRule, ...]:
     return tuple(
         SupersessionRule(
             base_source_id=r["base_source_id"],
-            base_provisions=tuple(r.get("base_provisions", [])),
+            base_provision_ids=tuple(r.get("base_provision_ids", [])),
             operative_source_id=r["operative_source_id"],
-            operative_provisions=tuple(r.get("operative_provisions", [])),
+            operative_provision_ids=tuple(r.get("operative_provision_ids", [])),
             kind=r.get("kind", "amendment"),
         )
         for r in data.get("supersessions", [])
     )
 
 
-def provision_matches(unit_label: str | None, provisions) -> bool:
-    """A chunk's unit_label matches provision P if it IS P or a sub-item of P
-    (Section 21 / Section 21(1)), but not a numeric neighbor (Section 210)."""
-    if not unit_label:
+def provision_matches(provision_id: str | None, provision_ids) -> bool:
+    """Exact provision_id match. Enumeration leaves inherit their parent provision_id."""
+    if not provision_id:
         return False
-    return any(unit_label == p or unit_label.startswith(p + "(") for p in provisions)
+    return provision_id in provision_ids

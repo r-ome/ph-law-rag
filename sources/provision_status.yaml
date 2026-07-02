@@ -1,13 +1,14 @@
 # Provision-level operability overrides — whole-provision repeal/reclassification only.
 #
 # Each entry marks a single base provision as no longer current law, so retrieval suppresses
-# it (operability_action: hide) even though its parent document is operative. This routes
-# around the "amendment-label wall": we only need the BASE provision's provision_id, never the
-# replacement's (amendment provisions are unlabeled). Keyed on the canonical provision_id emitted
-# by the chunker (source_id:unit_type:unit_number, lowercased).
+# it (operability_action: hide) even though its parent document is operative. Keyed on the
+# canonical provision_id emitted by the chunker (source_id:unit_type:unit_number, lowercased).
 #
 # SCOPE: whole-provision death ONLY (repealed / reclassified / renumbered). Do NOT use for partial
 # amendments (changed penalties/ages/inserted clauses) — those provisions stay operative.
+# HARD RULE: if an amendment inserts a same-id replacement that collides with a base provision_id,
+# add a curated rule to provision_supersession.yaml instead. Same-id collisions must never become
+# provision_status.yaml overrides because overrides match bare provision_id across source_id values.
 # status of the document is NEVER changed here; only provision_status + operability_action.
 # Applied at INDEX time — edits require `raglab reindex` (sync will not detect override drift).
 

@@ -71,7 +71,7 @@ def sync_env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [_source()])
     monkeypatch.setattr(sync_module, "fetch_source", fake_fetch)
-    monkeypatch.setattr(sync_module, "parse_html", lambda content, url: content.decode("utf-8"))
+    monkeypatch.setattr(sync_module, "parse_html", lambda content, url, extractor="auto": content.decode("utf-8"))
     monkeypatch.setattr(sync_module, "save_raw_fetch", lambda *a, **k: "data/raw/civil_code.html")
     monkeypatch.setattr(sync_module, "save_normalized_document", lambda *a, **k: "data/normalized/civil_code.html")
     monkeypatch.setattr("app.indexing.index_service.index_document", fake_index)
@@ -346,3 +346,46 @@ def test_tier_a_qdrant_failure_counts_failed_no_commit(sync_env, monkeypatch):
     assert counts["refreshed"] == 0
     after = json.loads(_query(db_path, "SELECT metadata_json FROM chunks")[0][0])["url"]
     assert after == before  # rolled back, no partial write persisted
+
+
+def test_omit_falsy_amends_metadata_prevents_mass_reindex(monkeypatch):
+    import json
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("CREATE TABLE chunks(chunk_id TEXT, doc_id TEXT, metadata_json TEXT)")
+    conn.execute(
+        "INSERT INTO chunks(chunk_id, doc_id, metadata_json) VALUES (?,?,?)",
+        ["c1", "doc", json.dumps({"source_id": "base", "title": "Base", "structure": "auto"})],
+    )
+    calls = []
+
+    def fake_index(conn, doc_id, text, source_metadata, version_id):
+        calls.append(source_metadata)
+        conn.execute("DELETE FROM chunks WHERE doc_id = ?", [doc_id])
+        conn.execute(
+            "INSERT INTO chunks(chunk_id, doc_id, metadata_json) VALUES (?,?,?)",
+            ["c2", doc_id, json.dumps(source_metadata)],
+        )
+
+    monkeypatch.setattr("app.indexing.index_service.index_document", fake_index)
+    from app.indexing.index_service import refresh_document_metadata
+
+    action, n = refresh_document_metadata(
+        conn,
+        "doc",
+        {"source_id": "base", "title": "Base", "structure": "auto"},
+        "text",
+        "version",
+    )
+    assert (action, n) == ("skip", 0)
+    assert calls == []
+
+    action, n = refresh_document_metadata(
+        conn,
+        "doc",
+        {"source_id": "base", "title": "Base", "structure": "auto", "amends": ["target"]},
+        "text",
+        "version",
+    )
+    assert (action, n) == ("reindex", 1)
+    assert calls and calls[-1]["amends"] == ["target"]

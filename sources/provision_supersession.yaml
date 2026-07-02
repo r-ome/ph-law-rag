@@ -4,15 +4,33 @@
 # replacement. Query-time only — no re-index. Repeal-replace (e.g. Civil Code <-> Family
 # Code marriage) is deferred to a later phase (kind: repeal_replace) and needs curated
 # cross-code provision pairs since the numbers don't align.
+#
+# Matching is exact provision_id + source_id (enumeration leaves inherit their parent's
+# provision_id). ids below are DB-derived from the live chunks table (2026-07-02):
+#   SELECT DISTINCT json_extract(metadata_json,'$.provision_id') FROM chunks
+#   WHERE json_extract(metadata_json,'$.source_id') = '<source_id>';
 supersessions:
+  # RA 10640 preserves its quotation marks in extraction, so its inserted Section 21
+  # carries the TARGET-namespace id (dangerous_drugs_act:section:21, path-less) while the
+  # base provision id is path-scoped (article-ii). Both sides listed as they exist in the DB.
   - base_source_id: dangerous_drugs_act
-    base_provisions: ["Section 21"]
+    base_provision_ids: ["dangerous_drugs_act:article-ii:section:21"]
     operative_source_id: dangerous_drugs_amendments_2014
-    operative_provisions: ["Section 1", "Section 21"]
+    operative_provision_ids:
+      - "dangerous_drugs_act:section:21"                  # inserted operative text
+      - "dangerous_drugs_amendments_2014:section:1"       # chapeau (Section 21 ... is hereby amended)
     kind: amendment
 
+  # RA 11576's Lawphil page loses its quotation marks in extraction; the chunker's
+  # sequence rule still classifies its out-of-series Sections 19/33 as insertions, so
+  # they carry TARGET-namespace path-less ids (base ids are chapter-scoped).
   - base_source_id: judiciary_reorganization_act
-    base_provisions: ["Section 19", "Section 33"]
+    base_provision_ids:
+      - "judiciary_reorganization_act:chapter-ii:section:19"
+      - "judiciary_reorganization_act:chapter-iii:section:33"
     operative_source_id: judiciary_reorganization_amendments_2021
-    operative_provisions: ["Section 1", "Section 33"]
+    operative_provision_ids:
+      - "judiciary_reorganization_amendments_2021:section:1"   # chapeau
+      - "judiciary_reorganization_act:section:19"              # inserted operative RTC jurisdiction text
+      - "judiciary_reorganization_act:section:33"              # inserted operative MTC jurisdiction text
     kind: amendment

@@ -16,7 +16,7 @@ def build_source_metadata(source: SourceConfig, doc_id: str) -> dict:
 	"""Chunk metadata for a source — the single definition shared by sync and reindex
 	so a re-chunk produces byte-identical metadata to the original index."""
 	from app.indexing.vector_store import operability_action_for  # lazy: avoids qdrant at CLI startup
-	return {
+	meta = {
 		"doc_id": doc_id,
 		"source_id": source.source_id,
 		"title": source.title,
@@ -31,6 +31,11 @@ def build_source_metadata(source: SourceConfig, doc_id: str) -> dict:
 		# per chunk at index time. status itself stays untouched (doc-level).
 		"operability_action": operability_action_for(source.status),
 	}
+	if source.amends:
+		meta["amends"] = source.amends
+	if source.amends_namespace:
+		meta["amends_namespace"] = source.amends_namespace
+	return meta
 
 def process_source(source: SourceConfig) -> dict:
 	from app.indexing.index_service import index_document, refresh_document_metadata
@@ -51,8 +56,8 @@ def process_source(source: SourceConfig) -> dict:
 		raw_text = parse_pdf(content)
 		extraction_method = "pdfplumber"
 	else:
-		raw_text = parse_html(content, url)
-		extraction_method = "trafilatura"
+		raw_text = parse_html(content, url, extractor=source.extractor)
+		extraction_method = "bs4" if source.extractor == "bs4" else "trafilatura"
 
 	normalized_text = normalize_text(raw_text)
 	content_hash = hash_content(normalized_text)

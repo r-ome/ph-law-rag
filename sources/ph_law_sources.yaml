@@ -588,6 +588,9 @@ sources:
     approval_date: 2022-06-23
     status: operative
     amends: [anti_trafficking, anti_trafficking_expanded_2013]
+    # Quoted insertions rewrite RA 9208's section numbering (RA 10364 amended the same base),
+    # so inserted provision_ids join the base act's namespace.
+    amends_namespace: anti_trafficking
     source_index: lawphil
     structure: hierarchical
 
@@ -626,6 +629,9 @@ sources:
   - source_id: anti_rape_law_1997
     enabled: true
     file_format: html
+    # trafilatura drops this page's enacting Sections 1-5 (incl. the reclassification and
+    # repeal clauses) and keeps only the quoted insertion block — force full-text extraction.
+    extractor: bs4
     url: "https://lawphil.net/statutes/repacts/ra1997/ra_8353_1997.html"
     availability: available
     category: statute
@@ -653,6 +659,10 @@ sources:
     approval_date: 2022-03-04
     status: operative
     amends: [revised_penal_code, anti_rape_law_1997, child_abuse_act]
+    # Mixed-target amendment: quoted Articles 266-A/337/338 belong to the RPC namespace (the
+    # important joins); the quoted RA 7610 Sections 5/7/9/10 get an inert wrong-namespace id
+    # (RPC has no section units) — single-namespace limitation, per-insertion resolution is backlog.
+    amends_namespace: revised_penal_code
     source_index: lawphil
     structure: hierarchical
 

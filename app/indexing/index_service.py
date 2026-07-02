@@ -17,7 +17,7 @@ TIER_A_FIELDS = ("status", "url", "tags", "category", "doc_type")
 # Fields that change the embedded text or the chunk boundaries (title/official_number are
 # baked into chunk text via chunker._with_source_context; structure drives chunk_texts).
 # A change here requires re-chunk + re-embed, not a payload patch.
-TIER_B_FIELDS = ("title", "official_number", "structure")
+TIER_B_FIELDS = ("title", "official_number", "structure", "amends", "amends_namespace")
 
 def index_document(
 	conn,
@@ -35,6 +35,8 @@ def index_document(
 	conn.execute("DELETE FROM chunk_parents WHERE doc_id = ?", [doc_id])
 
 	nodes = chunk_texts(text, source_metadata)
+	if source_metadata.get("amends"):
+		report_amendment_indexing(conn, source_metadata, nodes)
 
 	# Stamp provision-level operability overrides onto matching chunks (whole-provision repeal/
 	# reclassification). No-op for chunks without a matching provision_id. Sets operability_action
@@ -105,6 +107,91 @@ def index_document(
 	_rebuild_bm25(conn)
 
 	return len(nodes)
+
+
+def report_amendment_indexing(conn, source_metadata: dict, nodes: list[TextNode]) -> None:
+	source_id = source_metadata.get("source_id")
+	inserted = [n for n in nodes if n.metadata.get("inserted_into")]
+	if not inserted:
+		print(f"[WARN] {source_id}: amendment mode parsed 0 inserted provisions.")
+
+	_warn_amendment_namespace(source_metadata)
+	_warn_amendment_collisions(conn, source_id, inserted)
+	_warn_path_scoped_inserted_sections(conn, source_id, inserted)
+
+
+def _warn_amendment_namespace(source_metadata: dict) -> None:
+	try:
+		from app.config import load_allowed_sources
+		enabled_source_ids = {s.source_id for s in load_allowed_sources()}
+	except Exception as e:
+		print(f"[WARN] {source_metadata.get('source_id')}: could not validate amendment namespace: {e}")
+		return
+
+	amends = source_metadata.get("amends") or []
+	if len(amends) == 1:
+		target = amends[0]
+	elif source_metadata.get("amends_namespace"):
+		target = source_metadata["amends_namespace"]
+	else:
+		target = source_metadata.get("source_id")
+	if target not in enabled_source_ids:
+		print(f"[WARN] {source_metadata.get('source_id')}: amendment target namespace {target!r} is not an enabled source_id")
+
+
+def _warn_amendment_collisions(conn, amendment_source_id: str | None, inserted: list[TextNode]) -> None:
+	for pid in sorted({n.metadata.get("provision_id") for n in inserted if n.metadata.get("provision_id")}):
+		rows = conn.execute(
+			"""
+				SELECT DISTINCT json_extract(metadata_json, '$.source_id') AS source_id
+				FROM chunks
+				WHERE json_extract(metadata_json, '$.provision_id') = ?
+				  AND json_extract(metadata_json, '$.source_id') != ?
+			""",
+			[pid, amendment_source_id],
+		).fetchall()
+		for row in rows:
+			base_source_id = row["source_id"]
+			if base_source_id:
+				print(
+					f"[SUPERSESSION-CANDIDATE] {pid}: inserted by {amendment_source_id} "
+					f"collides with indexed base provision in {base_source_id}"
+				)
+
+
+def _warn_path_scoped_inserted_sections(conn, amendment_source_id: str | None, inserted: list[TextNode]) -> None:
+	seen: set[tuple[str, str, str]] = set()
+	for node in inserted:
+		meta = node.metadata
+		if meta.get("unit_type") != "section":
+			continue
+		target = meta.get("inserted_into")
+		number = meta.get("unit_number")
+		pid = meta.get("provision_id")
+		if not target or not number or not pid:
+			continue
+		rows = conn.execute(
+			"""
+				SELECT DISTINCT json_extract(metadata_json, '$.provision_id') AS provision_id
+				FROM chunks
+				WHERE json_extract(metadata_json, '$.source_id') = ?
+				  AND json_extract(metadata_json, '$.provision_id') LIKE ?
+				  AND json_extract(metadata_json, '$.provision_id') != ?
+			""",
+			[target, f"{target}:%:section:{number}".lower(), pid],
+		).fetchall()
+		for row in rows:
+			base_pid = row["provision_id"]
+			if not base_pid:
+				continue
+			key = (pid, target, base_pid)
+			if key in seen:
+				continue
+			seen.add(key)
+			print(
+				f"[WARN] {amendment_source_id}: inserted path-less section id {pid} may not join "
+				f"path-scoped target section id {base_pid}"
+			)
 
 def _rebuild_bm25(conn) -> None:
 	# BM25 has no incremental update — always rebuild from the full chunks table.

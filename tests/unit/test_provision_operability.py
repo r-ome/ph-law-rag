@@ -3,6 +3,9 @@ import pytest
 from app.indexing.chunker import _provision_id, chunk_texts
 from app.indexing.vector_store import operability_action_for, operative_filter
 from app.indexing.provision_status import ProvisionOverride, apply_overrides
+from app.retriever.prefer_operative import prefer_operative
+from app.retriever.supersession import SupersessionRule, provision_matches
+from app.retriever.types import RetrievalResult
 
 pytestmark = pytest.mark.unit
 
@@ -98,3 +101,62 @@ def test_operative_filter_off_returns_none(monkeypatch):
 	from app.config import settings
 	monkeypatch.setattr(settings, "retrieval_operative_only", False)
 	assert operative_filter() is None
+
+
+def test_provision_matches_exact_provision_id_only():
+	assert provision_matches("dangerous_drugs_act:section:21", ["dangerous_drugs_act:section:21"])
+	assert not provision_matches("dangerous_drugs_act:section:21(a)", ["dangerous_drugs_act:section:21"])
+
+
+def test_prefer_operative_demotes_base_same_provision_id_different_source(monkeypatch):
+	from app.config import settings
+	monkeypatch.setattr(settings, "prefer_operative_enabled", True)
+	rule = SupersessionRule(
+		base_source_id="dangerous_drugs_act",
+		base_provision_ids=("dangerous_drugs_act:section:21",),
+		operative_source_id="dangerous_drugs_amendments_2014",
+		operative_provision_ids=("dangerous_drugs_act:section:21",),
+		kind="amendment",
+	)
+	monkeypatch.setattr("app.retriever.prefer_operative.load_supersessions", lambda: (rule,))
+	base = RetrievalResult(
+		chunk_id="base",
+		text="old",
+		score=1.0,
+		metadata={"source_id": "dangerous_drugs_act", "provision_id": "dangerous_drugs_act:section:21"},
+	)
+	operative = RetrievalResult(
+		chunk_id="operative",
+		text="new",
+		score=0.9,
+		metadata={"source_id": "dangerous_drugs_amendments_2014", "provision_id": "dangerous_drugs_act:section:21"},
+	)
+	other = RetrievalResult(
+		chunk_id="other",
+		text="other",
+		score=0.8,
+		metadata={"source_id": "other", "provision_id": "other:section:1"},
+	)
+
+	assert [r.chunk_id for r in prefer_operative([base, operative, other])] == ["operative", "other", "base"]
+
+
+def test_prefer_operative_noop_when_operative_absent(monkeypatch):
+	from app.config import settings
+	monkeypatch.setattr(settings, "prefer_operative_enabled", True)
+	rule = SupersessionRule(
+		base_source_id="dangerous_drugs_act",
+		base_provision_ids=("dangerous_drugs_act:section:21",),
+		operative_source_id="dangerous_drugs_amendments_2014",
+		operative_provision_ids=("dangerous_drugs_act:section:21",),
+		kind="amendment",
+	)
+	monkeypatch.setattr("app.retriever.prefer_operative.load_supersessions", lambda: (rule,))
+	base = RetrievalResult(
+		chunk_id="base",
+		text="old",
+		score=1.0,
+		metadata={"source_id": "dangerous_drugs_act", "provision_id": "dangerous_drugs_act:section:21"},
+	)
+
+	assert prefer_operative([base]) == [base]

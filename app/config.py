@@ -153,6 +153,7 @@ Availability = Literal["available", "unavailable", "restricted"]
 SourceIndex = Literal["sc_elibrary", "sc_website", "onar", "pco", "lawphil"]
 Structure = Literal["hierarchical", "prose", "auto"]
 FileFormat = Literal["html", "pdf"]
+Extractor = Literal["auto", "bs4"]
 
 class SourceConfig(BaseModel):
 	model_config = ConfigDict(extra="forbid")
@@ -163,6 +164,8 @@ class SourceConfig(BaseModel):
 	file_format: FileFormat
 	url: str
 	availability: Availability = "available"
+	# HTML extraction override for pages where trafilatura drops law text (see parser.parse_html)
+	extractor: Extractor = "auto"
 
 	# Classification
 	category: Category
@@ -180,6 +183,7 @@ class SourceConfig(BaseModel):
 
 	# Forward edges only — inverse is derived at load
 	amends: list[str] = []
+	amends_namespace: str | None = None
 	repeals: list[str] = []
 	supersedes: list[str] = []
 	implements: list[str] = []
@@ -192,6 +196,15 @@ class SourceConfig(BaseModel):
 	structure: Structure = "auto"
 
 	notes: str | None = None
+
+	@model_validator(mode="after")
+	def validate_amends_namespace(self):
+		if self.amends_namespace is not None:
+			if not self.amends_namespace:
+				raise ValueError("amends_namespace must be non-empty when set")
+			if self.amends_namespace not in self.amends:
+				raise ValueError("amends_namespace must be one of amends")
+		return self
 
 class SourceFile(BaseModel):
 	sources: list[SourceConfig]

@@ -25,6 +25,8 @@ def _debug_trace(
                 "chunk_id": r.chunk_id,
                 "score": r.score,
                 "source_id": r.metadata.get("source_id", ""),
+                "unit_label": r.metadata.get("unit_label", ""),
+                "provision_id": r.metadata.get("provision_id", ""),
                 "preview": r.text[:120],
             }
             for r in reranked

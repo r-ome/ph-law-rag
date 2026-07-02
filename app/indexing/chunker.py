@@ -7,12 +7,20 @@ from app.config import settings
 
 # ── Marker grammar (line-start) ───────────────────────────────────────────
 # UNIT markers — each begins a legal unit we want as its own chunk
-ARTICLE_RE = re.compile(r"^\s*(?:ART(?:ICLE)?|Art(?:icle)?)\.?\s+(\d+)\b")
-SECTION_RE = re.compile(r"^\s*(?:SEC(?:TION)?|Sec(?:tion)?)\.?\s+(\d+)\b")
+ARTICLE_RE = re.compile(r"^\s*(?:ART(?:ICLE)?|Art(?:icle)?)\.?\s+(\d+(?:-[A-Z])?)\b")
+SECTION_RE = re.compile(r"^\s*(?:SEC(?:TION)?|Sec(?:tion)?)\.?\s+(\d+(?:-[A-Z])?)\b")
 # PARENT markers — context for structure_path; never a unit boundary themselves
 RULE_RE = re.compile(r"^\s*(?:RULE|Rule)\s+(\d+)\b")
 ARTICLE_ROMAN_RE = re.compile(r"^\s*ARTICLE\s+([IVXLCDM]+)\b")  # constitution divisions
 PARENT_RE = re.compile(r"^\s*(?:BOOK|Book|TITLE|Title|CHAPTER|Chapter|SUBTITLE|Subtitle)\b.*")
+_QUOTE = r'["\u201c\u2018\']'
+QUOTED_ARTICLE_RE = re.compile(
+	rf"^\s*{_QUOTE}\s*(?:ART(?:ICLE)?|Art(?:icle)?)\.?\s+(\d+(?:-[A-Z])?)\b"
+)
+QUOTED_SECTION_RE = re.compile(
+	rf"^\s*{_QUOTE}\s*(?:SEC(?:TION)?|Sec(?:tion)?)\.?\s+(\d+(?:-[A-Z])?)\b"
+)
+PARTIAL_ELLIPSIS_RE = re.compile(r"(?:^|\s)x\s+x\s+x(?:\s|$)", re.IGNORECASE)
 
 MIN_UNITS = 5  # auto-detect: minimum length of a monotonic ascending run to call a doc structural
 
@@ -71,6 +79,9 @@ def _open_kind(body: str) -> str:
 
 
 def chunk_texts(text: str, source_metadata: dict) -> list[TextNode]:
+	if source_metadata.get("amends"):
+		return _amendment_nodes(text, source_metadata)
+
 	# Rule 1: the manual hint wins.
 	hint = source_metadata.get("structure", "auto")
 	if hint == "prose":
@@ -118,6 +129,56 @@ def _unit(start: int, utype: str, number: str, label: str, parents: dict) -> dic
 	return {"start": start, "type": utype, "number": number, "label": label, "path": path}
 
 
+def _amendment_units(text: str) -> list[dict]:
+	"""Collect both an amendment law's own units and inserted provisions.
+
+	Quoted markers are always insertions. Unquoted markers can ALSO be insertions when
+	extraction strips the quotation marks (e.g. lawphil's RA 11576/RA 10707 pages): the
+	surviving signal is SEQUENCE — an amendment's own sections run 1, 2, 3, …, while a
+	quote-stripped insertion breaks the series (Section 1, Section 19, Section 2, …).
+	Unquoted Article markers are always insertions: an RA/PD amendment's own units are
+	Sections, never Articles."""
+	units: list[dict] = []
+	parents: dict[str, str] = {}
+	offset = 0
+	own_next = 1  # the amendment's own Section series: 1, 2, 3, …
+	for line in text.splitlines(keepends=True):
+		if RULE_RE.match(line):
+			parents["rule"] = line.strip()
+		elif ARTICLE_ROMAN_RE.match(line):
+			parents["division"] = line.strip()
+		elif PARENT_RE.match(line):
+			parents["parent"] = line.strip()
+		elif (m := QUOTED_ARTICLE_RE.match(line)):
+			units.append({**_unit(offset, "article", m.group(1), f"Article {m.group(1)}", parents), "inserted": True})
+		elif (m := QUOTED_SECTION_RE.match(line)):
+			units.append({**_unit(offset, "section", m.group(1), f"Section {m.group(1)}", parents), "inserted": True})
+		elif (m := ARTICLE_RE.match(line)):
+			units.append({**_unit(offset, "article", m.group(1), f"Article {m.group(1)}", parents), "inserted": True})
+		elif (m := SECTION_RE.match(line)):
+			num = m.group(1)
+			is_own = num.isdigit() and int(num) == own_next
+			if is_own:
+				own_next += 1
+			units.append({**_unit(offset, "section", num, f"Section {num}", parents), "inserted": not is_own})
+		offset += len(line)
+
+	for i, u in enumerate(units):
+		u["end"] = units[i + 1]["start"] if i + 1 < len(units) else len(text)
+	return units
+
+
+def _amendment_target(sm: dict) -> str:
+	amends = sm.get("amends") or []
+	if len(amends) == 1:
+		return amends[0]
+	if sm.get("amends_namespace"):
+		return sm["amends_namespace"]
+	target = sm.get("source_id")
+	print(f"[WARN] {target}: multi-target amendment without amends_namespace; using own namespace")
+	return target
+
+
 def _slug(s: str) -> str:
 	return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
@@ -136,17 +197,68 @@ def _provision_id(source_id: str | None, unit_type: str, unit_number: str, struc
 	return f"{source_id}:{unit_type}:{unit_number}".lower()
 
 
+def _number_key(number: str) -> tuple[int, str]:
+	head, _, suffix = number.partition("-")
+	return (int(head), suffix)
+
+
 def _looks_structural(units: list[dict]) -> bool:
 	"""Cautious auto-detect: need a long ASCENDING run, not just many markers.
 	Defeats prose decisions that quote scattered sections (e.g. 'Sec. 16' then 'Sec. 15')."""
 	if len(units) < MIN_UNITS:
 		return False
-	nums = [int(u["number"]) for u in units]
+	nums = [_number_key(u["number"]) for u in units]
 	longest = run = 1
 	for a, b in zip(nums, nums[1:]):
 		run = run + 1 if b > a else 1
 		longest = max(longest, run)
 	return longest >= MIN_UNITS
+
+
+def _amendment_nodes(text: str, sm: dict) -> list[TextNode]:
+	units = _amendment_units(text)
+	if not units:
+		return _prose_nodes(text, sm)
+
+	nodes: list[TextNode] = []
+	preamble = text[: units[0]["start"]].strip()
+	if preamble:
+		nodes += _prose_nodes(preamble, sm)
+
+	target = _amendment_target(sm)
+	for u in units:
+		seg = text[u["start"]: u["end"]].strip()
+		if not seg:
+			continue
+		if u.get("inserted"):
+			provision_id = f"{target}:{u['type']}:{u['number']}".lower()
+			base = {
+				**sm,
+				"is_structural": True,
+				"unit_type": u["type"],
+				"unit_number": u["number"],
+				"unit_label": u["label"],
+				"structure_path": u["path"],
+				"provision_id": provision_id,
+				"inserted_into": target,
+			}
+			if PARTIAL_ELLIPSIS_RE.search(seg):
+				base["provision_partial"] = True
+		else:
+			base = {
+				**sm,
+				"is_structural": True,
+				"unit_type": u["type"],
+				"unit_number": u["number"],
+				"unit_label": u["label"],
+				"structure_path": u["path"],
+				"provision_id": _provision_id(sm.get("source_id"), u["type"], u["number"], u["path"]),
+			}
+		if len(seg) <= settings.chunk_size * 4:
+			nodes.append(TextNode(text=_with_source_context(seg, base), metadata=base))
+		else:
+			nodes += _enumeration_nodes(seg, u, base)
+	return nodes
 
 
 def _structural_nodes(text: str, units: list[dict], sm: dict) -> list[TextNode]:
@@ -283,6 +395,12 @@ def extract_parents(text: str, source_metadata: dict) -> list[dict]:
 	"""Whole-section text for the oversized, enumeration-split units that produce
 	parent_key'd leaves — the merge target for post-rerank parent expansion. Only units
 	that actually fragment get a parent row; size-gated and prose docs return nothing."""
+	if source_metadata.get("amends"):
+		units = _amendment_units(text)
+		if not units:
+			return []
+		return _parent_rows_for_units(text, units, source_metadata)
+
 	hint = source_metadata.get("structure", "auto")
 	if hint == "prose":
 		return []
@@ -290,6 +408,10 @@ def extract_parents(text: str, source_metadata: dict) -> list[dict]:
 	if not units or (hint != "hierarchical" and not _looks_structural(units)):
 		return []
 
+	return _parent_rows_for_units(text, units, source_metadata)
+
+
+def _parent_rows_for_units(text: str, units: list[dict], source_metadata: dict) -> list[dict]:
 	parents: list[dict] = []
 	for u in units:
 		seg = text[u["start"]: u["end"]].strip()

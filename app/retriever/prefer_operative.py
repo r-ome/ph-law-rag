@@ -5,7 +5,7 @@ the reranked+cut result set, move the superseded chunk to the bottom of the list
 operative text outranks it in the prompt. Reorder-only: nothing is dropped, so recall is
 unchanged and the old text stays available; the intended gain is context_precision.
 
-Query-time only — reads each leaf's source_id + unit_label against the supersession map;
+Query-time only — reads each leaf's source_id + provision_id against the supersession map;
 no index metadata, no re-index. Runs after rerank/cutoff and before parent expansion so
 the operative-first order is preserved when parents expand.
 """
@@ -26,7 +26,7 @@ def prefer_operative(results: list[RetrievalResult]) -> list[RetrievalResult]:
     for rule in rules:
         operative_present = any(
             r.metadata.get("source_id") == rule.operative_source_id
-            and provision_matches(r.metadata.get("unit_label"), rule.operative_provisions)
+            and provision_matches(r.metadata.get("provision_id"), rule.operative_provision_ids)
             for r in results
         )
         if not operative_present:
@@ -34,7 +34,7 @@ def prefer_operative(results: list[RetrievalResult]) -> list[RetrievalResult]:
         for i, r in enumerate(results):
             if (
                 r.metadata.get("source_id") == rule.base_source_id
-                and provision_matches(r.metadata.get("unit_label"), rule.base_provisions)
+                and provision_matches(r.metadata.get("provision_id"), rule.base_provision_ids)
             ):
                 covered.add(i)
 
