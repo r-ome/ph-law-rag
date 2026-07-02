@@ -64,6 +64,17 @@ Rule:
 - Before answering, check each sentence: if it is not directly supported by a cited passage, delete it.
 """.format(abstain_message=ABSTAIN_MESSAGE)
 
+LATER_ENACTED_RULE = """- Philippine laws are amended over time, and the context may contain both an older \
+    and a newer version of the same rule. When two passages conflict on the same point (penalties, \
+    amounts, ages, thresholds, required witnesses, court jurisdiction), state the rule from the \
+    later-enacted law — a passage quoting a later Republic Act, or text marked '[as amended by ...]', \
+    overrides earlier text on the same provision. Mention the older version only if the question asks \
+    how the law changed.
+- If one passage shows that a provision was repealed, replaced, reclassified, or renumbered by a later \
+    law, do not state that the old provision is still in force, even if another passage cites the old \
+    number. Answer using the replacement provision, citing the passage that shows the replacement.
+"""
+
 SELFCHECK_SYSTEM = """You are a strict citation auditor for Philippine legal answers. You receive numbered context passages, a question, and a draft answer. Return a corrected answer containing ONLY claims directly supported by the context passages.
 
 - Delete any sentence, clause, number, or detail not directly stated in the context — even if it is generally true.

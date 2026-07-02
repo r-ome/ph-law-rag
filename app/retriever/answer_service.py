@@ -2,7 +2,7 @@ from app.retriever.hybrid_retriever import hybrid_retriever
 from app.retriever.reranker import rerank
 from app.retriever.context_builder import build_context
 from app.retriever.prompts import (
-    SYSTEM_PROMPT, ABSTAIN_MESSAGE, GREETING_MESSAGE,
+    SYSTEM_PROMPT, LATER_ENACTED_RULE, ABSTAIN_MESSAGE, GREETING_MESSAGE,
     is_abstention, is_conversational, build_user_prompt
 )
 from app.retriever.llm_client import generate, LLMError
@@ -100,8 +100,11 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
     context_block, sources = build_context(reranked,)
 
     user_prompt = build_user_prompt(question, context_block)
+    system_prompt = SYSTEM_PROMPT
+    if settings.later_enacted_preference_enabled:
+        system_prompt = SYSTEM_PROMPT + LATER_ENACTED_RULE
     try:
-        answer_text = generate(SYSTEM_PROMPT, user_prompt)
+        answer_text = generate(system_prompt, user_prompt)
     except LLMError as e:
         return _package(
             f"The language model could not be reached: {e}",

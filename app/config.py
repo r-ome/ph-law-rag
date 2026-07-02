@@ -102,6 +102,13 @@ class Settings(BaseSettings):
 	# retrieved context and deletes unsupported claims. Targets the generator groundedness gap
 	# (local mistral drifts from context; cloud doesn't). Off by default; eval before shipping.
 	faithfulness_selfcheck_enabled: bool = False
+	# Later-enacted-text preference: extra system-prompt rule telling the generator that when
+	# context passages conflict (penalties/ages/thresholds, or a provision one passage shows was
+	# replaced by a later law), the later-enacted text controls. Targets residual old-law
+	# following that retrieval-side fixes (operability hide, consolidation) can't reach — e.g.
+	# stale cross-references in operative law (RA 7610 §5(b) still citing repealed Art 335).
+	# Off by default; A/B'd 2026-07-03 before any default flip.
+	later_enacted_preference_enabled: bool = False
 	# AWS config
 	aws_region: str = "us-east-1"
 
