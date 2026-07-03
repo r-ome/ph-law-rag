@@ -66,7 +66,7 @@ It should:
 | Embeddings            | Ollama `nomic-embed-text`              | Local, high-quality 768-dim embeddings; swap via config                                                   |
 | Vector store          | Qdrant (local Docker)                  | Native hybrid search (dense + sparse in one query), metadata filtering, concurrent-safe                   |
 | Sparse index          | LlamaIndex BM25Retriever               | Exact-match keyword retrieval; pairs with dense for hybrid                                                |
-| Reranker              | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Query-time cross-encoder rescoring; significantly improves ranking quality                                |
+| Reranker              | Qwen3 reranker by default; `cross-encoder/ms-marco-MiniLM-L-6-v2` fallback | Qwen3 is the eval-quality selector default; MiniLM remains a latency-sensitive serving fallback |
 | PDF ingestion         | `pdfplumber` via LlamaIndex            | Better table and layout handling than PyPDF2                                                              |
 | HTML ingestion        | `trafilatura`                          | Strips navigation boilerplate better than BeautifulSoup                                                   |
 | Evals                 | RAGAS                                  | Semantic eval scoring: faithfulness, answer relevance, context precision, context recall                  |
@@ -108,10 +108,10 @@ The system has 5 parts:
 ### 3. Query Pipeline
 
 - Embed user query via Ollama
-- Run dense retrieval from Qdrant (top-k = 10 candidates)
+- Run dense retrieval from Qdrant (top-k = 30 candidates by default)
 - Run BM25 sparse retrieval (top-k = 10 candidates)
 - Merge results via Reciprocal Rank Fusion (RRF)
-- Re-score merged candidates with cross-encoder reranker
+- Re-score merged candidates with the configured reranker (`qwen3` by default; `minilm` fallback)
 - Apply `max_distance` filter; apply `min_chunks_for_answer` gate
 - Build numbered context prompt with source citations
 - Generate answer via Ollama LLM
@@ -521,6 +521,8 @@ class Settings(BaseSettings):
     embedding_dim: int | None = None     # backend/model default when unset
     llm_model: str = "mistral"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_backend: Literal["minilm", "qwen3"] = "qwen3"
+    qwen3_reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
 
     # Ollama
     ollama_base_url: str = "http://localhost:11434"
@@ -530,11 +532,12 @@ class Settings(BaseSettings):
     chunk_overlap: int = 32
 
     # Retrieval
-    dense_top_k: int = 10
+    dense_top_k: int = 30
     sparse_top_k: int = 10
-    rerank_top_n: int = 5
+    rerank_top_n: int = 8
     max_distance: float = 0.5
-    min_chunks_for_answer: int = 2
+    min_chunks_for_answer: int = 1
+    consolidated_dedup_enabled: bool = True
 
     # Qdrant
     qdrant_collection: str = "ph_law"
@@ -722,7 +725,7 @@ Phases B–E are explicitly out of the current OOS moat's in-scope set; expandin
 
 - Embed query via `nomic-embed-text` (768 dimensions)
 - Query Qdrant collection with cosine similarity
-- Retrieve top-k = 10 candidates with scores and metadata
+- Retrieve top-k = 30 candidates with scores and metadata
 
 ### Sparse Retrieval (BM25)
 
@@ -740,14 +743,16 @@ RRF_score(doc) = Σ 1 / (k + rank_i(doc))
 
 where `k = 60` (standard constant), and `rank_i` is the position in each retriever's result list. Documents appearing in both lists get a boosted combined score.
 
-### Cross-Encoder Reranking
+### Reranking
 
-After RRF fusion, the top 20 merged candidates are re-scored by a cross-encoder:
+After RRF fusion, merged candidates are re-scored by the configured selector:
 
 - Input: `(query, chunk_text)` pairs
-- Model: `cross-encoder/ms-marco-MiniLM-L-6-v2`
+- Eval-quality default: `reranker_backend=qwen3` using `Qwen/Qwen3-Reranker-0.6B`
+- Latency-sensitive fallback: `reranker_backend=minilm` using `cross-encoder/ms-marco-MiniLM-L-6-v2`
 - Output: relevance score per pair
-- Top `rerank_top_n` (default: 5) pass to context builder
+- Top `rerank_top_n` (default: 8) form the post-rerank/pre-parent-expansion list used by answer gates
+- Parent expansion and consolidated dedup then produce the final selected generation/inspection context
 
 ### Why This Matters for Legal Text
 
