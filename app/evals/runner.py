@@ -19,6 +19,12 @@ def run_eval_set() -> tuple[list[dict], Path]:
     dataset = load_dataset(settings.eval_dataset_path)
     results = []
 
+    out_dir = Path(settings.eval_results_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
+    label = f"_{settings.eval_run_label}" if settings.eval_run_label else ""
+    out_path = out_dir / f"run_{model_slug}{label}_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
+
     answer("warmup")  # prime reranker + Ollama so row 1 isn't cold-start inflated
 
     for i, item in enumerate(dataset, start=1):
@@ -44,20 +50,21 @@ def run_eval_set() -> tuple[list[dict], Path]:
             "retrieved_sources": resp.get("context_sources", []),
         }
         results.append(row)
+        # Append incrementally: a crash or kill hours into a run must not lose computed
+        # rows (a 5h40m all-or-nothing run died to swap pressure on 2026-07-03).
+        with out_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
         flag = "ABSTAIN" if row["abstained"] else "answered"
-        print(f"[{i}/{len(dataset)}] {row['category']:12} {flag:8} {elapsed:6.2f}s")
-
-    out_dir = Path(settings.eval_results_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
-    label = f"_{settings.eval_run_label}" if settings.eval_run_label else ""
-    out_path = out_dir /f"run_{model_slug}{label}_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
-    with out_path.open("w", encoding="utf-8") as f:
-        for r in results:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"[{i}/{len(dataset)}] {row['category']:12} {flag:8} {elapsed:6.2f}s", flush=True)
 
     times = [r["elapsed_s"] for r in results]
     print(f"\nTiming — median {statistics.median(times):.2f}s | mean {statistics.mean(times):.2f}s | "
           f"min {min(times):.2f}s | max {max(times):.2f}s | total {sum(times):.1f}s")
+
+    from app.retriever.reranker import rerank_timings_ms
+    if rerank_timings_ms:
+        ms = rerank_timings_ms
+        print(f"Rerank ({settings.reranker_backend}) — median {statistics.median(ms):.0f}ms | "
+              f"mean {statistics.mean(ms):.0f}ms | min {min(ms):.0f}ms | max {max(ms):.0f}ms | n={len(ms)}")
 
     return results, out_path

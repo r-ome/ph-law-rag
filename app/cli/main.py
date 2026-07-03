@@ -44,13 +44,18 @@ def eval_score(
 @app.command("eval")
 def eval(
 	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
+	do_score: bool = typer.Option(True, "--score/--no-score", help="run the RAGAS judge after generation (--no-score = generation only; review answers, then judge via eval-score)"),
 ):
 	from app.evals.runner import run_eval_set
-	from app.evals.ragas_scorer import score
 	from app.evals.report import print_report, save_scored
 
 	results, raw_path = run_eval_set()
 	typer.echo(f"\nRaw results saved to {raw_path}")
+	if not do_score:
+		typer.echo(f"Skipped judging (--no-score). Score later with: raglab eval-score {raw_path}")
+		return
+	from app.evals.ragas_scorer import score
+
 	run_tag = raw_path.stem.replace("run_", "")
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)

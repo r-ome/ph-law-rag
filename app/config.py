@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 	embedding_dim: int | None = None
 
 	ollama_base_url: str = "http://localhost:11434"
-	dense_top_k: int = 10
+	dense_top_k: int = 30
 	sparse_top_k: int = 10
 	sparse_overfetch_k: int = 100  # BM25 candidate pool to filter before taking sparse_top_k operative hits
 	rerank_top_n: int = 8
@@ -77,6 +77,14 @@ class Settings(BaseSettings):
 	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"
 	reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+	# Selector backend default (graduated 2026-07-03): Qwen3 at dense_top_k=30 fixed felony
+	# Art 3 + sale Art 1475 without workset regressions. "qwen3" scores via yes/no-token
+	# causal-LM path and takes plain top-8 — rerank_score_margin does NOT apply there (it is
+	# calibrated to MiniLM logit spread; Qwen3 emits [0,1] probabilities, margin 6.0 would keep
+	# the whole pool). MiniLM remains available for latency-sensitive serving.
+	reranker_backend: Literal["minilm", "qwen3"] = "qwen3"
+	qwen3_reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
+	consolidated_dedup_enabled: bool = True
 	debug: bool = False
 	eval_dataset_path: str = "data/eval_dataset.jsonl"
 	eval_results_dir: str = "data/eval_results"
