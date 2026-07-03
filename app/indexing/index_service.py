@@ -10,9 +10,10 @@ from app.indexing.embedder import embed_texts
 from app.indexing.vector_store import (
 	get_qdrant_client, ensure_collection,
 	upsert_nodes, delete_by_doc_id, refresh_doc_payload,
-	operability_action_for, set_chunk_payload,
+	set_chunk_payload,
 )
 from app.indexing.provision_status import load_provision_overrides, apply_overrides
+from app.source_metadata import operability_action_for
 
 # Doc-level metadata fields that are NOT embedded into chunk text, so a manifest edit
 # can be pushed into the derived stores by patching payload/metadata only — no re-embed.

@@ -11,13 +11,13 @@ from pathlib import Path
 
 from app.config import settings, load_allowed_sources
 from app.db import get_connection
-from app.ingestion.sync import build_source_metadata
 from app.indexing.index_service import index_document
 from app.indexing.provision_status import load_provision_overrides
 from app.indexing.consolidation import (
     build_splice_plan,
     check_consolidation_coherence,
 )
+from app.source_metadata import build_source_metadata
 
 
 def _warn_unmatched_overrides(conn) -> None:
@@ -135,9 +135,9 @@ def _warn_amendment_aggregate(conn) -> None:
 
 def _require_services() -> None:
     """Reindex still embeds + upserts, so fail loudly if the backends are down."""
-    from app.api.health_query import _qdrant_ok, ping_url
+    from app.runtime.health import ping_url, qdrant_ok
 
-    if not _qdrant_ok():
+    if not qdrant_ok():
         raise RuntimeError(f"Qdrant not reachable at {settings.qdrant_url} - start it before reindexing")
     if settings.embedding_backend == "ollama":
         if not ping_url(f"{settings.ollama_base_url}/api/version"):

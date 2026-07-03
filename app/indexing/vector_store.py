@@ -6,19 +6,14 @@ from qdrant_client.models import (
 )
 from llama_index.core.schema import TextNode
 from app.config import settings
+from app.source_metadata import NON_OPERATIVE_STATUSES, operability_action_for
 
 # Denylist (fail-open): keep only in-force law. "unknown" is intentionally allowed
 # through; "not_yet_effective" is excluded so future law isn't surfaced as current authority.
 # NON_OPERATIVE no longer feeds the retrieval filter directly — it derives operability_action
 # (the sole retrieval switch). Retrieval filters on operability_action == "hide".
-NON_OPERATIVE = ["superseded", "repealed", "not_yet_effective"]
+NON_OPERATIVE = sorted(NON_OPERATIVE_STATUSES)
 FILTER_PAYLOAD_FIELDS = ("doc_id", "source_id", "operability_action")
-
-
-def operability_action_for(status: str | None) -> str:
-	"""Default retrieval action derived from a chunk's DOCUMENT status. Provision-level
-	overrides may replace this per chunk; the filter reads operability_action, never status."""
-	return "hide" if status in NON_OPERATIVE else "show"
 
 def get_qdrant_client() -> QdrantClient:
 	key = settings.qdrant_api_key.get_secret_value()

@@ -76,7 +76,7 @@ class _QwenYesNoReranker:
         )
         for i, input_ids in enumerate(inputs["input_ids"]):
             inputs["input_ids"][i] = self.prefix_tokens + input_ids + self.suffix_tokens
-        padded = self.tokenizer.pad(inputs, padding=True, return_tensors="pt", max_length=self._MAX_LENGTH)
+        padded = self.tokenizer.pad(inputs, padding=True, return_tensors="pt")
         padded = {key: value.to(self.model.device) for key, value in padded.items()}
         with self._torch.no_grad():
             logits = self.model(**padded).logits[:, -1, :]

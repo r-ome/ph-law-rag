@@ -18,6 +18,7 @@ def _debug_trace(
     return {
         "num_retrieved": len(retrieved),
         "num_pre_expansion": len(pre_expansion),
+        "num_reranked": len(pre_expansion),
         "num_selected": len(selected),
         "prompt_length": len(prompt) if prompt else 0,
         "pre_expansion_chunks": [

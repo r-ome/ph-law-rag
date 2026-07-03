@@ -5,7 +5,7 @@ from app.config import settings
 from app.retriever.answer_service import answer
 
 def _service_ready() -> bool:
-    from app.api.health_query import ping_url
+    from app.runtime.health import ping_url
     from app.db import list_documents
     
     if not ping_url(f"{settings.qdrant_url}/collections"):

@@ -1,11 +1,11 @@
 import sqlite3
 import pytest
 
-import app.ingestion.sync as sync_module
+import app.sync_service as sync_service
 from app.config import SourceConfig, settings
 from app.db import init_db
 from app.ingestion.fetcher import FetchResult
-from app.ingestion.sync import run_sync
+from app.sync_service import run_sync
 
 pytestmark = pytest.mark.integration
 
@@ -69,11 +69,11 @@ def sync_env(tmp_path, monkeypatch):
         )
         return 1
 
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [_source()])
-    monkeypatch.setattr(sync_module, "fetch_source", fake_fetch)
-    monkeypatch.setattr(sync_module, "parse_html", lambda content, url, extractor="auto": content.decode("utf-8"))
-    monkeypatch.setattr(sync_module, "save_raw_fetch", lambda *a, **k: "data/raw/civil_code.html")
-    monkeypatch.setattr(sync_module, "save_normalized_document", lambda *a, **k: "data/normalized/civil_code.html")
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [_source()])
+    monkeypatch.setattr("app.ingestion.sync.fetch_source", fake_fetch)
+    monkeypatch.setattr("app.ingestion.sync.parse_html", lambda content, url, extractor="auto": content.decode("utf-8"))
+    monkeypatch.setattr("app.ingestion.sync.save_raw_fetch", lambda *a, **k: "data/raw/civil_code.html")
+    monkeypatch.setattr("app.ingestion.sync.save_normalized_document", lambda *a, **k: "data/normalized/civil_code.html")
     monkeypatch.setattr("app.indexing.index_service.index_document", fake_index)
     # Insulate the Tier A in-place refresh from real Qdrant / BM25.
     monkeypatch.setattr("app.indexing.index_service.get_qdrant_client", lambda: object())
@@ -141,8 +141,7 @@ def test_sync_run_row_recorded(sync_env):
 def test_failed_fetch_writes_no_version(sync_env, monkeypatch):
     _, db_path = sync_env
     monkeypatch.setattr(
-        sync_module,
-        "fetch_source",
+        "app.ingestion.sync.fetch_source",
         lambda source: FetchResult(
             source_id=source.source_id,
             url=source.url,
@@ -190,7 +189,7 @@ def test_url_change_keeps_same_document(sync_env, monkeypatch):
 
     changed = _source()
     changed.url = "https://www.example.test/civil-code-v2"
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [changed])
     state["text"] = "Article 1318 (relocated). Updated requisites."
 
     counts = run_sync()
@@ -208,7 +207,7 @@ def test_metadata_refresh_persists_on_unchanged_content(sync_env, monkeypatch):
     changed = _source()
     changed.url = "https://www.example.test/civil-code-RELOCATED"
     changed.title = "Civil Code (relocated)"
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [changed])
 
     counts = run_sync()  # content identical; title baked into text -> Tier B re-index
 
@@ -241,7 +240,7 @@ def test_tier_a_url_change_refreshes_in_place(sync_env, monkeypatch):
 
     changed = _source()
     changed.url = "https://www.example.test/civil-code-NEW"
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [changed])
 
     counts = run_sync()
 
@@ -263,7 +262,7 @@ def test_metadata_reconcile_folded_into_sync_runs_unchanged(sync_env, monkeypatc
 
     changed = _source()
     changed.url = "https://www.example.test/civil-code-FOLD"
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [changed])
 
     counts = run_sync()
 
@@ -300,7 +299,7 @@ def test_status_change_recomputes_operability_per_chunk(sync_env, monkeypatch):
 
     changed = _source()
     changed.status = "superseded"
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [changed])
 
     counts = run_sync()
 
@@ -338,7 +337,7 @@ def test_tier_a_qdrant_failure_counts_failed_no_commit(sync_env, monkeypatch):
     monkeypatch.setattr("app.indexing.index_service.refresh_doc_payload", boom)
     changed = _source()
     changed.url = "https://www.example.test/should-not-stick"
-    monkeypatch.setattr(sync_module, "load_allowed_sources", lambda: [changed])
+    monkeypatch.setattr(sync_service, "load_allowed_sources", lambda: [changed])
 
     counts = run_sync()  # must not raise
 

@@ -85,6 +85,8 @@ The system has 5 parts:
 
 ### 1. Source Sync Pipeline
 
+- `app.sync_service` owns the `raglab sync` source loop, per-source transaction boundary, indexing handoff, unchanged-content metadata reconcile, status counts, and `sync_runs` insert.
+- `app.ingestion` owns source-local ingestion only: fetch, parse, normalize, hash, artifact writes, `documents` upsert, and `document_versions` insert.
 - Read allowed sources from `sources/ph_law_sources.yaml`
 - Fetch documents (HTTP for HTML, download for PDF)
 - Extract text via `trafilatura` (HTML) or `pdfplumber` (PDF)
@@ -129,7 +131,7 @@ The system has 5 parts:
 
 - **Streamlit app** — chat-style UI with sidebar for settings and source browser
 - **FastAPI** — `/health`, `/query/ask`, `/documents`, `/sync` (for the API layer)
-- Both call the same shared service modules; no business logic in either adapter
+- Both call the same shared service modules; no business logic in either adapter. Runtime probes live in `app.runtime.health`, not in API adapters.
 
 ---
 
@@ -173,13 +175,17 @@ ph-law-rag/
 ├── app/
 │   ├── config.py            # pydantic-settings config
 │   ├── db.py                # SQLite bootstrap + migrations
+│   ├── sync_service.py      # sync orchestration, transactions, indexing handoff
+│   ├── source_metadata.py   # source → chunk metadata mapping
+│   ├── runtime/
+│   │   └── health.py        # Qdrant/Ollama HTTP probes shared by CLI/API/reindex
 │   ├── ingestion/
 │   │   ├── fetcher.py       # httpx downloader → FetchResult
 │   │   ├── pdf_parser.py    # pdfplumber extraction
 │   │   ├── html_parser.py   # trafilatura extraction
 │   │   ├── normalizer.py    # whitespace cleanup
 │   │   ├── storage.py       # hash compare, disk write, SQLite write
-│   │   └── sync.py          # orchestrator: loops sources, calls above
+│   │   └── sync.py          # ingest one source; no indexing or sync_runs ownership
 │   ├── indexing/
 │   │   ├── chunker.py       # LlamaIndex SentenceSplitter wrapper
 │   │   ├── embedder.py      # Ollama embedding client
@@ -263,7 +269,7 @@ Build:
 - `normalizer.py` — whitespace collapse, dedup blank lines
 - Content hashing (SHA-256 of normalized text)
 - `storage.py` — hash comparison, disk write, SQLite insert
-- `sync.py` — orchestrator with per-source status reporting
+- `sync_service.py` — orchestrator with per-source status reporting and `sync_runs`; `ingestion/sync.py` ingests one source
 - SQLite `documents`, `document_versions`, `sync_runs` tables
 
 Definition of done:

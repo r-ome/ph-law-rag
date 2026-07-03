@@ -7,21 +7,21 @@ app = typer.Typer()
 
 @app.command("healthcheck")
 def healthcheck():
-	from app.api.health_query import _qdrant_ok, ping_url
+	from app.runtime.health import ping_url, qdrant_ok
 
-	qdrant_ok = _qdrant_ok()
+	qdrant_healthy = qdrant_ok()
 	uses_ollama = settings.embedding_backend == "ollama" or not settings.llm_model.startswith("claude")
 	ollama_ok = ping_url(f"{settings.ollama_base_url}/api/version") if uses_ollama else None
-	healthy = qdrant_ok and (ollama_ok is not False)
+	healthy = qdrant_healthy and (ollama_ok is not False)
 	typer.echo(json.dumps({
 		"status": "ok" if healthy else "degraded",
-		"qdrant": qdrant_ok,
+		"qdrant": qdrant_healthy,
 		"ollama": ollama_ok,
 	}, indent=2))
 
 @app.command("sync")
 def sync():
-	from app.ingestion.sync import run_sync
+	from app.sync_service import run_sync
 
 	result = run_sync()
 	typer.echo(f"\nSync complete: {result}")

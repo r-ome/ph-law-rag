@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks
-from app.ingestion.sync import run_sync
+from app.sync_service import run_sync
 from app.db import list_documents
 
 router = APIRouter(prefix="/documents",tags=["documents"])
