@@ -41,7 +41,7 @@ generated_overrides:
     operability_action: hide
     basis_source_id: family_code
     effective_date: "1988-08-03"
-    note: "Family Code Art. 253 in the indexed Lawphil corpus: Titles III, IV, V, VI, VIII, IX, XI, and XV of Book I of the Civil Code are repealed by the Family Code. Backlog: verify against Official Gazette Art. 254 text, which may also include Title VII."
+    note: "Family Code Art. 253 in the indexed Lawphil corpus: Titles III, IV, V, VI, VIII, IX, XI, and XV of Book I of the Civil Code are repealed by the Family Code. Official Gazette Art. 254 includes Title VII, handled in a separate generated override entry."
     provision_ids:
       # Civil Code Book I Articles 52-96 (Title III)
       - civil_code:article:52
@@ -320,3 +320,51 @@ generated_overrides:
       - civil_code:article:404
       - civil_code:article:405
       - civil_code:article:406
+
+  - source_id: civil_code
+    provision_status: repealed
+    operability_action: hide
+    basis_source_id: family_code
+    effective_date: "1988-08-03"
+    note: "Official Gazette EO 209 Art. 254 repeals Titles III, IV, V, VI, VII, VIII, IX, XI, and XV of Book I of the Civil Code. Title VII is listed here separately because the indexed Lawphil Family Code text omits VII and numbers the repeal clause as Art. 253; ChanRobles numbers it Art. 254 but also omits VII."
+    provision_ids:
+      # Civil Code Book I Articles 216-254 (Title VII)
+      - civil_code:article:216
+      - civil_code:article:217
+      - civil_code:article:218
+      - civil_code:article:219
+      - civil_code:article:220
+      - civil_code:article:221
+      - civil_code:article:222
+      - civil_code:article:223
+      - civil_code:article:224
+      - civil_code:article:225
+      - civil_code:article:226
+      - civil_code:article:227
+      - civil_code:article:228
+      - civil_code:article:229
+      - civil_code:article:230
+      - civil_code:article:231
+      - civil_code:article:232
+      - civil_code:article:233
+      - civil_code:article:234
+      - civil_code:article:235
+      - civil_code:article:236
+      - civil_code:article:237
+      - civil_code:article:238
+      - civil_code:article:239
+      - civil_code:article:240
+      - civil_code:article:241
+      - civil_code:article:242
+      - civil_code:article:243
+      - civil_code:article:244
+      - civil_code:article:245
+      - civil_code:article:246
+      - civil_code:article:247
+      - civil_code:article:248
+      - civil_code:article:249
+      - civil_code:article:250
+      - civil_code:article:251
+      - civil_code:article:252
+      - civil_code:article:253
+      - civil_code:article:254
