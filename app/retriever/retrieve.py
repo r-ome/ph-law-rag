@@ -1,8 +1,6 @@
 from textwrap import shorten
 
-from app.config import settings
-from app.retriever.hybrid_retriever import hybrid_retriever
-from app.retriever.reranker import rerank
+from app.retriever.context_selection import select_context
 from app.retriever.types import RetrievalResult
 
 
@@ -29,26 +27,17 @@ def _format_result(index: int, result: RetrievalResult) -> str:
 
 
 def retrieve(query_text: str) -> str:
-    hits = hybrid_retriever(query_text)
-    top = rerank(query_text, hits)
-
-    if settings.prefer_operative_enabled:
-        from app.retriever.prefer_operative import prefer_operative
-        top = prefer_operative(top)
-
-    expanded = False
-    if settings.parent_expansion_enabled:
-        from app.retriever.parent_expansion import expand_parents
-        merged = expand_parents(top)
-        expanded = len(merged) != len(top) or any(
-            r.metadata.get("expanded_from_parent") for r in merged
-        )
-        top = merged
+    selection = select_context(query_text)
+    top = selection.selected
+    expanded = len(top) != len(selection.pre_expansion) or any(
+        r.metadata.get("expanded_from_parent") for r in top
+    )
 
     lines = [
         f"Query: {query_text}",
-        f"Retrieved: {len(hits)}",
-        f"Reranked: {len(top)}" + (" (parent-expanded)" if expanded else ""),
+        f"Retrieved: {len(selection.retrieved)}",
+        f"Pre-expansion: {len(selection.pre_expansion)}",
+        f"Selected: {len(top)}" + (" (parent-expanded/deduped)" if expanded else ""),
     ]
 
     if not top:

@@ -24,6 +24,8 @@ def prefer_operative(results: list[RetrievalResult]) -> list[RetrievalResult]:
 
     covered: set[int] = set()
     for rule in rules:
+        if rule.kind not in {"amendment", "repeal_replace"}:
+            continue
         operative_present = any(
             r.metadata.get("source_id") == rule.operative_source_id
             and provision_matches(r.metadata.get("provision_id"), rule.operative_provision_ids)

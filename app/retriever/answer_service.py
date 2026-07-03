@@ -1,5 +1,3 @@
-from app.retriever.hybrid_retriever import hybrid_retriever
-from app.retriever.reranker import rerank
 from app.retriever.context_builder import build_context
 from app.retriever.prompts import (
     SYSTEM_PROMPT, LATER_ENACTED_RULE, ABSTAIN_MESSAGE, GREETING_MESSAGE,
@@ -7,20 +5,22 @@ from app.retriever.prompts import (
 )
 from app.retriever.llm_client import generate, LLMError
 from app.retriever.types import RetrievalResult
-from app.retriever.edge_expansion import expand_with_edges
 from app.retriever.answerability import is_answerable
+from app.retriever.context_selection import SelectionResult, select_context
 from app.config import settings
 
 def _debug_trace(
     retrieved: list[RetrievalResult],
-    reranked: list[RetrievalResult],
+    pre_expansion: list[RetrievalResult],
+    selected: list[RetrievalResult],
     prompt: str | None
 ) -> dict:
     return {
         "num_retrieved": len(retrieved),
-        "num_reranked": len(reranked),
+        "num_pre_expansion": len(pre_expansion),
+        "num_selected": len(selected),
         "prompt_length": len(prompt) if prompt else 0,
-        "chunks": [
+        "pre_expansion_chunks": [
             {
                 "chunk_id": r.chunk_id,
                 "score": r.score,
@@ -29,16 +29,29 @@ def _debug_trace(
                 "provision_id": r.metadata.get("provision_id", ""),
                 "preview": r.text[:120],
             }
-            for r in reranked
-        ]
+            for r in pre_expansion
+        ],
+        "chunks": [
+            {
+                "chunk_id": r.chunk_id,
+                "score": r.score,
+                "source_id": r.metadata.get("source_id", ""),
+                "unit_label": r.metadata.get("unit_label", ""),
+                "provision_id": r.metadata.get("provision_id", ""),
+                "expanded_from_parent": bool(r.metadata.get("expanded_from_parent")),
+                "consolidated": r.metadata.get("consolidated", ""),
+                "dedup_merged_chunk_ids": r.metadata.get("dedup_merged_chunk_ids", []),
+                "preview": r.text[:120],
+            }
+            for r in selected
+        ],
     }
 
 def _package(
     answer: str,
     sources: list[dict],
     abstained: bool,
-    retrieved: list[RetrievalResult],
-    reranked: list[RetrievalResult],
+    selection: SelectionResult,
     prompt: str | None,
     error: bool = False,
     debug: bool = False
@@ -46,58 +59,45 @@ def _package(
     response = {
         "answer": answer,
         "sources": sources,
-        "contexts": [r.text for r in reranked],
-        "context_sources": [r.metadata.get("source_id", "") for r in reranked],
+        "contexts": [r.text for r in selection.selected],
+        "context_sources": [r.metadata.get("source_id", "") for r in selection.selected],
         "abstained": abstained,
         "error": error
     }
     if debug:
-        response["debug"] = _debug_trace(retrieved, reranked, prompt)
+        response["debug"] = _debug_trace(
+            selection.retrieved,
+            selection.pre_expansion,
+            selection.selected,
+            prompt,
+        )
     return response
 
 
 def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[RetrievalResult]]:
-    if settings.subquery_packaging_enabled:
-        from app.retriever.subquery_retrieval import packaged_retrieve
-        reranked = packaged_retrieve(question)
-        retrieved = reranked  # no separate candidate list in this path (debug trace)
-    else:
-        retrieved = hybrid_retriever(question)
-        reranked = rerank(question, retrieved)
-    if settings.edge_expansion_enabled:
-        reranked = expand_with_edges(question, reranked)
+    selection = select_context(question)
 
-    if settings.prefer_operative_enabled:
-        from app.retriever.prefer_operative import prefer_operative
-        reranked = prefer_operative(reranked)
-
-    if len(reranked) < settings.min_chunks_for_answer:
+    if len(selection.pre_expansion) < settings.min_chunks_for_answer:
         return _package(
             ABSTAIN_MESSAGE,
             sources=[],
             abstained=True,
-            retrieved=retrieved,
-            reranked=reranked,
+            selection=selection,
             prompt=None,
             debug=debug_enabled
-        ), reranked
+        ), selection.selected
 
-    if settings.answerability_gate_enabled and not is_answerable(question, reranked):
+    if settings.answerability_gate_enabled and not is_answerable(question, selection.pre_expansion):
         return _package(
             ABSTAIN_MESSAGE,
             sources=[],
             abstained=True,
-            retrieved=retrieved,
-            reranked=reranked,
+            selection=selection,
             prompt=None,
             debug=debug_enabled
-        ), reranked
+        ), selection.selected
 
-    if settings.parent_expansion_enabled:
-        from app.retriever.parent_expansion import expand_parents
-        reranked = expand_parents(reranked)
-
-    context_block, sources = build_context(reranked,)
+    context_block, sources = build_context(selection.selected)
 
     user_prompt = build_user_prompt(question, context_block)
     system_prompt = SYSTEM_PROMPT
@@ -110,12 +110,11 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
             f"The language model could not be reached: {e}",
             sources=[],
             abstained=False,
-            retrieved=retrieved,
-            reranked=reranked,
+            selection=selection,
             prompt=user_prompt,
             error=True,
             debug=debug_enabled
-        ), reranked
+        ), selection.selected
 
     # Faithfulness self-check (groundedness lever): a 2nd local pass that strips
     # any claim not supported by the same context. Skip when the draft already
@@ -138,11 +137,10 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
         answer_text,
         sources=[] if soft_abstained else sources,
         abstained=soft_abstained,
-        retrieved=retrieved,
-        reranked=reranked,
+        selection=selection,
         prompt=user_prompt,
         debug=debug_enabled
-    ), reranked
+    ), selection.selected
 
 
 def answer(
@@ -165,8 +163,7 @@ def answer(
             GREETING_MESSAGE,
             sources=[],
             abstained=False,
-            retrieved=[],
-            reranked=[],
+            selection=SelectionResult(retrieved=[], pre_expansion=[], selected=[]),
             prompt=None,
             debug=debug_enabled,
         )

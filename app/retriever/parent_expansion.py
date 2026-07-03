@@ -49,7 +49,14 @@ def _parent_result(row: dict, child_count: int, score: float, child_meta: dict) 
     # chunk_parents has no operability columns; carry them from the triggering child so debug
     # traces/citations keep the provision identity (a parent = one provision at v1 granularity).
     # Suppression already happened upstream in retrieval, so this never re-surfaces a hidden chunk.
-    for key in ("provision_id", "provision_status", "operability_action", "operability_basis_source_id"):
+    for key in (
+        "provision_id",
+        "provision_status",
+        "operability_action",
+        "operability_basis_source_id",
+        "consolidated",
+        "consolidation_basis",
+    ):
         if key in child_meta:
             metadata[key] = child_meta[key]
     return RetrievalResult(
