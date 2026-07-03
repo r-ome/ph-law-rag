@@ -2,7 +2,7 @@ import pytest
 
 from app.indexing.chunker import _provision_id, chunk_texts
 from app.indexing.vector_store import operability_action_for, operative_filter
-from app.indexing.provision_status import ProvisionOverride, apply_overrides
+from app.indexing.provision_status import ProvisionOverride, apply_overrides, load_provision_overrides
 from app.retriever.prefer_operative import prefer_operative
 from app.retriever.supersession import SupersessionRule, provision_matches
 from app.retriever.types import RetrievalResult
@@ -226,6 +226,38 @@ def test_apply_overrides_synthetic_section_21_chunk_set_and_amendment_pid_sanity
 		"source_id": "dangerous_drugs_amendments_2014",
 		"unit_label": "Section 21",
 	}
+
+
+def test_generated_civil_family_overrides_expand_from_config(monkeypatch, tmp_path):
+	path = tmp_path / "provision_status.yaml"
+	path.write_text("""
+generated_overrides:
+  - source_id: civil_code
+    provision_status: repealed
+    operability_action: hide
+    basis_source_id: family_code
+    effective_date: "1988-08-03"
+    note: "Family Code Art. 254 repeal clause"
+    provision_ids:
+      - civil_code:article:52
+      - civil_code:article:53
+""")
+	from app.config import settings
+
+	monkeypatch.setattr(settings, "provision_status_path", str(path))
+	load_provision_overrides.cache_clear()
+	try:
+		overrides = load_provision_overrides()
+	finally:
+		load_provision_overrides.cache_clear()
+
+	rule = overrides["civil_code:article:52"][0]
+	assert rule.source_id == "civil_code"
+	assert rule.provision_id == "civil_code:article:52"
+	assert rule.provision_status == "repealed"
+	assert rule.operability_action == "hide"
+	assert rule.basis_source_id == "family_code"
+	assert rule.effective_date == "1988-08-03"
 
 
 # ── retrieval filter repoint ───────────────────────────────────────────────

@@ -41,7 +41,14 @@ def load_provision_overrides() -> dict[str, tuple[ProvisionOverride, ...]]:
 		return {}
 	data = yaml.safe_load(path.read_text()) or {}
 	grouped: dict[str, list[ProvisionOverride]] = {}
-	for r in data.get("overrides", []):
+	rows = list(data.get("overrides", []))
+	for generated in data.get("generated_overrides", []):
+		for provision_id in generated.get("provision_ids", []):
+			row = dict(generated)
+			row.pop("provision_ids", None)
+			row["provision_id"] = provision_id
+			rows.append(row)
+	for r in rows:
 		pid = r["provision_id"]
 		labels = r.get("unit_labels")
 		grouped.setdefault(pid, []).append(ProvisionOverride(
