@@ -28,7 +28,7 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 | Embeddings | Ollama `nomic-embed-text` (768-dim) |
 | Vector store | Qdrant (local Docker) |
 | Sparse index | LlamaIndex BM25Retriever |
-| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| Reranker | `Qwen/Qwen3-Reranker-0.6B` (default; `ms-marco-MiniLM-L-6-v2` as the fast alternate) |
 | PDF ingestion | `pdfplumber` |
 | HTML ingestion | `trafilatura` + BeautifulSoup fallback |
 | Evals | RAGAS (Anthropic judge) |
@@ -190,10 +190,10 @@ Hybrid retrieval is used because legal text needs both semantic understanding an
 
 Pipeline:
 1. Embed query via `nomic-embed-text`
-2. Dense retrieval from Qdrant (top-10)
+2. Dense retrieval from Qdrant (top-30)
 3. BM25 sparse retrieval (top-10)
 4. RRF fusion (k=60)
-5. Cross-encoder reranking (top-5 pass to the context builder)
+5. Reranking (Qwen3 by default; top-8 pass to the context builder)
 6. Abstention gate: if fewer than `min_chunks_for_answer` chunks survive, skip generation and return the abstain message — no LLM call
 7. Grounded generation via Ollama, with `[n]` citations
 
@@ -214,8 +214,9 @@ ollama_base_url=http://localhost:11434
 qdrant_url=http://localhost:6333
 chunk_size=256
 chunk_overlap=32
-dense_top_k=10
-rerank_top_n=5
+dense_top_k=30
+rerank_top_n=8
+reranker_backend=qwen3      # or minilm for latency-sensitive serving
 min_chunks_for_answer=2
 debug=false
 ```
@@ -303,6 +304,14 @@ Full rationale lives in [`docs/ADR/`](docs/ADR/). In brief:
 **Local-first with Ollama** — no cloud keys for the core pipeline; lower model quality than frontier APIs, but the backend is swappable via config.
 
 **Abstention by design** — a confident wrong answer is worse than "I don't know" in a legal tool, enforced by a hard gate plus prompt instruction.
+
+**Trace-first retrieval tuning** — the hardest misses turned out to be budget cutoffs (targets at dense rank 11–29), diagnosed with a free retrieve-trace before spending on eval judges; fix was `dense_top_k=30` plus a stronger Qwen3 reranker, not new components.
+
+**Deterministic hides over model instructions** — repealed provisions (e.g. Civil Code family law superseded by the Family Code) are hidden from retrieval via a curated status file; reordering and prompt rules both failed A/Bs. Rules enforced in code beat rules a model is asked to follow.
+
+**One context-selection pipeline** — a single `select_context()` feeds the answerability gate, the debug trace, and the generator, so debug output always shows exactly what the model saw.
+
+**Modular monolith, enforced** — a microservices split was reviewed and rejected (BM25's global rebuild races across service boundaries); instead, module seams (`sync_service`, `source_metadata`, `runtime/health`) are enforced by AST-based import-boundary tests.
 
 ---
 
