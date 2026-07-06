@@ -50,6 +50,10 @@ def _active_config() -> dict:
 
 
 def run_eval_set() -> tuple[list[dict], Path, str]:
+    from app.observability.logger import configure_logging
+
+    configure_logging()
+
     dataset = load_dataset(settings.eval_dataset_path)
     results = []
 
@@ -59,11 +63,11 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
     paths = artifacts.create_run_paths(run_tag, started_at)
     out_path = paths.run
 
-    answer("warmup")  # prime reranker + Ollama so row 1 isn't cold-start inflated
+    answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
 
     for i, item in enumerate(dataset, start=1):
         start = time.perf_counter()
-        resp = answer(item["question"])
+        resp = answer(item["question"], trace_label="eval")
         elapsed = time.perf_counter() - start
         row = {
             "question": item["question"],

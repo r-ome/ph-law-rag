@@ -1,6 +1,9 @@
 import httpx
 import streamlit as st
 from app.config import settings
+from app.observability.logger import configure_logging
+
+configure_logging()
 
 st.set_page_config(page_title="PH Law RAG", layout="wide")
 st.title("PH Law RAG")

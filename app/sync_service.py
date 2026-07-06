@@ -5,6 +5,9 @@ from app.config import load_allowed_sources
 from app.db import get_connection
 from app.ingestion.sync import ingest_source
 from app.source_metadata import build_source_metadata
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _empty_counts() -> dict:
@@ -30,14 +33,17 @@ def _require_result_fields(result) -> None:
 def _record_reconcile(source_id: str, action: str, n: int, counts: dict) -> None:
 	if action == "skip":
 		print(f"[SKIP] {source_id} — unchanged")
+		logger.info("sync_source_unchanged", source_id=source_id)
 		counts["unchanged"] += 1
 		return
 	if action == "meta":
 		print(f"[META] {source_id} — refreshed {n} chunks")
+		logger.info("sync_source_metadata_refreshed", source_id=source_id, chunks=n)
 		counts["refreshed"] += 1
 		return
 	if action == "reindex":
 		print(f"[REINDEX] {source_id} — metadata, no new version ({n} chunks)")
+		logger.info("sync_source_metadata_reindexed", source_id=source_id, chunks=n)
 		counts["reindexed_meta"] += 1
 		return
 	raise RuntimeError(f"{source_id}: unknown metadata reconcile action {action!r}")
@@ -85,6 +91,7 @@ def run_sync() -> dict:
 	counts = _empty_counts()
 	sync_run_id = str(uuid4())
 	started_at = datetime.now(timezone.utc).isoformat()
+	logger.info("sync_started", sync_run_id=sync_run_id, sources=len(sources))
 
 	for source in sources:
 		counts["scanned"] += 1
@@ -94,6 +101,7 @@ def run_sync() -> dict:
 			if result.status == "failed":
 				conn.rollback()
 				print(f"[FAIL] {source.source_id} — {result.error}")
+				logger.warning("sync_source_failed", source_id=source.source_id, error=result.error)
 				counts["failed"] += 1
 				continue
 
@@ -111,8 +119,10 @@ def run_sync() -> dict:
 					version_id=result.version_id,
 				)
 				print(f" indexed: {chunk_count} chunks")
+				logger.info("sync_source_indexed", source_id=source.source_id, status=result.status, chunks=chunk_count)
 				conn.commit()
 				print(f"[OK] {source.source_id} — {result.status}")
+				logger.info("sync_source_ok", source_id=source.source_id, status=result.status)
 				counts["changed"] += 1
 				continue
 
@@ -130,9 +140,11 @@ def run_sync() -> dict:
 		except Exception as e:
 			conn.rollback()
 			print(f"[FAIL] {source.source_id} — {e}")
+			logger.warning("sync_source_failed", source_id=source.source_id, error=str(e), exc_info=True)
 			counts["failed"] += 1
 		finally:
 			conn.close()
 
 	_write_sync_run(sync_run_id, started_at, counts)
+	logger.info("sync_completed", sync_run_id=sync_run_id, **counts)
 	return counts

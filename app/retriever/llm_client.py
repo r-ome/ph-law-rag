@@ -1,6 +1,12 @@
+import time
+
 import httpx
 
 from app.config import settings
+from app.observability.context import record_stage
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 class LLMError(Exception):
     """Raised when the LLM call fails or returns an unexpected response."""
@@ -27,9 +33,34 @@ def generate(system_prompt: str, user_prompt: str, model: str | None = None) -> 
     the run is self-labeling.
     """
     model = model or settings.llm_model
-    if model.startswith("claude"):
-        return _generate_anthropic(system_prompt, user_prompt, model)
-    return _generate_ollama(system_prompt, user_prompt, model)
+    prompt_length = len(system_prompt or "") + len(user_prompt or "")
+    start = time.perf_counter()
+    succeeded = False
+    try:
+        if model.startswith("claude"):
+            result = _generate_anthropic(system_prompt, user_prompt, model)
+        else:
+            result = _generate_ollama(system_prompt, user_prompt, model)
+        succeeded = True
+        return result
+    except LLMError as exc:
+        logger.warning("llm_generate_failed", model=model, prompt_length=prompt_length, error=str(exc))
+        record_stage(
+            "llm_generate",
+            ms=(time.perf_counter() - start) * 1000,
+            model=model,
+            prompt_length=prompt_length,
+            error=str(exc),
+        )
+        raise
+    finally:
+        if succeeded:
+            record_stage(
+                "llm_generate",
+                ms=(time.perf_counter() - start) * 1000,
+                model=model,
+                prompt_length=prompt_length,
+            )
 
 
 def _generate_ollama(system_prompt: str, user_prompt: str, model: str) -> str:

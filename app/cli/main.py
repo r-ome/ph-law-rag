@@ -1,7 +1,12 @@
 import typer
 import json
+from pathlib import Path
 from app.config import settings
 from app.db import init_db
+from app.observability.logger import configure_logging
+
+configure_logging()
+
 app = typer.Typer()
 
 @app.command("healthcheck")
@@ -82,6 +87,16 @@ def eval_cache_clear():
 	typer.echo(f"deleted {deleted} cached RAGAS score rows")
 
 app.add_typer(eval_cache_app, name="eval-cache")
+
+logs_app = typer.Typer(help="Manage local log and trace files")
+
+@logs_app.command("prune")
+def logs_prune(days: int = typer.Option(30, "--days", min=0, help="keep traces from the last N days")):
+	from app.observability.trace import prune_traces
+
+	typer.echo(json.dumps(prune_traces(days), indent=2))
+
+app.add_typer(logs_app, name="logs")
  
 @app.command("reindex")
 def reindex(doc_id: str = typer.Option(None, help="reindex only this doc_id/source_id")):
@@ -114,7 +129,7 @@ def ask(query: str, session: str = typer.Option(None, "--session")):
 	session_id = session
 	if session_id and not session_exists(session_id):
 		create_session(session_id=session_id)  # create with the given ID
-	result = answer(query, session_id=session_id)
+	result = answer(query, session_id=session_id, trace_label="cli")
 	typer.echo(result["answer"])
 	if result["sources"]:
 		typer.echo("\nSources:")
@@ -193,6 +208,7 @@ def init():
 		settings.bm25_path,
 		Path(settings.db_path).parent,
 		settings.eval_results_dir,
+		settings.log_dir,
 	]:
 		Path(path).mkdir(parents=True, exist_ok=True)
 	init_db()

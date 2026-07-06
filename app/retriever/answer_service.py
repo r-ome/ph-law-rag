@@ -1,3 +1,6 @@
+import time
+from datetime import datetime, timezone
+
 from app.retriever.context_builder import build_context
 from app.retriever.prompts import (
     SYSTEM_PROMPT, LATER_ENACTED_RULE, ABSTAIN_MESSAGE, GREETING_MESSAGE,
@@ -8,12 +11,32 @@ from app.retriever.types import RetrievalResult
 from app.retriever.answerability import is_answerable
 from app.retriever.context_selection import SelectionResult, select_context
 from app.config import settings
+from app.observability.context import TraceCollector, new_trace_id, trace_context
+from app.observability.logger import get_logger
+from app.observability.trace import TraceWriter
+
+logger = get_logger(__name__)
+
+
+def _chunk_trace(r: RetrievalResult, preview_chars: int) -> dict:
+    return {
+        "chunk_id": r.chunk_id,
+        "score": r.score,
+        "source_id": r.metadata.get("source_id", ""),
+        "unit_label": r.metadata.get("unit_label", ""),
+        "provision_id": r.metadata.get("provision_id", ""),
+        "expanded_from_parent": bool(r.metadata.get("expanded_from_parent")),
+        "consolidated": r.metadata.get("consolidated", ""),
+        "dedup_merged_chunk_ids": r.metadata.get("dedup_merged_chunk_ids", []),
+        "preview": r.text[:preview_chars],
+    }
 
 def _debug_trace(
     retrieved: list[RetrievalResult],
     pre_expansion: list[RetrievalResult],
     selected: list[RetrievalResult],
-    prompt: str | None
+    prompt: str | None,
+    preview_chars: int = 120,
 ) -> dict:
     return {
         "num_retrieved": len(retrieved),
@@ -22,30 +45,75 @@ def _debug_trace(
         "num_selected": len(selected),
         "prompt_length": len(prompt) if prompt else 0,
         "pre_expansion_chunks": [
-            {
-                "chunk_id": r.chunk_id,
-                "score": r.score,
-                "source_id": r.metadata.get("source_id", ""),
-                "unit_label": r.metadata.get("unit_label", ""),
-                "provision_id": r.metadata.get("provision_id", ""),
-                "preview": r.text[:120],
-            }
+            _chunk_trace(r, preview_chars)
             for r in pre_expansion
         ],
         "chunks": [
-            {
-                "chunk_id": r.chunk_id,
-                "score": r.score,
-                "source_id": r.metadata.get("source_id", ""),
-                "unit_label": r.metadata.get("unit_label", ""),
-                "provision_id": r.metadata.get("provision_id", ""),
-                "expanded_from_parent": bool(r.metadata.get("expanded_from_parent")),
-                "consolidated": r.metadata.get("consolidated", ""),
-                "dedup_merged_chunk_ids": r.metadata.get("dedup_merged_chunk_ids", []),
-                "preview": r.text[:120],
-            }
+            _chunk_trace(r, preview_chars)
             for r in selected
         ],
+    }
+
+
+def _feature_flags() -> dict:
+    return {
+        "debug": settings.debug,
+        "trace_logging_enabled": settings.trace_logging_enabled,
+        "retrieval_operative_only": settings.retrieval_operative_only,
+        "parent_expansion_enabled": settings.parent_expansion_enabled,
+        "prefer_operative_enabled": settings.prefer_operative_enabled,
+        "consolidated_dedup_enabled": settings.consolidated_dedup_enabled,
+        "edge_expansion_enabled": settings.edge_expansion_enabled,
+        "answerability_gate_enabled": settings.answerability_gate_enabled,
+        "query_decomposition_enabled": settings.query_decomposition_enabled,
+        "subquery_packaging_enabled": settings.subquery_packaging_enabled,
+        "enable_query_rewriting": settings.enable_query_rewriting,
+        "faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
+        "later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
+        "reranker_backend": settings.reranker_backend,
+        "dense_top_k": settings.dense_top_k,
+        "sparse_top_k": settings.sparse_top_k,
+        "rerank_top_n": settings.rerank_top_n,
+        "min_chunks_for_answer": settings.min_chunks_for_answer,
+    }
+
+
+def _build_trace_record(
+    *,
+    trace_id: str,
+    trace_label: str | None,
+    session_id: str | None,
+    original_question: str,
+    rewritten_question: str,
+    response: dict,
+    selection: SelectionResult,
+    prompt: str | None,
+    collector: TraceCollector | None,
+    elapsed_ms: float,
+) -> dict:
+    preview_chars = settings.trace_max_text_preview
+    return {
+        "trace_id": trace_id,
+        "trace_label": trace_label,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id,
+        "question": original_question,
+        "rewritten_question": rewritten_question,
+        "stage_counts": {
+            "retrieved": len(selection.retrieved),
+            "pre_expansion": len(selection.pre_expansion),
+            "selected": len(selection.selected),
+        },
+        "retrieved_chunks": [_chunk_trace(r, preview_chars) for r in selection.retrieved],
+        "pre_expansion_chunks": [_chunk_trace(r, preview_chars) for r in selection.pre_expansion],
+        "selected_chunks": [_chunk_trace(r, preview_chars) for r in selection.selected],
+        "feature_flags": _feature_flags(),
+        "abstained": response.get("abstained", False),
+        "error": response.get("error", False),
+        "stages": list(collector.stages) if collector else [],
+        "latency_ms": round(elapsed_ms, 2),
+        "prompt_length": len(prompt) if prompt else 0,
+        "generator_model": settings.llm_model,
     }
 
 def _package(
@@ -75,7 +143,7 @@ def _package(
     return response
 
 
-def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[RetrievalResult]]:
+def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, SelectionResult, str | None]:
     selection = select_context(question)
 
     if len(selection.pre_expansion) < settings.min_chunks_for_answer:
@@ -86,7 +154,7 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
             selection=selection,
             prompt=None,
             debug=debug_enabled
-        ), selection.selected
+        ), selection, None
 
     if settings.answerability_gate_enabled and not is_answerable(question, selection.pre_expansion):
         return _package(
@@ -96,7 +164,7 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
             selection=selection,
             prompt=None,
             debug=debug_enabled
-        ), selection.selected
+        ), selection, None
 
     context_block, sources = build_context(selection.selected)
 
@@ -107,6 +175,7 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
     try:
         answer_text = generate(system_prompt, user_prompt)
     except LLMError as e:
+        logger.warning("generation_failed", error=str(e), model=settings.llm_model)
         return _package(
             f"The language model could not be reached: {e}",
             sources=[],
@@ -115,7 +184,7 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
             prompt=user_prompt,
             error=True,
             debug=debug_enabled
-        ), selection.selected
+        ), selection, user_prompt
 
     # Faithfulness self-check (groundedness lever): a 2nd local pass that strips
     # any claim not supported by the same context. Skip when the draft already
@@ -141,49 +210,84 @@ def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, list[Retrie
         selection=selection,
         prompt=user_prompt,
         debug=debug_enabled
-    ), selection.selected
+    ), selection, user_prompt
 
 
 def answer(
     question: str,
     debug: bool | None = None,
-    session_id: str | None = None
+    session_id: str | None = None,
+    trace: bool = True,
+    trace_label: str | None = None,
     ) -> dict:
+    trace_id = new_trace_id()
+    collector = TraceCollector() if trace and settings.trace_logging_enabled else None
+    started = time.perf_counter()
     debug_enabled = settings.debug if debug is None else debug
     effective_question = question
+    prompt: str | None = None
+    selection = SelectionResult(retrieved=[], pre_expansion=[], selected=[])
 
-    if session_id:
-        from app.conversation.session import session_exists, create_session
-        if not session_exists(session_id):
-            create_session(session_id=session_id)  # guard direct callers (FK safety)
+    with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):
+        logger.info("answer_started", trace_label=trace_label)
 
-    if is_conversational(question):
-        # Greeting / chitchat — reply conversationally, skip retrieval entirely so
-        # we never dump unrelated context for a non-legal message.
-        response = _package(
-            GREETING_MESSAGE,
-            sources=[],
-            abstained=False,
-            selection=SelectionResult(retrieved=[], pre_expansion=[], selected=[]),
-            prompt=None,
-            debug=debug_enabled,
-        )
-        reranked = []
-    else:
         if session_id:
-            from app.conversation.session import get_history
-            from app.conversation.query_rewriter import rewrite_query
-            history = get_history(session_id, settings.max_conversation_turns)
-            effective_question = rewrite_query(question, history)
-        response, reranked = _run_pipeline(effective_question, debug_enabled)
+            from app.conversation.session import session_exists, create_session
+            if not session_exists(session_id):
+                create_session(session_id=session_id)  # guard direct callers (FK safety)
 
-    if session_id:
-        import json
-        from app.conversation.session import append_turn
-        append_turn(session_id, {
-            "question": question,                       # original, not rewritten
-            "rewritten_question": effective_question,
-            "answer": response["answer"],
-            "retrieved_chunks_json": json.dumps([r.chunk_id for r in reranked]),
-        })
-    return response
+        if is_conversational(question):
+            # Greeting / chitchat — reply conversationally, skip retrieval entirely so
+            # we never dump unrelated context for a non-legal message.
+            response = _package(
+                GREETING_MESSAGE,
+                sources=[],
+                abstained=False,
+                selection=selection,
+                prompt=None,
+                debug=debug_enabled,
+            )
+        else:
+            if session_id:
+                from app.conversation.session import get_history
+                from app.conversation.query_rewriter import rewrite_query
+                history = get_history(session_id, settings.max_conversation_turns)
+                effective_question = rewrite_query(question, history)
+            response, selection, prompt = _run_pipeline(effective_question, debug_enabled)
+
+        if session_id:
+            import json
+            from app.conversation.session import append_turn
+            append_turn(session_id, {
+                "question": question,                       # original, not rewritten
+                "rewritten_question": effective_question,
+                "answer": response["answer"],
+                "retrieved_chunks_json": json.dumps([r.chunk_id for r in selection.selected]),
+            })
+
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        logger.info(
+            "answer_completed",
+            trace_label=trace_label,
+            abstained=response.get("abstained", False),
+            error=response.get("error", False),
+            retrieved=len(selection.retrieved),
+            selected=len(selection.selected),
+            latency_ms=round(elapsed_ms, 2),
+        )
+        if trace and settings.trace_logging_enabled:
+            TraceWriter().write(
+                _build_trace_record(
+                    trace_id=trace_id,
+                    trace_label=trace_label,
+                    session_id=session_id,
+                    original_question=question,
+                    rewritten_question=effective_question,
+                    response=response,
+                    selection=selection,
+                    prompt=prompt,
+                    collector=collector,
+                    elapsed_ms=elapsed_ms,
+                )
+            )
+        return response

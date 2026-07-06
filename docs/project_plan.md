@@ -223,7 +223,8 @@ ph-law-rag/
 │   ├── qdrant/                   # gitignored; Qdrant local storage
 │   ├── bm25/                     # gitignored; BM25 index files
 │   ├── sqlite/                   # gitignored; raglab.db
-│   └── eval_results/             # gitignored; eval run outputs
+│   ├── eval_results/             # gitignored; eval run outputs
+│   └── logs/                     # gitignored; app logs and JSONL traces
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -340,12 +341,16 @@ Build:
 - `llm_client.py` — Ollama HTTP client with structured error handling
 - `answer_service.py` — full ask pipeline: retrieve → rerank → build context → check abstention gate → generate → package response
 - Debug mode: exposes retrieved chunks, distances, rerank scores, prompt length
+- Observability: every real `answer()` call persists a local JSONL retrieval trace
+  when `trace_logging_enabled=True`, independent of whether debug data is returned
+  to the caller. Internal synthetic calls opt out with `trace=False`.
 
 Definition of done:
 
 - `raglab ask "..."` returns a grounded answer with numbered citations
 - Out-of-scope questions trigger the abstention response
-- Debug mode shows the full retrieval trace
+- Debug mode shows the full retrieval trace in the response; config-gated JSONL
+  traces are written for serving and eval calls without exposing debug data.
 
 ---
 
@@ -560,7 +565,13 @@ class Settings(BaseSettings):
     # Misc
     request_timeout: int = 30
     debug: bool = False
+    log_dir: str = "data/logs"
     log_level: str = "INFO"
+    log_to_file: bool = True
+    log_max_bytes: int = 10_000_000
+    log_backup_count: int = 5
+    trace_logging_enabled: bool = True
+    trace_max_text_preview: int = 200
 ```
 
 ---
@@ -1205,7 +1216,9 @@ When reviewing code:
 3. Keep business logic out of the Streamlit and FastAPI adapters
 4. Preserve incremental-sync architecture
 5. Preserve local-first design
-6. Prefer explicit retrieval trace in debug mode over silent failures
+6. Prefer explicit retrieval traces over silent failures. Debug mode may expose
+   traces in responses; local JSONL trace persistence is config-gated and enabled
+   separately from response debugging.
 
 If the current implementation differs from this plan, note whether the difference is:
 

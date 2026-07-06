@@ -35,6 +35,7 @@ dependencies = [
  "llama-index-embeddings-bedrock>=0.8.0",
  "boto3>=1.40.61",
  "truststore>=0.10.4",
+ "structlog>=26.1.0",
 ]
 
 [project.scripts]

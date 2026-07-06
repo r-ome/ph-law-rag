@@ -13,6 +13,6 @@ class AskRequest(BaseModel):
 @router.post("/ask")
 def ask(request: AskRequest):
     session_id = request.session_id or create_session()  # API auto-threads
-    result = answer(request.question, debug=request.debug, session_id=session_id)
+    result = answer(request.question, debug=request.debug, session_id=session_id, trace_label="api")
     result["session_id"] = session_id
     return result

@@ -3,6 +3,9 @@ import time
 from sentence_transformers import CrossEncoder
 from app.retriever.types import RetrievalResult
 from app.config import settings
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 _model: CrossEncoder | None = None
 _qwen = None
@@ -104,7 +107,8 @@ def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalRes
     else:
         model = _get_model()
         scores = model.predict([(query_text, r.text) for r in results])
-    rerank_timings_ms.append((time.perf_counter() - start) * 1000)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    rerank_timings_ms.append(elapsed_ms)
 
     for r, score in zip(results, scores):
         r.score = float(score)
@@ -115,8 +119,26 @@ def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalRes
         # Plain top-8: rerank_score_margin is calibrated to MiniLM logit spread and would
         # keep the entire pool against [0,1] probabilities (see config comment). A [0,1]
         # probability floor is the native replacement if trimming proves needed — backlog.
-        return results[: settings.rerank_top_n]
+        kept = results[: settings.rerank_top_n]
+        logger.debug(
+            "rerank_completed",
+            backend=settings.reranker_backend,
+            in_count=len(results),
+            out_count=len(kept),
+            top_score=kept[0].score if kept else None,
+            latency_ms=round(elapsed_ms, 2),
+        )
+        return kept
 
     top = results[0].score
     kept = [r for r in results if r.score >= top - settings.rerank_score_margin]
-    return kept[: settings.rerank_top_n]
+    kept = kept[: settings.rerank_top_n]
+    logger.debug(
+        "rerank_completed",
+        backend=settings.reranker_backend,
+        in_count=len(results),
+        out_count=len(kept),
+        top_score=kept[0].score if kept else None,
+        latency_ms=round(elapsed_ms, 2),
+    )
+    return kept

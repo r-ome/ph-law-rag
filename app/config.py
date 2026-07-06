@@ -86,6 +86,13 @@ class Settings(BaseSettings):
 	qwen3_reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
 	consolidated_dedup_enabled: bool = True
 	debug: bool = False
+	log_dir: str = "data/logs"
+	log_level: str = "INFO"
+	log_to_file: bool = True
+	log_max_bytes: int = 10_000_000
+	log_backup_count: int = 5
+	trace_logging_enabled: bool = True
+	trace_max_text_preview: int = 200
 	eval_dataset_path: str = "data/eval_dataset.jsonl"
 	eval_results_dir: str = "data/eval_results"
 	eval_run_label: str = ""  # optional A/B tag baked into eval output filenames

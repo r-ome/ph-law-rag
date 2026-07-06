@@ -14,6 +14,9 @@ from app.indexing.vector_store import (
 )
 from app.indexing.provision_status import load_provision_overrides, apply_overrides
 from app.source_metadata import operability_action_for
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Doc-level metadata fields that are NOT embedded into chunk text, so a manifest edit
 # can be pushed into the derived stores by patching payload/metadata only — no re-embed.
@@ -164,7 +167,7 @@ def report_amendment_indexing(conn, source_metadata: dict, nodes: list[TextNode]
 	source_id = source_metadata.get("source_id")
 	inserted = [n for n in nodes if n.metadata.get("inserted_into")]
 	if not inserted:
-		print(f"[WARN] {source_id}: amendment mode parsed 0 inserted provisions.")
+		logger.warning("amendment_mode_empty", source_id=source_id)
 
 	_warn_amendment_namespace(source_metadata)
 	_warn_amendment_collisions(conn, source_id, inserted)
@@ -176,7 +179,11 @@ def _warn_amendment_namespace(source_metadata: dict) -> None:
 		from app.config import load_allowed_sources
 		enabled_source_ids = {s.source_id for s in load_allowed_sources()}
 	except Exception as e:
-		print(f"[WARN] {source_metadata.get('source_id')}: could not validate amendment namespace: {e}")
+		logger.warning(
+			"amendment_namespace_validation_failed",
+			source_id=source_metadata.get("source_id"),
+			error=str(e),
+		)
 		return
 
 	amends = source_metadata.get("amends") or []
@@ -187,7 +194,11 @@ def _warn_amendment_namespace(source_metadata: dict) -> None:
 	else:
 		target = source_metadata.get("source_id")
 	if target not in enabled_source_ids:
-		print(f"[WARN] {source_metadata.get('source_id')}: amendment target namespace {target!r} is not an enabled source_id")
+		logger.warning(
+			"amendment_namespace_unknown_target",
+			source_id=source_metadata.get("source_id"),
+			target=target,
+		)
 
 
 def _warn_amendment_collisions(conn, amendment_source_id: str | None, inserted: list[TextNode]) -> None:
@@ -204,9 +215,11 @@ def _warn_amendment_collisions(conn, amendment_source_id: str | None, inserted: 
 		for row in rows:
 			base_source_id = row["source_id"]
 			if base_source_id:
-				print(
-					f"[SUPERSESSION-CANDIDATE] {pid}: inserted by {amendment_source_id} "
-					f"collides with indexed base provision in {base_source_id}"
+				logger.info(
+					f"[SUPERSESSION-CANDIDATE] {pid}: inserted by {amendment_source_id} collides with indexed base provision in {base_source_id}",
+					provision_id=pid,
+					amendment_source_id=amendment_source_id,
+					base_source_id=base_source_id,
 				)
 
 
@@ -239,9 +252,12 @@ def _warn_path_scoped_inserted_sections(conn, amendment_source_id: str | None, i
 			if key in seen:
 				continue
 			seen.add(key)
-			print(
-				f"[WARN] {amendment_source_id}: inserted path-less section id {pid} may not join "
-				f"path-scoped target section id {base_pid}"
+			logger.warning(
+				"pathless_inserted_section_collision",
+				amendment_source_id=amendment_source_id,
+				provision_id=pid,
+				target=target,
+				base_provision_id=base_pid,
 			)
 
 def _rebuild_bm25(conn) -> None:

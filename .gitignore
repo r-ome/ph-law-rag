@@ -29,6 +29,7 @@ data/qdrant/
 data/bm25/
 data/sqlite/
 data/eval_results/
+data/logs/
 
 # Keep eval dataset tracked
 !data/eval_dataset.jsonl

@@ -60,6 +60,7 @@ def test_api_and_ui_import_only_allowed_app_prefixes():
 		"app.runtime.health",
 		"app.db",
 		"app.conversation.session",
+		"app.observability",
 	)
 	for folder in ("api", "ui"):
 		for path in _python_files("app", folder):

@@ -2,6 +2,9 @@ from app.retriever.types import RetrievalResult
 from app.retriever.dense_retriever import dense_retriever
 from app.retriever.sparse_retriever import sparse_retriever
 from app.retriever.query_planner import plan_queries
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 RRF_K = 60
 
@@ -24,7 +27,19 @@ def hybrid_retriever (query_text: str) -> list[RetrievalResult]:
     ranked_lists: list[list[RetrievalResult]] = []
     
     for subquery in subqueries:
-        ranked_lists.append(dense_retriever(subquery))
-        ranked_lists.append(sparse_retriever(subquery))
+        dense = dense_retriever(subquery)
+        sparse = sparse_retriever(subquery)
+        logger.debug(
+            "hybrid_subquery_retrieved",
+            subquery=subquery,
+            dense_count=len(dense),
+            sparse_count=len(sparse),
+            dense_top_score=dense[0].score if dense else None,
+            sparse_top_score=sparse[0].score if sparse else None,
+        )
+        ranked_lists.append(dense)
+        ranked_lists.append(sparse)
         
-    return _fuse(ranked_lists)
+    fused = _fuse(ranked_lists)
+    logger.debug("hybrid_fused", subqueries=len(subqueries), count=len(fused), top_score=fused[0].score if fused else None)
+    return fused

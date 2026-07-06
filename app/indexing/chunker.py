@@ -5,6 +5,9 @@ from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
 from app.config import settings
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 # ── Marker grammar (line-start) ───────────────────────────────────────────
 # UNIT markers — each begins a legal unit we want as its own chunk
@@ -236,7 +239,7 @@ def _amendment_target(sm: dict) -> str:
 	if sm.get("amends_namespace"):
 		return sm["amends_namespace"]
 	target = sm.get("source_id")
-	print(f"[WARN] {target}: multi-target amendment without amends_namespace; using own namespace")
+	logger.warning("multi-target amendment without amends_namespace", source_id=target)
 	return target
 
 

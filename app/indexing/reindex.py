@@ -18,6 +18,9 @@ from app.indexing.consolidation import (
     check_consolidation_coherence,
 )
 from app.source_metadata import build_source_metadata
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _warn_unmatched_overrides(conn) -> None:
@@ -33,8 +36,11 @@ def _warn_unmatched_overrides(conn) -> None:
     present = {r["pid"] for r in rows if r["pid"]}
     missing = [pid for pid in overrides if pid not in present]
     if missing:
-        print(f"[WARN] {len(missing)} provision override(s) matched ZERO chunks "
-              f"(typo/renumber/unsynced): {', '.join(missing)}")
+        logger.warning(
+            "provision_overrides_unmatched",
+            count=len(missing),
+            provision_ids=missing,
+        )
     for pid, rules in sorted(overrides.items()):
         rows = conn.execute(
             """
@@ -46,10 +52,10 @@ def _warn_unmatched_overrides(conn) -> None:
         ).fetchall()
         source_ids = sorted(r["source_id"] for r in rows if r["source_id"])
         if len(source_ids) > 1 and any(rule.source_id is None for rule in rules):
-            print(
-                f"[WARN] provision_status override {pid} matches chunks from multiple "
-                f"source_id values ({', '.join(source_ids)}); set source_id on the rule or use "
-                "provision_supersession.yaml for same-id collisions"
+            logger.warning(
+                "provision_status override matches chunks from multiple source_id values; set source_id on the rule or use provision_supersession.yaml for same-id collisions",
+                provision_id=pid,
+                source_ids=source_ids,
             )
         for rule in rules:
             if not rule.unit_labels:
@@ -76,10 +82,11 @@ def _warn_unmatched_overrides(conn) -> None:
             present_labels = {r["unit_label"] for r in label_rows if r["unit_label"]}
             missing_labels = [label for label in rule.unit_labels if label not in present_labels]
             if missing_labels:
-                source_note = f" source_id={rule.source_id}" if rule.source_id else ""
-                print(
-                    f"[WARN] provision_status override {pid}{source_note} unit_labels matched "
-                    f"ZERO chunks: {', '.join(missing_labels)}"
+                logger.warning(
+                    "provision_status override unit_labels matched ZERO chunks",
+                    provision_id=pid,
+                    source_id=rule.source_id,
+                    unit_labels=missing_labels,
                 )
     print(f"[overrides] {len(overrides) - len(missing)}/{len(overrides)} provision overrides matched ≥1 chunk")
 
@@ -118,18 +125,23 @@ def _warn_amendment_aggregate(conn) -> None:
     for pid, bucket in sorted(by_pid.items()):
         for amendment_source_id in sorted(bucket["inserted"]):
             for base_source_id in sorted(bucket["base"] - {amendment_source_id}):
-                print(
-                    f"[SUPERSESSION-CANDIDATE] {pid}: inserted by {amendment_source_id} "
-                    f"collides with indexed base provision in {base_source_id}"
+                logger.info(
+                    f"[SUPERSESSION-CANDIDATE] {pid}: inserted by {amendment_source_id} collides with indexed base provision in {base_source_id}",
+                    provision_id=pid,
+                    amendment_source_id=amendment_source_id,
+                    base_source_id=base_source_id,
                 )
 
     for amendment_source_id, target, number, pid in sorted(inserted_sections):
         for base_pid in sorted(target_pids.get(target, set())):
             pathless = f"{target}:section:{number}".lower()
             if base_pid != pathless and base_pid.endswith(f":section:{number}".lower()):
-                print(
-                    f"[WARN] {amendment_source_id}: inserted path-less section id {pid} may not join "
-                    f"path-scoped target section id {base_pid}"
+                logger.warning(
+                    "pathless_inserted_section_collision",
+                    amendment_source_id=amendment_source_id,
+                    provision_id=pid,
+                    target=target,
+                    base_provision_id=base_pid,
                 )
 
 
@@ -206,7 +218,7 @@ def reindex(doc_id: str | None = None) -> list[dict]:
         conn.close()
 
     if doc_id and not results:
-        print(f"[WARN] no source matched '{doc_id}'")
+        logger.warning("reindex_source_not_matched", doc_id=doc_id)
     return results
 
 
