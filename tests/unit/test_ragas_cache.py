@@ -1,6 +1,7 @@
 import json
 
 from app.evals import ragas_cache
+from app.evals import artifacts
 
 
 def test_cache_key_is_stable_and_context_order_sensitive():
@@ -67,3 +68,39 @@ def test_seed_from_artifacts(tmp_path, monkeypatch):
         "skipped": 0,
     }
     assert ragas_cache.stats(path=db_path)["total"] == 1
+
+
+def test_seed_from_bundled_artifacts(tmp_path, monkeypatch):
+    results_dir = tmp_path / "eval_results"
+    run_tag = "model_label_20260706_103554"
+    run_dir = results_dir / "runs" / "2026-07-06" / run_tag
+    run_dir.mkdir(parents=True)
+    run_row = {
+        "question": "question",
+        "answer": "answer",
+        "contexts": ["context"],
+        "ground_truth": "reference",
+        "abstained": False,
+    }
+    scored_row = {
+        "user_input": "question",
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.75,
+        "llm_context_precision_with_reference": 0.5,
+        "context_recall": 0.25,
+    }
+    (run_dir / "run.jsonl").write_text(json.dumps(run_row) + "\n")
+    (run_dir / "scored.json").write_text(json.dumps([scored_row]))
+    monkeypatch.setattr(ragas_cache.settings, "eval_results_dir", str(results_dir))
+
+    db_path = tmp_path / "cache.sqlite"
+    assert ragas_cache.seed_from_artifacts(run_tag, path=db_path) == {
+        "written": 1,
+        "skipped": 0,
+    }
+    assert ragas_cache.stats(path=db_path)["total"] == 1
+
+
+def test_tag_from_run_path_handles_bundled_and_legacy():
+    assert artifacts.tag_from_run_path("data/eval_results/runs/2026-07-06/demo/run.jsonl") == "demo"
+    assert artifacts.tag_from_run_path("data/eval_results/run_mistral_20260613_191727.jsonl") == "mistral_20260613_191727"

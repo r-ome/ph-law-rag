@@ -1,9 +1,12 @@
 import json
 import time
 import statistics
+import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from app.config import settings
+from app.evals import artifacts
 from app.retriever.answer_service import answer
 
 def load_dataset(path: str) -> list[dict]:
@@ -15,15 +18,46 @@ def load_dataset(path: str) -> list[dict]:
                 items.append(json.loads(line))
     return items
 
-def run_eval_set() -> tuple[list[dict], Path]:
+def _git_sha() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return None
+
+
+def _active_config() -> dict:
+    return {
+        "llm_model": settings.llm_model,
+        "query_decomposition_enabled": settings.query_decomposition_enabled,
+        "reranker_backend": settings.reranker_backend,
+        "dense_top_k": settings.dense_top_k,
+        "sparse_top_k": settings.sparse_top_k,
+        "rerank_top_n": settings.rerank_top_n,
+        "retrieval_operative_only": settings.retrieval_operative_only,
+        "parent_expansion_enabled": settings.parent_expansion_enabled,
+        "prefer_operative_enabled": settings.prefer_operative_enabled,
+        "consolidated_dedup_enabled": settings.consolidated_dedup_enabled,
+        "edge_expansion_enabled": settings.edge_expansion_enabled,
+        "answerability_gate_enabled": settings.answerability_gate_enabled,
+        "faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
+        "later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
+        "subquery_packaging_enabled": settings.subquery_packaging_enabled,
+    }
+
+
+def run_eval_set() -> tuple[list[dict], Path, str]:
     dataset = load_dataset(settings.eval_dataset_path)
     results = []
 
-    out_dir = Path(settings.eval_results_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    started_at = datetime.now().astimezone()
     model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
-    label = f"_{settings.eval_run_label}" if settings.eval_run_label else ""
-    out_path = out_dir / f"run_{model_slug}{label}_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
+    run_tag = artifacts.make_run_tag(model_slug, settings.eval_run_label, started_at)
+    paths = artifacts.create_run_paths(run_tag, started_at)
+    out_path = paths.run
 
     answer("warmup")  # prime reranker + Ollama so row 1 isn't cold-start inflated
 
@@ -67,4 +101,21 @@ def run_eval_set() -> tuple[list[dict], Path]:
         print(f"Rerank ({settings.reranker_backend}) — median {statistics.median(ms):.0f}ms | "
               f"mean {statistics.mean(ms):.0f}ms | min {min(ms):.0f}ms | max {max(ms):.0f}ms | n={len(ms)}")
 
-    return results, out_path
+    meta = {
+        "tag": run_tag,
+        "date": started_at.strftime("%Y-%m-%d"),
+        "started_at": started_at.isoformat(),
+        "completed_at": datetime.now().astimezone().isoformat(),
+        "model": settings.llm_model,
+        "model_slug": model_slug,
+        "label": settings.eval_run_label,
+        "question_count": len(results),
+        "scored_count": None,
+        "git_sha": _git_sha(),
+        "active_config": _active_config(),
+    }
+    artifacts.save_meta(run_tag, meta)
+    artifacts.update_manifest(run_tag, meta=meta)
+    artifacts.write_latest(run_tag)
+
+    return results, out_path, run_tag

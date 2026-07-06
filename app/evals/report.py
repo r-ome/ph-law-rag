@@ -1,9 +1,6 @@
-import json
 from datetime import datetime
-from pathlib import Path
-from collections import defaultdict
 
-from app.config import settings
+from app.evals import artifacts
 
 def abstention_accuracy(results: list[dict]) -> dict:
     """Out of scope rows SHOULD abstain; everything else should NOT."""
@@ -69,16 +66,22 @@ def build_summary(results: list[dict], scored) -> dict:
 
 def save_scored(results: list[dict], scored, run_tag: str | None = None) -> None:
     ragas_result, scorable = scored
-    out_dir = Path(settings.eval_results_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
     tag = run_tag or datetime.now().strftime("%Y%m%d_%H%M%S")
+    paths = artifacts.paths_for_tag(tag)
+    summary = build_summary(results, scored)
 
-    # Timestamped summary — the thing print_report shows, now durable + diffable.
-    (out_dir / f"summary_{tag}.json").write_text(
-        json.dumps(build_summary(results, scored), indent=2)
-    )
+    artifacts.write_json(paths.summary, summary)
 
     if ragas_result is not None:
         df = ragas_result.to_pandas()
-        df.to_json(out_dir / "scored_latest.json", orient="records", indent=2)
-        df.to_json(out_dir / f"scored_{tag}.json", orient="records", indent=2)
+        paths.scored.parent.mkdir(parents=True, exist_ok=True)
+        df.to_json(paths.scored, orient="records", indent=2)
+
+    meta = artifacts.load_meta(tag)
+    if meta is not None:
+        meta["scored_count"] = len(scorable)
+        meta["scored_at"] = datetime.now().astimezone().isoformat()
+        artifacts.save_meta(tag, meta)
+
+    artifacts.update_manifest(tag, meta=meta, summary=summary)
+    artifacts.write_latest(tag)

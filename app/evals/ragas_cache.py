@@ -8,6 +8,7 @@ from typing import Any
 import ragas
 
 from app.config import settings
+from app.evals import artifacts
 
 SCORER_VERSION = "ragas-cache-v1"
 METRIC_NAMES = [
@@ -190,13 +191,8 @@ def clear(path: Path | None = None) -> int:
 
 
 def seed_from_artifacts(run_tag: str, path: Path | None = None) -> dict[str, int]:
-    out_dir = Path(settings.eval_results_dir)
-    run_path = out_dir / f"run_{run_tag}.jsonl"
-    scored_path = out_dir / f"scored_{run_tag}.json"
-    if not run_path.exists():
-        raise FileNotFoundError(run_path)
-    if not scored_path.exists():
-        raise FileNotFoundError(scored_path)
+    run_path = artifacts.existing_path(run_tag, "run", required=True)
+    scored_path = artifacts.existing_path(run_tag, "scored", required=True)
 
     run_rows = [
         json.loads(line)

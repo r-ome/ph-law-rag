@@ -1,6 +1,5 @@
 import typer
 import json
-from pathlib import Path
 from app.config import settings
 from app.db import init_db
 app = typer.Typer()
@@ -31,12 +30,13 @@ def eval_score(
 	run_path: str,
 	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
 ):
-	from app.evals.runner import run_eval_set, load_dataset
+	from app.evals import artifacts
+	from app.evals.runner import load_dataset
 	from app.evals.ragas_scorer import score
 	from app.evals.report import print_report, save_scored
 
 	results = load_dataset(run_path)
-	run_tag = Path(run_path).stem.replace("run_", "")
+	run_tag = artifacts.tag_from_run_path(run_path)
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
@@ -49,14 +49,13 @@ def eval(
 	from app.evals.runner import run_eval_set
 	from app.evals.report import print_report, save_scored
 
-	results, raw_path = run_eval_set()
+	results, raw_path, run_tag = run_eval_set()
 	typer.echo(f"\nRaw results saved to {raw_path}")
 	if not do_score:
 		typer.echo(f"Skipped judging (--no-score). Score later with: raglab eval-score {raw_path}")
 		return
 	from app.evals.ragas_scorer import score
 
-	run_tag = raw_path.stem.replace("run_", "")
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)

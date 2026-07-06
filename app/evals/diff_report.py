@@ -22,6 +22,7 @@ import json
 from pathlib import Path
 
 from app.config import settings
+from app.evals import artifacts
 
 # Worst-first; source-level problems rank above provision-level ones.
 CLASS_ORDER = ["OOS_LEAK", "IN_SCOPE_ABSTAIN", "DOC_MISS", "CROSS_SOURCE",
@@ -114,10 +115,10 @@ def classify(rec: dict) -> str:
 
 def _load(tag: str) -> dict[str, dict]:
     """Merge run_{tag}.jsonl with scored_{tag}.json (joined on question), keyed by question."""
-    d = Path(settings.eval_results_dir)
-    run = [json.loads(line) for line in (d / f"run_{tag}.jsonl").read_text().splitlines() if line.strip()]
-    scored_path = d / f"scored_{tag}.json"
-    scored = json.loads(scored_path.read_text()) if scored_path.exists() else []
+    run_path = artifacts.existing_path(tag, "run", required=True)
+    run = [json.loads(line) for line in run_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    scored_path = artifacts.existing_path(tag, "scored")
+    scored = json.loads(scored_path.read_text(encoding="utf-8")) if scored_path else []
     by_q = {s["user_input"]: s for s in scored}
     out = {}
     for r in run:
@@ -209,6 +210,7 @@ def build_diff_report(experiment: str, baseline: str | None = None, out: str | N
             f"{_trunc(r['answer'], 60)} |"
         )
 
-    out_path = Path(out) if out else Path(settings.eval_results_dir) / f"diff_{experiment}.md"
+    out_path = Path(out) if out else Path(settings.eval_results_dir) / "diffs" / f"diff_{experiment}.md"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines) + "\n")
     return out_path

@@ -124,7 +124,12 @@ The system has 5 parts:
 - Load eval questions from `data/eval_dataset.jsonl`
 - Run each question through the full ask pipeline
 - Score results via RAGAS metrics: faithfulness, answer relevance, context precision, context recall
-- Save per-question results to `data/eval_results/`
+- Save eval artifacts under `data/eval_results/`: new runs use
+  `runs/YYYY-MM-DD/<tag>/` with `run.jsonl`, `meta.json`, `summary.json`,
+  and `scored.json`; legacy flat files remain readable through the artifact
+  resolver
+- Maintain `manifest.jsonl` and `latest.json` pointers for listing and
+  comparing runs without opening every artifact bundle
 - Print category-level report
 
 ### 5. Interface Layer
@@ -203,6 +208,7 @@ ph-law-rag/
 │   │   ├── prompts.py            # system + grounding prompt templates
 │   │   └── answer_service.py     # full ask pipeline orchestrator
 │   ├── evals/
+│   │   ├── artifacts.py          # eval artifact paths, legacy fallback, manifest
 │   │   ├── runner.py             # runs questions through ask pipeline
 │   │   ├── ragas_scorer.py       # RAGAS metric computation
 │   │   └── report.py             # aggregates + prints category report
@@ -382,6 +388,8 @@ Build:
   - Ambiguous questions (may or may not be answerable from corpus)
   - Out-of-scope questions (should trigger abstention)
 - `runner.py` — feeds questions through `answer_service`, saves results to JSONL
+- `artifacts.py` — owns run tags, bundled artifact paths, legacy flat-file
+  fallback, `manifest.jsonl`, and `latest.json`
 - `ragas_scorer.py` — computes RAGAS metrics per question:
   - **Faithfulness** — is the answer grounded in the retrieved context?
   - **Answer relevance** — does the answer address the question?
@@ -393,7 +401,8 @@ Build:
 Definition of done:
 
 - `raglab eval` produces per-question RAGAS scores and a category summary
-- Results are saved as JSONL for manual review
+- Results are saved as bundled artifacts for manual review and indexed in
+  `manifest.jsonl`
 
 ---
 

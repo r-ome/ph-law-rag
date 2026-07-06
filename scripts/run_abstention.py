@@ -18,8 +18,9 @@ def load(path):
 
 
 def main(baseline_path: str | None):
-    results, out_path = run_eval_set()
+    results, out_path, run_tag = run_eval_set()
     print(f"\nrun written: {out_path}")
+    print(f"run tag: {run_tag}")
 
     by_cat = defaultdict(lambda: [0, 0])  # [abstained, total]
     oos_leaks, nonoos_abstains = [], []
