@@ -34,3 +34,7 @@ Use local models using Ollama.
 - Time consuming when evaluating answers. Local models usually takes longer to generate answer.
 - Local models are weaker and might not reflect eval scores with production quality; swapping to cloud later means re-running evals to re-baseline.
 - Dev needs Ollama running locally.
+
+## Addendum (2026-07-07)
+
+This ADR still governs local development defaults. The deployed portfolio demo now uses a separate cloud runtime profile for serving, documented in ADR-020, with Bedrock embeddings and Anthropic generation. That is a deployment profile, not a replacement for the local-first development baseline.

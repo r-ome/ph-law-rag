@@ -40,3 +40,7 @@ Use `mistral` as the default generator model for local development and demos.
 - Local demos and eval runs are faster and easier to repeat.
 - Results are still tied to the chosen local model, so changing to DeepSeek or a cloud model requires re-running evals.
 - DeepSeek and Qwen remain useful as experiments, but not as the baseline generator.
+
+## Addendum (2026-07-07)
+
+Mistral remains the default local generator. Cloud serving uses Claude Haiku through the Anthropic API as part of ADR-020's deployment profile, after the Haiku generator A/B showed a material faithfulness and out-of-scope fencing win over the local generator on the frozen retrieval stack.
