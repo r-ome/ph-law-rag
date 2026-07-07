@@ -30,12 +30,15 @@ RUN uv sync --frozen --no-dev
 # compose mounts the host Hugging Face cache instead, so rebuilds don't block
 # on model downloads.
 ARG PRELOAD_RERANKER=false
-# Serving runs MiniLM (qwen3 is eval-only; no GPU in containers — see ADR-016).
+# Serving runs MiniLM (bedrock is quota-capped at 2 calls/min, qwen3 needs a GPU —
+# see ADR-021 / ADR-016).
 ARG RERANKER_BACKEND=minilm
 ARG RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
 ARG QWEN3_RERANKER_MODEL=Qwen/Qwen3-Reranker-0.6B
 RUN if [ "$PRELOAD_RERANKER" != "true" ]; then \
       echo "Skipping reranker preload"; \
+    elif [ "$RERANKER_BACKEND" = "bedrock" ]; then \
+      echo "bedrock reranker is a remote API — nothing to preload"; \
     elif [ "$RERANKER_BACKEND" = "minilm" ]; then \
       RERANKER_MODEL="$RERANKER_MODEL" .venv/bin/python -c "import os; from sentence_transformers import CrossEncoder; CrossEncoder(os.environ['RERANKER_MODEL'])"; \
     elif [ "$RERANKER_BACKEND" = "qwen3" ]; then \

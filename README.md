@@ -216,7 +216,7 @@ chunk_size=256
 chunk_overlap=32
 dense_top_k=30
 rerank_top_n=8
-reranker_backend=qwen3      # eval-quality default; use minilm for CPU-only serving
+reranker_backend=bedrock    # eval/host default (ADR-021); minilm serves, qwen3 = research arm
 min_chunks_for_answer=1
 debug=false
 ```

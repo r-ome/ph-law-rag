@@ -34,6 +34,11 @@ def _active_config() -> dict:
         "llm_model": settings.llm_model,
         "query_decomposition_enabled": settings.query_decomposition_enabled,
         "reranker_backend": settings.reranker_backend,
+        "bedrock_rerank_model": settings.bedrock_rerank_model,
+        "bedrock_rerank_region": settings.bedrock_rerank_region,
+        "embedding_backend": settings.embedding_backend,
+        "embedding_model": settings.embedding_model,
+        "qdrant_collection": settings.qdrant_collection,
         "dense_top_k": settings.dense_top_k,
         "sparse_top_k": settings.sparse_top_k,
         "rerank_top_n": settings.rerank_top_n,
@@ -62,6 +67,12 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
     run_tag = artifacts.make_run_tag(model_slug, settings.eval_run_label, started_at)
     paths = artifacts.create_run_paths(run_tag, started_at)
     out_path = paths.run
+
+    # Print the effective config BEFORE warmup: warmup already exercises the reranker
+    # (a remote backend spends money on it), and a stale .env has silently confounded a
+    # run before (dense_top_k=10 during the Haiku A/B). Eyeball this, then let it spend.
+    print("Active config:")
+    print(json.dumps(_active_config(), indent=2), flush=True)
 
     answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
 

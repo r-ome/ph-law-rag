@@ -66,7 +66,7 @@ It should:
 | Embeddings            | Ollama `nomic-embed-text`              | Local, high-quality 768-dim embeddings; swap via config                                                   |
 | Vector store          | Qdrant (local Docker)                  | Native hybrid search (dense + sparse in one query), metadata filtering, concurrent-safe                   |
 | Sparse index          | LlamaIndex BM25Retriever               | Exact-match keyword retrieval; pairs with dense for hybrid                                                |
-| Reranker              | Qwen3 reranker by default; `cross-encoder/ms-marco-MiniLM-L-6-v2` fallback | Qwen3 is the eval-quality selector default; MiniLM remains a latency-sensitive serving fallback |
+| Reranker              | Bedrock Rerank (`amazon.rerank-v1:0`) by default; MiniLM serving pin; Qwen3 research arm | Bedrock matches Qwen3 eval quality serverlessly (ADR-021); MiniLM serves (bedrock quota = 2 calls/min); Qwen3 kept for offline research |
 | PDF ingestion         | `pdfplumber` via LlamaIndex            | Better table and layout handling than PyPDF2                                                              |
 | HTML ingestion        | `trafilatura`                          | Strips navigation boilerplate better than BeautifulSoup                                                   |
 | Evals                 | RAGAS                                  | Semantic eval scoring: faithfulness, answer relevance, context precision, context recall                  |
@@ -113,7 +113,7 @@ The system has 5 parts:
 - Run dense retrieval from Qdrant (top-k = 30 candidates by default)
 - Run BM25 sparse retrieval (top-k = 10 candidates)
 - Merge results via Reciprocal Rank Fusion (RRF)
-- Re-score merged candidates with the configured reranker (`qwen3` by default; `minilm` fallback)
+- Re-score merged candidates with the configured reranker (`bedrock` by default; `minilm` serving pin; `qwen3` research arm)
 - Apply `max_distance` filter; apply `min_chunks_for_answer` gate
 - Build numbered context prompt with source citations
 - Generate answer via Ollama LLM
@@ -475,8 +475,8 @@ and is documented separately in [`docs/aws_deployment_diagram.md`](aws_deploymen
 - **Vectors** → Qdrant Cloud (collection `ph_law-titan1024`); SQLite + BM25 baked into the image as seed artifacts.
 - **Runtime** → one image, two entrypoints (FastAPI `api` + Streamlit `ui`) on Fargate behind an ALB; secrets via
   Secrets Manager / task role, never baked.
-- **Serving reranker** → `reranker_backend=minilm`; Qwen3 remains the eval-quality local default but is not viable on
-  CPU-only Docker/Fargate serving.
+- **Serving reranker** → `reranker_backend=minilm`; evals/host default to Bedrock Rerank (ADR-021), which matches
+  Qwen3 quality but is quota-capped at 2 calls/min — not servable for interactive traffic.
 - **Local cloud-smoke** → `docker compose -f docker-compose.cloud.yaml up --build` with
   `RAGLAB_ENV_FILE=.env.cloud-gate` and AWS creds mounted.
 
@@ -543,8 +543,10 @@ class Settings(BaseSettings):
     embedding_dim: int | None = None     # backend/model default when unset
     llm_model: str = "mistral"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    reranker_backend: Literal["minilm", "qwen3"] = "qwen3"
+    reranker_backend: Literal["minilm", "qwen3", "bedrock"] = "bedrock"
     qwen3_reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
+    bedrock_rerank_model: str = "amazon.rerank-v1:0"
+    bedrock_rerank_region: str = "us-west-2"   # rerank models are not in us-east-1
 
     # Ollama
     ollama_base_url: str = "http://localhost:11434"
@@ -776,9 +778,12 @@ where `k = 60` (standard constant), and `rank_i` is the position in each retriev
 After RRF fusion, merged candidates are re-scored by the configured selector:
 
 - Input: `(query, chunk_text)` pairs
-- Eval-quality default: `reranker_backend=qwen3` using `Qwen/Qwen3-Reranker-0.6B`
-- Latency-sensitive fallback: `reranker_backend=minilm` using `cross-encoder/ms-marco-MiniLM-L-6-v2`
-- Output: relevance score per pair
+- Eval/host default (ADR-021): `reranker_backend=bedrock` via the Bedrock Rerank API (`amazon.rerank-v1:0`,
+  us-west-2, ~0.8s/query, quota-capped 2 calls/min → paced 31s apart)
+- Serving pin: `reranker_backend=minilm` using `cross-encoder/ms-marco-MiniLM-L-6-v2` (compose, cloud compose,
+  Fargate — the quota makes bedrock unservable for interactive traffic)
+- Research arm: `reranker_backend=qwen3` using `Qwen/Qwen3-Reranker-0.6B` (prior eval default, ADR-016; GPU-only)
+- Output: relevance score per pair (bedrock scores are uncalibrated — ordering only)
 - Top `rerank_top_n` (default: 8) form the post-rerank/pre-parent-expansion list used by answer gates
 - Parent expansion and consolidated dedup then produce the final selected generation/inspection context
 

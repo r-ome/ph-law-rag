@@ -116,9 +116,9 @@ sequenceDiagram
 - Bedrock Titan v2 replaces Ollama for runtime embeddings.
 - Generation stays on the first-party Anthropic API because the `generate()`
   seam already routes `claude*` models there and has been evaluated on Haiku 4.5.
-- The deployed API pins `reranker_backend=minilm`. Qwen3 remains the offline
-  eval-quality default, but it is too slow and memory-heavy for CPU-only
-  Docker/Fargate serving.
+- The deployed API pins `reranker_backend=minilm`. Bedrock Rerank is the
+  eval/host default (ADR-021) but its 2-calls/min non-adjustable quota makes
+  it unservable for interactive traffic; qwen3 is a GPU-only research arm.
 - SQLite and BM25 are prebuilt artifacts for the first deploy.
 - Conversation history can be ephemeral for v1; move it to durable storage later
   if persistence becomes important.

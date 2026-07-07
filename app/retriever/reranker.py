@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 
 _model: CrossEncoder | None = None
 _qwen = None
+_bedrock_client = None
 
 # Per-call scoring latency (ms), appended by rerank(). The eval runner reads this to
 # report selector cost alongside answer timing — the Qwen3 ship decision is gated on it.
@@ -97,6 +98,66 @@ def _get_qwen() -> _QwenYesNoReranker:
     return _qwen
 
 
+def _get_bedrock_client():
+    global _bedrock_client
+    if _bedrock_client is None:
+        import boto3  # lazy: only the bedrock backend needs boto3 at runtime
+        from botocore.config import Config
+
+        # Adaptive client-side rate limiting: the Rerank API throttled back-to-back
+        # calls at default retry settings (preflight 2026-07-07, 4 retries exhausted).
+        _bedrock_client = boto3.client(
+            "bedrock-agent-runtime",
+            region_name=settings.bedrock_rerank_region,
+            config=Config(retries={"max_attempts": 10, "mode": "adaptive"}),
+        )
+    return _bedrock_client
+
+
+# amazon.rerank-v1 is quota-capped at 2 requests/MINUTE in this account (non-adjustable;
+# verified via service-quotas 2026-07-07). Pace calls to stay under it — botocore's
+# adaptive mode assumes per-second limits and exhausts its retries against this quota.
+_BEDROCK_MIN_INTERVAL_S = 31.0
+_bedrock_last_call = 0.0
+
+
+def _bedrock_scores(query_text: str, texts: list[str]) -> list[float]:
+    """Bedrock Rerank API scores: uncalibrated relevance floats, ordering only."""
+    global _bedrock_last_call
+    wait = _BEDROCK_MIN_INTERVAL_S - (time.monotonic() - _bedrock_last_call)
+    if wait > 0:
+        time.sleep(wait)
+    _bedrock_last_call = time.monotonic()
+    resp = _get_bedrock_client().rerank(
+        queries=[{"type": "TEXT", "textQuery": {"text": query_text}}],
+        sources=[
+            {
+                "type": "INLINE",
+                "inlineDocumentSource": {"type": "TEXT", "textDocument": {"text": t}},
+            }
+            for t in texts
+        ],
+        rerankingConfiguration={
+            "type": "BEDROCK_RERANKING_MODEL",
+            "bedrockRerankingConfiguration": {
+                "modelConfiguration": {
+                    "modelArn": (
+                        f"arn:aws:bedrock:{settings.bedrock_rerank_region}"
+                        f"::foundation-model/{settings.bedrock_rerank_model}"
+                    )
+                },
+                # A score for every candidate, not just the eventual top-n: the trim
+                # below stays backend-agnostic. Pool (~30-40) is under the 100 limit.
+                "numberOfResults": len(texts),
+            },
+        },
+    )
+    scores = [0.0] * len(texts)
+    for item in resp["results"]:
+        scores[item["index"]] = float(item["relevanceScore"])
+    return scores
+
+
 def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalResult]:
     if not results:
         return []
@@ -104,6 +165,8 @@ def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalRes
     start = time.perf_counter()
     if settings.reranker_backend == "qwen3":
         scores = _get_qwen().score(query_text, [r.text for r in results])
+    elif settings.reranker_backend == "bedrock":
+        scores = _bedrock_scores(query_text, [r.text for r in results])
     else:
         model = _get_model()
         scores = model.predict([(query_text, r.text) for r in results])
@@ -115,10 +178,11 @@ def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalRes
 
     results.sort(key=lambda r: r.score, reverse=True)
 
-    if settings.reranker_backend == "qwen3":
-        # Plain top-8: rerank_score_margin is calibrated to MiniLM logit spread and would
-        # keep the entire pool against [0,1] probabilities (see config comment). A [0,1]
-        # probability floor is the native replacement if trimming proves needed — backlog.
+    if settings.reranker_backend in ("qwen3", "bedrock"):
+        # Plain top-8: rerank_score_margin is calibrated to MiniLM logit spread and does
+        # not transfer — qwen3 emits [0,1] probabilities, bedrock uncalibrated relevance
+        # floats (ordering only; no probability semantics). A native floor per backend
+        # is the replacement if trimming proves needed — backlog.
         kept = results[: settings.rerank_top_n]
         logger.debug(
             "rerank_completed",

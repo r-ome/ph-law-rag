@@ -77,13 +77,21 @@ class Settings(BaseSettings):
 	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"
 	reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-	# Selector backend default (graduated 2026-07-03): Qwen3 at dense_top_k=30 fixed felony
-	# Art 3 + sale Art 1475 without workset regressions. "qwen3" scores via yes/no-token
-	# causal-LM path and takes plain top-8 — rerank_score_margin does NOT apply there (it is
-	# calibrated to MiniLM logit spread; Qwen3 emits [0,1] probabilities, margin 6.0 would keep
-	# the whole pool). MiniLM remains available for latency-sensitive serving.
-	reranker_backend: Literal["minilm", "qwen3"] = "qwen3"
+	# Selector backend default (graduated 2026-07-07, ADR-021): Bedrock Rerank API,
+	# serverless per-call. Matched qwen3 retrieval quality in the judged A/B (prec +.023,
+	# faith/recall within noise) at ~0.8s/query vs qwen3's ~6.5s MPS. Scores are
+	# uncalibrated relevance floats — ordering only, nothing like qwen3's P(yes)
+	# probabilities; takes plain top-8, rerank_score_margin does not apply.
+	# CAVEAT: amazon.rerank-v1 is quota-capped at 2 calls/min (non-adjustable) — calls are
+	# paced 31s apart, so serving surfaces pin "minilm" instead (compose/cloud/infra).
+	# "qwen3" (prior default, ADR-016) is kept as a research arm; same top-8 semantics,
+	# [0,1] P(yes) scores, needs MPS + empty_cache per call.
+	reranker_backend: Literal["minilm", "qwen3", "bedrock"] = "bedrock"
 	qwen3_reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
+	bedrock_rerank_model: str = "amazon.rerank-v1:0"
+	# Rerank models are not served in us-east-1; only the rerank client points here —
+	# the rest of the stack stays on aws_region.
+	bedrock_rerank_region: str = "us-west-2"
 	consolidated_dedup_enabled: bool = True
 	debug: bool = False
 	log_dir: str = "data/logs"

@@ -28,6 +28,12 @@ pytestmark = [
     )
 ]
 
+@pytest.fixture(autouse=True)
+def _local_reranker(monkeypatch):
+    # These tests verify pipeline mechanics against the local stack; the bedrock
+    # default (ADR-021) needs AWS credentials and paces calls 31s apart.
+    monkeypatch.setattr(settings, "reranker_backend", "minilm")
+
 def test_in_corpus_questions_returns_grounded_answer():
     query = "What are the requisites of a valid contract under the Civil Code?"
     resp = answer(query)

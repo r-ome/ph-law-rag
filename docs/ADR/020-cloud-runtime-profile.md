@@ -32,7 +32,7 @@ Use a distinct cloud runtime profile for serving:
 - Vectors: Qdrant Cloud with authenticated `qdrant_url` and `qdrant_api_key`.
 - Sparse/metadata stores: prebuilt SQLite and BM25 artifacts baked into the image as seed artifacts.
 - Runtime: one Docker image with separate FastAPI and Streamlit entrypoints on ECS Fargate, fronted by an ALB to the UI only; API traffic stays internal through Service Connect.
-- Reranker: cloud serving pins `reranker_backend=minilm`; Qwen3 remains the host/eval-quality default until a managed reranker, GPU endpoint, quantized CPU path, or MiniLM-matched eval baseline replaces that split.
+- Reranker: cloud serving pins `reranker_backend=minilm`; the managed-reranker option landed as ADR-021 (Bedrock Rerank is the host/eval default, quota-bound out of serving; Qwen3 retired to a research arm).
 - Optional local-model side paths are disabled in the cloud gate: query rewriting, answerability gate, faithfulness self-check, and query decomposition.
 - Trace persistence is disabled for cloud serving by default because local JSONL traces can include legal questions and chunk previews.
 

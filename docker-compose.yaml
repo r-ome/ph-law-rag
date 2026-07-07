@@ -22,8 +22,8 @@ services:
     environment:
       qdrant_url: http://qdrant:6333
       ollama_base_url: http://host.docker.internal:11434
-      # Serving pins MiniLM; qwen3 (the config default) is eval-only — no GPU in
-      # containers, so it OOMs or takes minutes per query. See ADR-016.
+      # Serving pins MiniLM; bedrock (the config default) is quota-capped at
+      # 2 calls/min, qwen3 needs a GPU. See ADR-021 / ADR-016.
       reranker_backend: minilm
     volumes:
       - ./data:/app/data

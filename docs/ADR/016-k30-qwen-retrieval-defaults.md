@@ -53,3 +53,8 @@ generator-side results (Haiku faithfulness) transfer, since contexts are judged 
 Closing the gap means a third `reranker_backend` (managed rerank API — Bedrock/Cohere/Jina/
 Voyage), a GPU endpoint, quantized qwen3 on CPU, or matching eval down to MiniLM; that choice
 is still open.
+
+**Resolved by ADR-021 (2026-07-07):** the managed-API option won. `reranker_backend=bedrock`
+is the eval/host default (qwen3-class quality, judged A/B); qwen3 is retired to a research
+arm. Serving still pins MiniLM — the Rerank API's 2-calls/min non-adjustable quota makes it
+unservable — so the split persists but is now quota-bound, not quality-bound.
