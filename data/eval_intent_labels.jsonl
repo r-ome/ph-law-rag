@@ -1,0 +1,81 @@
+{"question": "Under the 1987 Constitution, who is not entitled to bail before conviction?", "intent": "default"}
+{"question": "What are the grounds for impeachment under the 1987 Constitution?", "intent": "list_or_rule_synthesis"}
+{"question": "What does the 1987 Constitution require before a search warrant may be issued?", "intent": "default"}
+{"question": "Does the 1987 Constitution protect a person from being forced to testify against himself?", "intent": "default"}
+{"question": "How long is the President's term under the 1987 Constitution and may the President be reelected?", "intent": "default"}
+{"question": "How many Senators make up the Senate under the 1987 Constitution?", "intent": "default"}
+{"question": "How does the Revised Penal Code define a felony?", "intent": "default"}
+{"question": "When does conspiracy exist under the Revised Penal Code?", "intent": "default"}
+{"question": "What are the requisites of self-defense as a justifying circumstance under the Revised Penal Code?", "intent": "list_or_rule_synthesis"}
+{"question": "What is estafa by false pretenses under the Revised Penal Code?", "intent": "list_or_rule_synthesis"}
+{"question": "What are the essential requisites of a valid marriage under the Family Code?", "intent": "list_or_rule_synthesis"}
+{"question": "Under the Family Code, is a marriage where one party is below 18 years old void?", "intent": "default"}
+{"question": "On what grounds may a marriage be annulled under Philippine law?", "intent": "list_or_rule_synthesis"}
+{"question": "What is a contract of sale under the Civil Code?", "intent": "default"}
+{"question": "When is a contract of sale perfected under the Civil Code?", "intent": "default"}
+{"question": "What are the essential requisites of a valid contract under the Civil Code?", "intent": "list_or_rule_synthesis"}
+{"question": "What are the sources of obligations under the Civil Code?", "intent": "list_or_rule_synthesis"}
+{"question": "How long does a party have to file an action upon a written contract under the Civil Code?", "intent": "default"}
+{"question": "What inventions are patentable under the Intellectual Property Code?", "intent": "list_or_rule_synthesis"}
+{"question": "How is consent of the data subject defined under the Data Privacy Act?", "intent": "default"}
+{"question": "What rights does a data subject have under the Data Privacy Act?", "intent": "list_or_rule_synthesis"}
+{"question": "How are crimes under the Revised Penal Code penalized when committed through information and communications technology?", "intent": "default"}
+{"question": "What is a protection order under the Anti-VAWC Act?", "intent": "default"}
+{"question": "What is the penalty for possession of dangerous drugs under RA 9165?", "intent": "citation_lookup"}
+{"question": "What penalty does RA 9165 impose for the sale of dangerous drugs?", "intent": "citation_lookup"}
+{"question": "Have the property values used to determine penalties under the Revised Penal Code been updated, and by what law?", "intent": "amendment_or_current_law"}
+{"question": "Who must be present during the inventory and photographing of seized dangerous drugs under current law?", "intent": "amendment_or_current_law"}
+{"question": "What is the penalty for issuing a bouncing check under BP 22?", "intent": "citation_lookup"}
+{"question": "Who may apply for a homestead under the Public Land Act?", "intent": "list_or_rule_synthesis"}
+{"question": "When is employment considered regular under the Labor Code?", "intent": "default"}
+{"question": "What are the just causes for which an employer may terminate an employee under the Labor Code?", "intent": "list_or_rule_synthesis"}
+{"question": "What civil cases fall under the exclusive original jurisdiction of the Regional Trial Courts?", "intent": "list_or_rule_synthesis"}
+{"question": "What is Alternative Dispute Resolution under RA 9285?", "intent": "citation_lookup"}
+{"question": "If someone bounces a check, can they actually go to jail for it?", "intent": "default"}
+{"question": "Who can be removed from office through impeachment in the Philippines?", "intent": "default"}
+{"question": "Can the police search my house without a warrant?", "intent": "default"}
+{"question": "Can my employer fire me just for stealing from the company?", "intent": "default"}
+{"question": "When I buy something, at what point is the sale actually a done deal?", "intent": "default"}
+{"question": "What can happen to me if I'm caught holding illegal drugs?", "intent": "default"}
+{"question": "Can a Philippine president run for the office again after serving a term?", "intent": "default"}
+{"question": "If a couple was tricked into getting married, can the marriage be undone?", "intent": "default"}
+{"question": "Is libel posted online treated the same as ordinary libel, and is the penalty the same?", "intent": "default"}
+{"question": "Can conspiring to sell illegal drugs be punished even if no sale actually took place?", "intent": "default"}
+{"question": "Can an obligation to pay arise from a crime, and where is that recognized in the Civil Code?", "intent": "default"}
+{"question": "During a cybercrime investigation, can a suspect be compelled to give self-incriminating testimony?", "intent": "default"}
+{"question": "For a dispute over a written contract worth several million pesos, which court has jurisdiction and how long is there to sue?", "intent": "default"}
+{"question": "Could parties resolve a civil contract dispute without going to trial in court?", "intent": "default"}
+{"question": "Is a marriage of a 17-year-old void or merely voidable, even if the parents consented?", "intent": "default"}
+{"question": "What is the difference between the essential and formal requisites of marriage, and what happens if a formal requisite is missing?", "intent": "list_or_rule_synthesis"}
+{"question": "How is the penalty for theft determined under the Revised Penal Code today, and how has that changed?", "intent": "amendment_or_current_law"}
+{"question": "What are the chain-of-custody requirements for seized drugs, and how were they relaxed from the original Comprehensive Dangerous Drugs Act?", "intent": "amendment_or_current_law"}
+{"question": "If I stop paying for a car I bought on installment, can I get back what I already paid?", "intent": "default"}
+{"question": "Is a purely verbal agreement to sell a parcel of land valid in the Philippines?", "intent": "default"}
+{"question": "A 19-year-old marries without telling her parents — is the marriage automatically void?", "intent": "default"}
+{"question": "Someone threatened me online — is that automatically a cybercrime with a higher penalty?", "intent": "default"}
+{"question": "I lent money to a friend with only a verbal agreement — do I still have ten years to sue?", "intent": "default"}
+{"question": "Can a person charged with a crime punishable by life imprisonment always post bail?", "intent": "default"}
+{"question": "What is the current daily minimum wage for workers in Metro Manila?", "intent": "out_of_scope"}
+{"question": "What is the income tax rate for individual taxpayers in the Philippines?", "intent": "out_of_scope"}
+{"question": "What are the requirements to incorporate a stock corporation in the Philippines?", "intent": "out_of_scope"}
+{"question": "How is the estate tax on an inheritance computed in the Philippines?", "intent": "out_of_scope"}
+{"question": "How many days does a defendant have to file an Answer to a complaint in a civil case?", "intent": "out_of_scope"}
+{"question": "What are the requirements to register a political party with the COMELEC?", "intent": "out_of_scope"}
+{"question": "How is the SSS retirement pension benefit computed?", "intent": "out_of_scope"}
+{"question": "What customs duties apply to an imported motor vehicle?", "intent": "out_of_scope"}
+{"question": "What are the requirements for a Philippine citizen to obtain a US tourist visa?", "intent": "out_of_scope"}
+{"question": "What are the zoning and building permit requirements for constructing a house in Quezon City?", "intent": "out_of_scope"}
+{"question": "What are the registration requirements for a public offering of securities in the Philippines?", "intent": "out_of_scope"}
+{"question": "Is it illegal to secretly record a private telephone conversation in the Philippines?", "intent": "out_of_scope"}
+{"question": "In Oposa v. Factoran, did the Supreme Court allow minors to sue on behalf of future generations?", "intent": "default"}
+{"question": "What age threshold did RA 11648 set for statutory rape in the Philippines, even without force or intimidation?", "intent": "amendment_or_current_law"}
+{"question": "Is there an exception to statutory rape when the offender and the minor are close in age?", "intent": "amendment_or_current_law"}
+{"question": "My cousin is 15 and her boyfriend is 17 — if they sleep together, is he committing statutory rape?", "intent": "amendment_or_current_law"}
+{"question": "How did the Anti-Rape Law of 1997 change the treatment of rape under the Revised Penal Code?", "intent": "amendment_or_current_law"}
+{"question": "If a husband is charged with raping his wife, what is the effect of the wife's subsequent forgiveness?", "intent": "default"}
+{"question": "Is rape still prosecuted under Article 335 of the Revised Penal Code?", "intent": "amendment_or_current_law"}
+{"question": "Several provisions of the Revised Penal Code still prescribe the death penalty. Can Philippine courts impose it, and what penalty is imposed instead?", "intent": "amendment_or_current_law"}
+{"question": "Is a person whose death sentence was reduced to reclusion perpetua eligible for parole?", "intent": "amendment_or_current_law"}
+{"question": "Does Philippine law punish attempted trafficking in persons, and what constitutes it?", "intent": "list_or_rule_synthesis"}
+{"question": "Is trafficking in persons committed during a pandemic or other public emergency treated more severely?", "intent": "amendment_or_current_law"}
+{"question": "Can a defendant who appealed their conviction still apply for probation?", "intent": "amendment_or_current_law"}

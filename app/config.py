@@ -102,6 +102,7 @@ class Settings(BaseSettings):
 	trace_logging_enabled: bool = True
 	trace_max_text_preview: int = 200
 	eval_dataset_path: str = "data/eval_dataset.jsonl"
+	eval_intent_labels_path: str = "data/eval_intent_labels.jsonl"
 	eval_results_dir: str = "data/eval_results"
 	eval_run_label: str = ""  # optional A/B tag baked into eval output filenames
 	ragas_score_cache_path: str = "data/eval_results/ragas_score_cache.sqlite"
