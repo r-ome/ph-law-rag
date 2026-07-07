@@ -11,12 +11,17 @@ the operative-first order is preserved when parents expand.
 """
 
 from app.config import settings
+from app.retriever.strategy import RetrievalKnobs
 from app.retriever.types import RetrievalResult
 from app.retriever.supersession import load_supersessions, provision_matches
 
 
-def prefer_operative(results: list[RetrievalResult]) -> list[RetrievalResult]:
-    if not settings.prefer_operative_enabled or not results:
+def prefer_operative(
+    results: list[RetrievalResult],
+    knobs: RetrievalKnobs | None = None,
+) -> list[RetrievalResult]:
+    enabled = knobs.prefer_operative_enabled if knobs else settings.prefer_operative_enabled
+    if not enabled or not results:
         return results
     rules = load_supersessions()
     if not rules:

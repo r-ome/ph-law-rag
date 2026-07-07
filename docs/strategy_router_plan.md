@@ -92,6 +92,18 @@ Refactor before router: strategies must be deterministic and testable before the
 4. Trace gains the resolved-strategy block (rule 6).
 5. Tests, including the zero-behavior-change proof: the `default` preset resolves to exactly today's effective settings.
 
+**Binding build notes (review 2026-07-07):**
+
+1. **`RetrievalKnobs` owns seven fields:** `dense_top_k`, `sparse_top_k`, `rerank_top_n`, `parent_expansion_enabled`, `prefer_operative_enabled`, `retrieval_operative_only`, `consolidated_dedup_enabled`. The last two are rule 5's "consolidated/operative controls" and are exactly what an R3 `current_law` preset would vary. `sparse_overfetch_k`, `parent_expansion_min_children/max_chars`, and `edge_expansion_enabled` stay Settings-owned (tuning constants / not named by rule 5; promote later if a preset needs them).
+2. **`default` resolves by pass-through to `Settings`** — the Settings-backed baseline lane. Pinned code values would break the zero-change proof and the env-sweep eval workflow; pinning is for non-default presets after R3 proves a diff.
+3. **Thread knobs through every rerank/retrieval path, including the leaks:** `expand_with_edges` re-calls `rerank()` (reads `settings.rerank_top_n`; edge expansion is on by default) and `packaged_retrieve` reads it too — both take knobs even though subquery packaging is off. `retrieval_operative_only` flows into **both** dense and sparse paths; passing it into the operative filter in `app/indexing/vector_store.py` as a `bool | None = None` parameter is fine despite the package boundary.
+4. **Single-resolver rule:** routed strategy execution never reads preset-owned settings directly. Leaf `None`→settings fallbacks remain for legacy/non-routed callers only; tests must prove the routed path passes concrete knobs all the way down.
+5. **`Strategy.execute(standalone_question) -> SelectionResult`**, not a bare context list — `answer_service` gates on `pre_expansion` and builds from `selected`, and the trace records all three stages.
+6. **Trace: add `retrieval_strategy: {strategy, knobs}` from the resolver; drop the preset-owned knob lines from `_feature_flags()`** (resolved knobs get exactly one trace source). Keep the trimmed runtime block for non-preset facts (reranker backend, answerability, edge/subquery/generator toggles, `min_chunks_for_answer`).
+7. **Circular-import guard:** if `context_selection` takes a `RetrievalKnobs` parameter while the default strategy calls `select_context`, keep the strategy's `select_context` import inside `execute()` (or `TYPE_CHECKING` for `SelectionResult`).
+
+**Required tests:** default resolver equals current settings field-by-field; a pinned fake preset beats monkeypatched settings through the full `select_context()` path; edge-expansion rerank uses resolved `rerank_top_n`, not settings; packaged retrieval uses resolved knobs when `subquery_packaging_enabled=True`; trace contains `retrieval_strategy.strategy == "default"` with exact resolved knobs (including greeting/no-retrieval queries if traces are written for them).
+
 **Done when:** every query runs through the `default` preset; eval preflight shows zero diff vs pre-refactor; resolved knobs visible in every trace.
 
 ### R3 — Trace-first preset candidates ($0)

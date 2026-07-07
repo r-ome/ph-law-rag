@@ -3,6 +3,7 @@ from app.retriever.dense_retriever import dense_retriever
 from app.retriever.sparse_retriever import sparse_retriever
 from app.retriever.query_planner import plan_queries
 from app.observability.logger import get_logger
+from app.retriever.strategy import RetrievalKnobs
 
 logger = get_logger(__name__)
 
@@ -21,14 +22,17 @@ def _fuse(ranked_lists: list[list[RetrievalResult]]) -> list[RetrievalResult]:
         retrieved.score = scores[retrieved.chunk_id]
     return fused
 
-def hybrid_retriever (query_text: str) -> list[RetrievalResult]:
+def hybrid_retriever(
+    query_text: str,
+    knobs: RetrievalKnobs | None = None,
+) -> list[RetrievalResult]:
     subqueries = plan_queries(query_text)
     
     ranked_lists: list[list[RetrievalResult]] = []
     
     for subquery in subqueries:
-        dense = dense_retriever(subquery)
-        sparse = sparse_retriever(subquery)
+        dense = dense_retriever(subquery, knobs=knobs)
+        sparse = sparse_retriever(subquery, knobs=knobs)
         logger.debug(
             "hybrid_subquery_retrieved",
             subquery=subquery,

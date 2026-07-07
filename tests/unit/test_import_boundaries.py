@@ -70,3 +70,12 @@ def test_api_and_ui_import_only_allowed_app_prefixes():
 				assert any(_matches(module, prefix) for prefix in allowed), (
 					f"{path.relative_to(ROOT)} imports forbidden module {module}"
 				)
+
+
+def test_retriever_strategy_does_not_import_downstream_layers():
+	path = ROOT / "app" / "retriever" / "strategy.py"
+	for module in _imports(path):
+		assert not any(
+			_matches(module, prefix)
+			for prefix in ("app.api", "app.ui", "app.evals", "app.ingestion", "app.indexing")
+		), f"{path.relative_to(ROOT)} imports forbidden module {module}"

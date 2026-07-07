@@ -114,17 +114,25 @@ def set_chunk_payload(client: QdrantClient, chunk_id: str, payload_fields: dict)
 		wait=True,
 	)
 
-def operative_filter(source_id: str | None = None) -> Filter | None:
+def operative_filter(
+	source_id: str | None = None,
+	retrieval_operative_only: bool | None = None,
+) -> Filter | None:
 	must = (
 		[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
 		if source_id else []
+	)
+	operative_only = (
+		settings.retrieval_operative_only
+		if retrieval_operative_only is None
+		else retrieval_operative_only
 	)
 	# fail-open: only chunks explicitly marked operability_action="hide" are excluded
 	# (chunks lacking the field — e.g. pre-reindex — are kept). operability_action is the sole
 	# retrieval switch; it is derived from doc status by default and overridden per provision.
 	must_not = (
 		[FieldCondition(key="operability_action", match=MatchValue(value="hide"))]
-		if settings.retrieval_operative_only else []
+		if operative_only else []
 	)
 
 	if not must and not must_not:

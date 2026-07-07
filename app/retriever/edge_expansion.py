@@ -3,8 +3,13 @@ from app.retriever.edges import neighbors
 from app.retriever.dense_retriever import dense_retriever
 from app.retriever.reranker import rerank
 from app.config import settings
+from app.retriever.strategy import RetrievalKnobs
 
-def expand_with_edges(question: str, seed: list[RetrievalResult]) -> list[RetrievalResult]:
+def expand_with_edges(
+    question: str,
+    seed: list[RetrievalResult],
+    knobs: RetrievalKnobs | None = None,
+) -> list[RetrievalResult]:
     if not seed:
         return seed
 
@@ -25,13 +30,18 @@ def expand_with_edges(question: str, seed: list[RetrievalResult]) -> list[Retrie
 
     extra: list[RetrievalResult] = []
     for nbr, label in targets.items():
-        for r in dense_retriever(question, source_id=nbr, top_k=settings.edge_hop_top_k):
+        for r in dense_retriever(
+            question,
+            source_id=nbr,
+            top_k=settings.edge_hop_top_k,
+            knobs=knobs,
+        ):
             r.metadata["_edge_relation"] = label
             extra.append(r)
     if not extra:
         return seed
 
-    return rerank(question, _dedup(seed + extra))
+    return rerank(question, _dedup(seed + extra), knobs=knobs)
 
 def _dedup(results: list[RetrievalResult]) -> list[RetrievalResult]:
     seen: set[str] = set()
@@ -41,4 +51,3 @@ def _dedup(results: list[RetrievalResult]) -> list[RetrievalResult]:
             seen.add(r.chunk_id)
             out.append(r)
     return out
-    

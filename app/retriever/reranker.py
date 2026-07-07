@@ -4,6 +4,7 @@ from sentence_transformers import CrossEncoder
 from app.retriever.types import RetrievalResult
 from app.config import settings
 from app.observability.logger import get_logger
+from app.retriever.strategy import RetrievalKnobs
 
 logger = get_logger(__name__)
 
@@ -158,9 +159,14 @@ def _bedrock_scores(query_text: str, texts: list[str]) -> list[float]:
     return scores
 
 
-def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalResult]:
+def rerank(
+    query_text: str,
+    results: list[RetrievalResult],
+    knobs: RetrievalKnobs | None = None,
+) -> list[RetrievalResult]:
     if not results:
         return []
+    top_n = knobs.rerank_top_n if knobs else settings.rerank_top_n
 
     start = time.perf_counter()
     if settings.reranker_backend == "qwen3":
@@ -183,7 +189,7 @@ def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalRes
         # not transfer — qwen3 emits [0,1] probabilities, bedrock uncalibrated relevance
         # floats (ordering only; no probability semantics). A native floor per backend
         # is the replacement if trimming proves needed — backlog.
-        kept = results[: settings.rerank_top_n]
+        kept = results[:top_n]
         logger.debug(
             "rerank_completed",
             backend=settings.reranker_backend,
@@ -196,7 +202,7 @@ def rerank(query_text: str, results: list[RetrievalResult]) -> list[RetrievalRes
 
     top = results[0].score
     kept = [r for r in results if r.score >= top - settings.rerank_score_margin]
-    kept = kept[: settings.rerank_top_n]
+    kept = kept[:top_n]
     logger.debug(
         "rerank_completed",
         backend=settings.reranker_backend,

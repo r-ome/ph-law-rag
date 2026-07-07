@@ -14,6 +14,7 @@ retrieved (truncating legal provisions is the bug this whole track exists to fix
 from collections import Counter
 
 from app.config import settings
+from app.retriever.strategy import RetrievalKnobs
 from app.retriever.types import RetrievalResult
 
 
@@ -67,8 +68,12 @@ def _parent_result(row: dict, child_count: int, score: float, child_meta: dict) 
     )
 
 
-def expand_parents(results: list[RetrievalResult]) -> list[RetrievalResult]:
-    if not settings.parent_expansion_enabled:
+def expand_parents(
+    results: list[RetrievalResult],
+    knobs: RetrievalKnobs | None = None,
+) -> list[RetrievalResult]:
+    enabled = knobs.parent_expansion_enabled if knobs else settings.parent_expansion_enabled
+    if not enabled:
         return results
 
     # parent_has_hidden_leaves means the parent text contains leaves hidden by a

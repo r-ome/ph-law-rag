@@ -9,7 +9,8 @@ from app.retriever.prompts import (
 from app.retriever.llm_client import generate, LLMError
 from app.retriever.types import RetrievalResult
 from app.retriever.answerability import is_answerable
-from app.retriever.context_selection import SelectionResult, select_context
+from app.retriever.context_selection import SelectionResult
+from app.retriever.strategy import STRATEGIES, RetrievalKnobs, resolve_knobs
 from app.config import settings
 from app.observability.context import TraceCollector, new_trace_id, trace_context
 from app.observability.logger import get_logger
@@ -59,10 +60,6 @@ def _feature_flags() -> dict:
     return {
         "debug": settings.debug,
         "trace_logging_enabled": settings.trace_logging_enabled,
-        "retrieval_operative_only": settings.retrieval_operative_only,
-        "parent_expansion_enabled": settings.parent_expansion_enabled,
-        "prefer_operative_enabled": settings.prefer_operative_enabled,
-        "consolidated_dedup_enabled": settings.consolidated_dedup_enabled,
         "edge_expansion_enabled": settings.edge_expansion_enabled,
         "answerability_gate_enabled": settings.answerability_gate_enabled,
         "query_decomposition_enabled": settings.query_decomposition_enabled,
@@ -71,9 +68,6 @@ def _feature_flags() -> dict:
         "faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
         "later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
         "reranker_backend": settings.reranker_backend,
-        "dense_top_k": settings.dense_top_k,
-        "sparse_top_k": settings.sparse_top_k,
-        "rerank_top_n": settings.rerank_top_n,
         "min_chunks_for_answer": settings.min_chunks_for_answer,
     }
 
@@ -90,6 +84,8 @@ def _build_trace_record(
     prompt: str | None,
     collector: TraceCollector | None,
     elapsed_ms: float,
+    strategy_name: str,
+    strategy_knobs: RetrievalKnobs,
 ) -> dict:
     preview_chars = settings.trace_max_text_preview
     return {
@@ -107,6 +103,10 @@ def _build_trace_record(
         "retrieved_chunks": [_chunk_trace(r, preview_chars) for r in selection.retrieved],
         "pre_expansion_chunks": [_chunk_trace(r, preview_chars) for r in selection.pre_expansion],
         "selected_chunks": [_chunk_trace(r, preview_chars) for r in selection.selected],
+        "retrieval_strategy": {
+            "strategy": strategy_name,
+            "knobs": strategy_knobs.as_trace_dict(),
+        },
         "feature_flags": _feature_flags(),
         "abstained": response.get("abstained", False),
         "error": response.get("error", False),
@@ -143,8 +143,13 @@ def _package(
     return response
 
 
-def _run_pipeline(question: str, debug_enabled: bool) -> tuple[dict, SelectionResult, str | None]:
-    selection = select_context(question)
+def _run_pipeline(
+    question: str,
+    debug_enabled: bool,
+    strategy_name: str,
+    strategy_knobs: RetrievalKnobs,
+) -> tuple[dict, SelectionResult, str | None]:
+    selection = STRATEGIES[strategy_name].execute(question, knobs=strategy_knobs)
 
     if len(selection.pre_expansion) < settings.min_chunks_for_answer:
         return _package(
@@ -227,6 +232,8 @@ def answer(
     effective_question = question
     prompt: str | None = None
     selection = SelectionResult(retrieved=[], pre_expansion=[], selected=[])
+    strategy_name = "default"
+    strategy_knobs = resolve_knobs(strategy_name)
 
     with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):
         logger.info("answer_started", trace_label=trace_label)
@@ -253,7 +260,12 @@ def answer(
                 from app.conversation.query_rewriter import rewrite_query
                 history = get_history(session_id, settings.max_conversation_turns)
                 effective_question = rewrite_query(question, history)
-            response, selection, prompt = _run_pipeline(effective_question, debug_enabled)
+            response, selection, prompt = _run_pipeline(
+                effective_question,
+                debug_enabled,
+                strategy_name,
+                strategy_knobs,
+            )
 
         if session_id:
             import json
@@ -288,6 +300,8 @@ def answer(
                     prompt=prompt,
                     collector=collector,
                     elapsed_ms=elapsed_ms,
+                    strategy_name=strategy_name,
+                    strategy_knobs=strategy_knobs,
                 )
             )
         return response

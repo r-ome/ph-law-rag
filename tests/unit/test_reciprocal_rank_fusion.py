@@ -8,8 +8,8 @@ def _result(chunk_id: str) -> RetrievalResult:
     return RetrievalResult(chunk_id=chunk_id,text=f"text-{chunk_id}", score=0.0, metadata={})
 
 def _patch(monkeypatch, dense, sparse):
-    monkeypatch.setattr(hr, "dense_retriever", lambda _q:dense)
-    monkeypatch.setattr(hr, "sparse_retriever", lambda _q:sparse)
+    monkeypatch.setattr(hr, "dense_retriever", lambda _q, knobs=None: dense)
+    monkeypatch.setattr(hr, "sparse_retriever", lambda _q, knobs=None: sparse)
     
 pytestmark = pytest.mark.unit
 

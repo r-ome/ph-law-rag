@@ -24,10 +24,10 @@ def test_select_context_exposes_pre_expansion_for_gates_and_selected_for_generat
 	expanded = [_r("expanded", expanded_from_parent=True)]
 	deduped = [_r("selected", expanded_from_parent=True)]
 
-	monkeypatch.setattr("app.retriever.context_selection.hybrid_retriever", lambda question: raw)
-	monkeypatch.setattr("app.retriever.context_selection.rerank", lambda question, results: reranked)
-	monkeypatch.setattr("app.retriever.context_selection.expand_with_edges", lambda question, results: results)
-	monkeypatch.setattr("app.retriever.parent_expansion.expand_parents", lambda results: expanded)
+	monkeypatch.setattr("app.retriever.context_selection.hybrid_retriever", lambda question, knobs=None: raw)
+	monkeypatch.setattr("app.retriever.context_selection.rerank", lambda question, results, knobs=None: reranked)
+	monkeypatch.setattr("app.retriever.context_selection.expand_with_edges", lambda question, results, knobs=None: results)
+	monkeypatch.setattr("app.retriever.parent_expansion.expand_parents", lambda results, knobs=None: expanded)
 	monkeypatch.setattr("app.retriever.dedup.dedup_results", lambda results: deduped)
 
 	selection = select_context("question")
