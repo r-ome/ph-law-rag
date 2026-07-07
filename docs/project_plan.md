@@ -360,7 +360,7 @@ Goal: interactive UI works; API is usable.
 
 Build:
 
-- `app/ui/app.py` — Streamlit chat interface:
+- `app/ui/home.py` — Streamlit chat interface:
   - Query input with submit
   - Answer display with inline citation links
   - Sidebar: model selector, top-k slider, debug toggle
@@ -475,6 +475,8 @@ and is documented separately in [`docs/aws_deployment_diagram.md`](aws_deploymen
 - **Vectors** → Qdrant Cloud (collection `ph_law-titan1024`); SQLite + BM25 baked into the image as seed artifacts.
 - **Runtime** → one image, two entrypoints (FastAPI `api` + Streamlit `ui`) on Fargate behind an ALB; secrets via
   Secrets Manager / task role, never baked.
+- **Serving reranker** → `reranker_backend=minilm`; Qwen3 remains the eval-quality local default but is not viable on
+  CPU-only Docker/Fargate serving.
 - **Local cloud-smoke** → `docker compose -f docker-compose.cloud.yaml up --build` with
   `RAGLAB_ENV_FILE=.env.cloud-gate` and AWS creds mounted.
 
@@ -932,7 +934,7 @@ raglab sync
 raglab ask "What are the elements of a valid contract under the Civil Code?"
 
 # 8. Run Streamlit
-streamlit run app/ui/app.py
+streamlit run app/ui/home.py
 
 # 9. Run evals
 raglab eval
@@ -984,7 +986,7 @@ enable_query_rewriting: bool = True   # toggle rewriting off for debugging
 - `answer_service.py` — accept optional `session_id: str | None`; if provided, load history, rewrite query, run pipeline on rewritten query, persist turn to `conversation_turns`
 - `app/cli/main.py` — `raglab ask` gains `--session TEXT` option; if omitted, creates a new session each invocation (stateless); if provided, loads and continues that session
 - `app/api/main.py` — `POST /query/ask` request body gains optional `session_id`; response includes `session_id` so clients can thread turns
-- `app/ui/app.py` — maintain `session_id` in `st.session_state`; display full conversation history in the chat tab; "New conversation" button resets state
+- `app/ui/home.py` — maintain `session_id` in `st.session_state`; display full conversation history in the chat tab; "New conversation" button resets state
 
 **Query rewriting prompt (in `prompts.py`):**
 

@@ -8,13 +8,17 @@ services:
       context: .
       dockerfile: dockerfile
       args:
-        REQUIRE_SEED: "true"   # cloud image must bake the seed artifacts
+        REQUIRE_SEED: "true"       # cloud image must bake the seed artifacts
+        PRELOAD_RERANKER: "true"   # bake MiniLM so Fargate never downloads at startup
     image: ph-law-rag:cloud
     command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
     ports: ["8000:8000"]
     env_file: [.env.cloud-gate]
     environment:
       AWS_PROFILE: ph-law-rag-dev
+      # Match the deployed demo (infra API_ENVIRONMENT): serving uses MiniLM,
+      # qwen3 stays eval-only. See ADR-016.
+      reranker_backend: minilm
     volumes:
       - ${HOME}/.aws:/root/.aws:ro
 

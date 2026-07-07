@@ -103,7 +103,7 @@ docker compose up        # Qdrant (:6333), API (:8000), UI (:8501)
 
 Notes:
 - Start host Ollama with `OLLAMA_HOST=0.0.0.0:11434 ollama serve` so the containers can reach it (the default `127.0.0.1` binding rejects container traffic).
-- The cross-encoder reranker is **pre-baked into the image at build time**, so the first query isn't blocked on a slow model download.
+- Local dev compose mounts the host Hugging Face cache for reranker models; frozen images can opt into build-time preloading with Docker build args.
 - The `data/` volume is shared from the host — run `raglab sync` (locally or `docker compose exec api raglab sync`) before querying.
 
 ---
@@ -216,8 +216,8 @@ chunk_size=256
 chunk_overlap=32
 dense_top_k=30
 rerank_top_n=8
-reranker_backend=qwen3      # or minilm for latency-sensitive serving
-min_chunks_for_answer=2
+reranker_backend=qwen3      # eval-quality default; use minilm for CPU-only serving
+min_chunks_for_answer=1
 debug=false
 ```
 
@@ -285,7 +285,7 @@ Integration tests `skipif` cleanly when services are unavailable.
 | 7 — Polish, docs, tests, docker-compose | ✅ complete |
 | 8 — Conversation context (multi-turn, query rewriting) | ⬜ planned |
 
-Future: cloud LLM backend (AWS Bedrock) with an eval delta vs. local, metadata filtering in Qdrant, expanded corpus, scanned-PDF OCR.
+Future: managed/cloud reranker parity for serving, expanded corpus, scanned-PDF OCR, and answer-mode polish for ambiguous questions.
 
 ---
 

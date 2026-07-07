@@ -24,10 +24,14 @@ API_ENVIRONMENT = {
     "aws_region": "us-east-1",
     "qdrant_collection": "ph_law-titan1024",
     "llm_model": "claude-haiku-4-5-20251001",
+    # Qwen3 is the eval-quality local default, but it is not viable on the
+    # small CPU-only Fargate task. Pin the deployed demo to the serving backend.
+    "reranker_backend": "minilm",
     "enable_query_rewriting": "false",
     "answerability_gate_enabled": "false",
     "faithfulness_selfcheck_enabled": "false",
     "query_decomposition_enabled": "false",
+    "trace_logging_enabled": "false",
 }
 
 

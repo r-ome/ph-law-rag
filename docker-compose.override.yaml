@@ -12,9 +12,11 @@ services:
     volumes:
       - ./app:/app/app
       - ./sources:/app/sources
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
 
   ui:
     command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501 --server.runOnSave true
     volumes:
       - ./app:/app/app
       - ./sources:/app/sources
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface

@@ -47,7 +47,7 @@ with chat_tab:
                             "debug": debug,
                             "session_id": st.session_state.session_id,
                         },
-                        timeout=120,
+                        timeout=settings.api_request_timeout,
                     )
                     resp.raise_for_status()
                     result = resp.json()

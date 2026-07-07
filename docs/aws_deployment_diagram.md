@@ -116,6 +116,9 @@ sequenceDiagram
 - Bedrock Titan v2 replaces Ollama for runtime embeddings.
 - Generation stays on the first-party Anthropic API because the `generate()`
   seam already routes `claude*` models there and has been evaluated on Haiku 4.5.
+- The deployed API pins `reranker_backend=minilm`. Qwen3 remains the offline
+  eval-quality default, but it is too slow and memory-heavy for CPU-only
+  Docker/Fargate serving.
 - SQLite and BM25 are prebuilt artifacts for the first deploy.
 - Conversation history can be ephemeral for v1; move it to durable storage later
   if persistence becomes important.
@@ -136,8 +139,8 @@ Before any CDK was written, the app had to pass the local zero-Ollama gate
 3. Load cloud runtime settings locally with `RAGLAB_ENV_FILE=.env.cloud-gate`.
    The profile sets `EMBEDDING_BACKEND=bedrock`, `QDRANT_URL`,
    `QDRANT_API_KEY`, `QDRANT_COLLECTION=ph_law-titan1024`,
-   `LLM_MODEL=claude-haiku-4-5-20251001`, `ANTHROPIC_API_KEY`, and
-   `AWS_REGION=us-east-1`. The app derives Titan v2
+   `LLM_MODEL=claude-haiku-4-5-20251001`, `ANTHROPIC_API_KEY`,
+   `RERANKER_BACKEND=minilm`, and `AWS_REGION=us-east-1`. The app derives Titan v2
    (`amazon.titan-embed-text-v2:0`) and dimension `1024` from the backend.
 4. Disable optional local-model paths for the gate:
    `ENABLE_QUERY_REWRITING=false`, `ANSWERABILITY_GATE_ENABLED=false`,

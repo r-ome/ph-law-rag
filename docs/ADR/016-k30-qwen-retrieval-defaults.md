@@ -36,6 +36,20 @@ The five hardest retrieval misses weren't missing from the index — they were s
 
 ## Consequences
 
-- Qwen3 costs ~10s/query on MPS (CPU unusable) — acceptable for eval, not serving. Serving needs a cascade (MiniLM first pass → Qwen on close calls) or MiniLM+deterministic signals; that decision is open.
+- Qwen3 costs ~10s/query on MPS (CPU unusable) — acceptable for eval, not serving.
 - Full eval run is now ~30 min (21.5s/row).
 - §6 remains unreachable by budget/reranker changes (edge-candidate track).
+
+## Addendum (2026-07-07): serving/eval split accepted
+
+Docker verification (2026-07-06) confirmed qwen3 cannot be served: CPU-only containers OOM at
+8 GB or take >10 min/query at 12 GB. Interim decision: **serving pins `reranker_backend=minilm`**
+(docker-compose, docker-compose.cloud, infra `API_ENVIRONMENT`) while **eval keeps qwen3** as the
+config default on the host.
+
+Accepted trade-off: eval measures a retrieval stack that serving doesn't run — the qwen3
+retrieval gains (precision 0.63→0.74, recall 0.81→0.86) do not apply to served answers;
+generator-side results (Haiku faithfulness) transfer, since contexts are judged per-run.
+Closing the gap means a third `reranker_backend` (managed rerank API — Bedrock/Cohere/Jina/
+Voyage), a GPU endpoint, quantized qwen3 on CPU, or matching eval down to MiniLM; that choice
+is still open.

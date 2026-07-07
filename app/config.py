@@ -101,6 +101,7 @@ class Settings(BaseSettings):
 	ragas_embedding_model: str = "nomic-embed-text"
 	anthropic_api_key: SecretStr = SecretStr("")
 	api_base_url: str = "http://localhost:8000"
+	api_request_timeout: int = 600
 	edge_expansion_enabled: bool = True
 	edge_hop_top_k: int = 3
 	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
