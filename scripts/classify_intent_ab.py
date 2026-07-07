@@ -24,13 +24,15 @@ INTENTS = [
     "out_of_scope",
 ]
 
-LLM_ARMS = {"mistral", "haiku"}
-ALL_ARMS = ["mistral", "haiku", "nli"]
+LLM_ARMS = {"mistral", "haiku", "qwen3", "gemma3"}
+ALL_ARMS = ["mistral", "haiku", "nli", "qwen3", "gemma3"]
 
 DEFAULT_MODELS = {
     "mistral": "mistral",
     "haiku": "claude-haiku-4-5",
     "nli": "cross-encoder/nli-deberta-v3-base",
+    "qwen3": "qwen3:4b",
+    "gemma3": "gemma3:4b",
 }
 
 DEFAULT_NLI_MARGIN_THRESHOLD = 0.15
@@ -566,6 +568,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mistral-model", default=DEFAULT_MODELS["mistral"])
     parser.add_argument("--haiku-model", default=DEFAULT_MODELS["haiku"])
     parser.add_argument("--nli-model", default=DEFAULT_MODELS["nli"])
+    parser.add_argument("--qwen3-model", default=DEFAULT_MODELS["qwen3"])
+    parser.add_argument("--gemma3-model", default=DEFAULT_MODELS["gemma3"])
     parser.add_argument("--nli-margin-threshold", type=float, default=DEFAULT_NLI_MARGIN_THRESHOLD)
     parser.add_argument("--smoke-only", action="store_true", help="Run only the non-eval smoke pool.")
     parser.add_argument("--cache-dir", type=Path, default=default_cache_dir(), help="Shared crash/resume cache directory.")
@@ -585,6 +589,8 @@ def main() -> None:
         "mistral": args.mistral_model,
         "haiku": args.haiku_model,
         "nli": args.nli_model,
+        "qwen3": args.qwen3_model,
+        "gemma3": args.gemma3_model,
     }
     system_template, user_template = render_llm_prompts("{question}")
     prompt_text = f"SYSTEM:\n{system_template}\nUSER:\n{user_template}"
