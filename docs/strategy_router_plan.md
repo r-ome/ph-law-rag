@@ -1,6 +1,6 @@
 # Strategy Router — Plan
 
-**Status:** locked 2026-07-07. Planning only — nothing in this document is implemented yet, except the R1 step-0 labeling artifacts (labels, loader, test, config keys), committed 2026-07-07. R1 build constraints amended same day after external review (see R1 "Binding constraints").
+**Status:** locked 2026-07-07. R1 tooling (00cb232, benchmark run pending), R2 (d07fef8, zero-diff preflight), and R3 (traced + decided, see R3 outcome) are implemented; R4/R5 are not. Build constraints amended after external reviews (see per-milestone "Binding" notes).
 
 ## Motivation
 
@@ -35,9 +35,9 @@ The classifier is a **separate LLM call** from the query rewriter. Same model ma
 | Intent | v1 status | Maps to |
 |---|---|---|
 | `default` | baseline strategy | `default` |
-| `citation_lookup` | candidate preset — blocked on R3 BM25 trace check | `citation_precision` or `default` |
+| `citation_lookup` | label only — R3 demoted; no sparse-depth counterfactual evidence | `default` |
 | `list_or_rule_synthesis` | label only (parent expansion + k30 are already defaults) | `default` |
-| `amendment_or_current_law` | candidate preset — operative/consolidated controls, pending R3 | `current_law` or `default` |
+| `amendment_or_current_law` | preset registered by R3; prefer-operative won on the chain-of-custody row with no regressions. **Evidence is MiniLM-specific** (serving backend): under bedrock rerank the operative chunk doesn't survive the cut, so the preset no-ops there — harmless, but invisible to a bedrock-judged eval (see R5 caveat) | `current_law` |
 | `out_of_scope` | label only | `default` |
 
 Cut from the initial 9-class proposal: `case_law` (no corpus behind it — a lane pointing at nothing adds misclassification surface), `broad_research -> decomposition` (re-enables two proven failures), `procedure_or_remedy` / `statute_interpretation` / etc. (no evidence they need different retrieval; forum data may revive a procedure lane later).
@@ -111,7 +111,20 @@ Refactor before router: strategies must be deterministic and testable before the
 1. **Citation check:** run the 4 `citation_lookup` rows plus a few synthetic article-level queries ("What does Art 308 say?") through retrieve-trace. Does weighting BM25 up actually rank statute-mention queries better? (BM25 tested badly on paraphrase; untested as a citation matcher.) No -> `citation_lookup` stays label-only; delete the stub.
 2. **Amendment check:** trace the 13 `amendment_or_current_law` rows under `default`. Consolidation and operative preference already ship by default, so `default` may already serve them. Define `current_law` only from a concrete knob diff the traces justify.
 
+**Binding build notes (review 2026-07-07):**
+
+1. **Decision rule = default trace plus minimal counterfactual arms, not a single-trace read.** All arms are pure `RetrievalKnobs` variants driven through the R2 layer, minilm, $0.
+2. **Citation registration criterion:** `_fuse` is RRF (`1/(60+rank)`) — depth admits candidates but never re-weights an already-included target, so "target strong in sparse but lost in fusion" is unfixable by any of the 7 knobs. `citation_precision` registers only if the counterfactual (default vs `sparse_top_k=20` vs `30`) shows targets **outside sparse top-10 but inside the deeper cut** that then reach `selected`.
+3. **Amendment registration criterion:** `prefer_operative` reorders only when both stale and operative chunks survive the post-rerank cut — candidate-set presence proves nothing. Run the real counterfactual (default vs `prefer_operative_enabled=True`); `current_law` registers only if a stale chunk is actually demoted below the operative target after the full downstream path on ≥1 row, with no row regressing.
+4. **Instrumented stage trace:** replicate the pipeline stage-by-stage (hybrid → rerank → edge → prefer-op → parent → dedup, same functions/order, explicit knobs) recording the target's rank per stage; `SelectionResult`'s three snapshots are too coarse. Final sanity assert: script's end state equals the real `select_context` output, compared on **ordered chunk_ids at `selected`** — not scores (rerank mutates result objects; floats drift).
+5. **Backend pinning:** `reranker_backend` defaults to `bedrock` — the script forces `minilm` via a scoped monkeypatch/restore of `settings.reranker_backend` (not env mutation after import) for the main arms; Bedrock spot-checks of near-cut rows are explicit and opt-in.
+6. **Baseline assert:** write `resolve_knobs("default")` to `meta.json` and hard-fail if it differs from the intended baseline (k30/10/8, parent-exp on, prefer-op off, operative-only on, dedup on) — the stale-`.env` guard — with an explicit escape-hatch flag.
+
+**R3 result (2026-07-07):** `scripts/trace_r3_candidates.py` run `data/eval_results/runs/2026-07-07/r3_trace_20260707_201442/` demoted `citation_precision` (no sparse-depth selected-target improvement) and registered `current_law` as default + `prefer_operative_enabled=True` (evidence: `eval_051`, no regressions).
+
 **Done when:** each candidate has either a trace-justified knob diff or is demoted to label-only. Both demoting is an acceptable outcome — the router still ships as trace-labeling infrastructure that prices future lanes.
+
+**R3 outcome (2026-07-07, runs `r3_trace_20260707_201442`/`_202924`):** `citation_precision` **demoted** — no sparse-depth improvement on any of the 8 probes via the outside-top-10 mechanism (the one near-miss, RA 9165 §5 at sparse rank 24, was cut by rerank — the unfixable-within-7-knobs pattern). `current_law` **registered** (`default` + `prefer_operative_enabled=True`) on eval_051: stale RA 9165 §21 at rank 2 over the operative RA 10640 version at rank 6 under default, flipped by prefer-operative; no regressions on the other 12 rows; result reproduced exactly across reruns. **Bedrock spot-check on eval_051 refutes the evidence on that backend:** bedrock rerank cuts the operative chunk entirely (stale stays rank 2), so prefer-operative no-ops — no benefit, no harm. Kept registered because serving pins MiniLM (a990aa7), where the evidence stands. Backlog (bedrock rerank quality, independent of router): bedrock drops the operative amendment on the stale-cross-reference row that MiniLM keeps — same family as the libel-row watch from the bedrock A/B.
 
 ### R4 — Router in serving
 
@@ -122,6 +135,8 @@ Refactor before router: strategies must be deterministic and testable before the
 ### R5 — Predicted-strategy eval
 
 Oracle-labels vs predicted-labels run pair on the 81 rows (the RAGAS row cache keeps the unchanged majority cheap). Judge on **changed-context rows only**, per the locked eval method. Graduation per preset: changed-row recall/precision up, no faithfulness regression, R1 router accuracy holding in-pipeline.
+
+**Backend caveat (from the R3 bedrock spot-check):** the `current_law` lane must be judged under the **serving reranker (MiniLM)** — its trace evidence exists only there; under bedrock the preset never fires, so a bedrock-judged R5 would auto-fail it as inert rather than measure it. Run the R5 pair with the reranker matched to serving for that lane (or note explicitly that the lane is bedrock-invisible).
 
 **Watch rows:** 22 (RPC via ICT), 42 (online vs ordinary libel), 46 (jurisdiction + prescription) are cross-source / two-part questions labeled `default` because no v1 lane exists for them. If they underperform, the confusion matrix will wrongly blame the classifier — the real gap is a missing lane.
 

@@ -57,6 +57,27 @@ def test_pinned_preset_beats_settings(monkeypatch):
     assert resolve_knobs("pinned") == pinned
 
 
+def test_current_law_registered_from_r3_trace():
+    knobs = resolve_knobs("current_law")
+
+    assert "current_law" in strategy.STRATEGIES
+    assert knobs == RetrievalKnobs(
+        dense_top_k=30,
+        sparse_top_k=10,
+        rerank_top_n=8,
+        parent_expansion_enabled=True,
+        prefer_operative_enabled=True,
+        retrieval_operative_only=True,
+        consolidated_dedup_enabled=True,
+    )
+
+
+def test_r3_candidate_stubs_cleared_after_decisions():
+    assert strategy.CANDIDATE_PRESET_STUBS == ()
+    assert "citation_precision" not in strategy._PRESET_KNOBS
+    assert "citation_precision" not in strategy.STRATEGIES
+
+
 def test_default_strategy_passes_resolved_knobs(monkeypatch):
     captured = {}
     expected = _knobs(dense_top_k=12)

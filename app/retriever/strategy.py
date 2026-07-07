@@ -54,13 +54,23 @@ class StrategyPreset:
 
 _PRESET_KNOBS: dict[str, RetrievalKnobs | None] = {
     "default": None,
+    "current_law": RetrievalKnobs(
+        dense_top_k=30,
+        sparse_top_k=10,
+        rerank_top_n=8,
+        parent_expansion_enabled=True,
+        prefer_operative_enabled=True,
+        retrieval_operative_only=True,
+        consolidated_dedup_enabled=True,
+    ),
 }
 
 # Candidate stubs kept out of STRATEGIES until R3 trace checks justify a real knob diff.
-CANDIDATE_PRESET_STUBS = ("citation_precision", "current_law")
+CANDIDATE_PRESET_STUBS: tuple[str, ...] = ()
 
 STRATEGIES: dict[str, Strategy] = {
     "default": StrategyPreset("default"),
+    "current_law": StrategyPreset("current_law"),
 }
 
 
