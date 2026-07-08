@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime, timezone
 
 from app.retriever.context_builder import build_context
@@ -18,8 +19,18 @@ from app.observability.trace import TraceWriter
 
 logger = get_logger(__name__)
 
+_CITATION_RE = re.compile(r"\[(\d+)\]")
+
+
+def _cited_sources(answer_text: str, sources: list[dict]) -> list[dict]:
+    cited_refs = {int(match.group(1)) for match in _CITATION_RE.finditer(answer_text)}
+    if not cited_refs:
+        return []
+    return [source for source in sources if source.get("ref") in cited_refs]
+
 
 def _chunk_trace(r: RetrievalResult, preview_chars: int) -> dict:
+    consolidated = r.metadata.get("consolidated", "")
     return {
         "chunk_id": r.chunk_id,
         "score": r.score,
@@ -27,7 +38,7 @@ def _chunk_trace(r: RetrievalResult, preview_chars: int) -> dict:
         "unit_label": r.metadata.get("unit_label", ""),
         "provision_id": r.metadata.get("provision_id", ""),
         "expanded_from_parent": bool(r.metadata.get("expanded_from_parent")),
-        "consolidated": r.metadata.get("consolidated", ""),
+        "consolidated": "" if consolidated is None else str(consolidated),
         "dedup_merged_chunk_ids": r.metadata.get("dedup_merged_chunk_ids", []),
         "preview": r.text[:preview_chars],
     }
@@ -218,7 +229,7 @@ def _run_pipeline(
 
     return _package(
         answer_text,
-        sources=[] if soft_abstained else sources,
+        sources=[] if soft_abstained else _cited_sources(answer_text, sources),
         abstained=soft_abstained,
         selection=selection,
         prompt=user_prompt,
@@ -226,14 +237,14 @@ def _run_pipeline(
     ), selection, user_prompt
 
 
-def answer(
+def run_answer(
     question: str,
     debug: bool | None = None,
     session_id: str | None = None,
     trace: bool = True,
     trace_label: str | None = None,
     strategy_override: str | None = None,
-) -> dict:
+) -> tuple[dict, dict | None]:
     trace_id = new_trace_id()
     started = time.perf_counter()
     debug_enabled = settings.debug if debug is None else debug
@@ -245,6 +256,7 @@ def answer(
     strategy_knobs = resolve_knobs(strategy_name)
     router_decision = None
     router_skipped_reason = None
+    trace_record: dict | None = None
 
     with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):
         logger.info("answer_started", trace_label=trace_label)
@@ -299,6 +311,7 @@ def answer(
                 "rewritten_question": effective_question,
                 "answer": response["answer"],
                 "retrieved_chunks_json": json.dumps([r.chunk_id for r in selection.selected]),
+                "sources_json": json.dumps(response.get("sources", [])),
             })
 
         elapsed_ms = (time.perf_counter() - started) * 1000
@@ -311,23 +324,43 @@ def answer(
             selected=len(selection.selected),
             latency_ms=round(elapsed_ms, 2),
         )
-        if trace and settings.trace_logging_enabled:
-            TraceWriter().write(
-                _build_trace_record(
-                    trace_id=trace_id,
-                    trace_label=trace_label,
-                    session_id=session_id,
-                    original_question=question,
-                    rewritten_question=effective_question,
-                    response=response,
-                    selection=selection,
-                    prompt=prompt,
-                    collector=collector,
-                    elapsed_ms=elapsed_ms,
-                    strategy_name=strategy_name,
-                    strategy_knobs=strategy_knobs,
-                    router_decision=router_decision,
-                    router_skipped_reason=router_skipped_reason,
-                )
+        want_record = debug_enabled or (trace and settings.trace_logging_enabled)
+        if want_record:
+            trace_record = _build_trace_record(
+                trace_id=trace_id,
+                trace_label=trace_label,
+                session_id=session_id,
+                original_question=question,
+                rewritten_question=effective_question,
+                response=response,
+                selection=selection,
+                prompt=prompt,
+                collector=collector,
+                elapsed_ms=elapsed_ms,
+                strategy_name=strategy_name,
+                strategy_knobs=strategy_knobs,
+                router_decision=router_decision,
+                router_skipped_reason=router_skipped_reason,
             )
-        return response
+            if trace and settings.trace_logging_enabled:
+                TraceWriter().write(trace_record)
+        return response, trace_record
+
+
+def answer(
+    question: str,
+    debug: bool | None = None,
+    session_id: str | None = None,
+    trace: bool = True,
+    trace_label: str | None = None,
+    strategy_override: str | None = None,
+) -> dict:
+    """Backward-compatible wrapper — public return is unchanged (CLI + evals)."""
+    return run_answer(
+        question,
+        debug=debug,
+        session_id=session_id,
+        trace=trace,
+        trace_label=trace_label,
+        strategy_override=strategy_override,
+    )[0]

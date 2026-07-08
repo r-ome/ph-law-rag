@@ -114,8 +114,6 @@ class Settings(BaseSettings):
 	ragas_llm_model: str = "claude-haiku-4-5-20251001"
 	ragas_embedding_model: str = "nomic-embed-text"
 	anthropic_api_key: SecretStr = SecretStr("")
-	api_base_url: str = "http://localhost:8000"
-	api_request_timeout: int = 600
 	edge_expansion_enabled: bool = True
 	edge_hop_top_k: int = 3
 	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
@@ -261,4 +259,29 @@ def load_allowed_sources() -> list[SourceConfig]:
 		if source.enabled:
 			allowed.append(source)
 	return allowed
+
+def config_view() -> dict:
+	"""Curated, secret-free config for the dashboard."""
+	return {
+		"embedding_backend": settings.embedding_backend,
+		"embedding_model": settings.embedding_model,
+		"embedding_dim": settings.embedding_dim,
+		"llm_model": settings.llm_model,
+		"generator_backend": "anthropic" if settings.llm_model.startswith("claude") else "ollama",
+		"reranker_backend": settings.reranker_backend,
+		"qdrant_collection": settings.qdrant_collection,
+		"qdrant_url": settings.qdrant_url,
+		"ollama_base_url": settings.ollama_base_url,
+		"chunk_size": settings.chunk_size,
+		"chunk_overlap": settings.chunk_overlap,
+		"min_chunks_for_answer": settings.min_chunks_for_answer,
+		"max_conversation_turns": settings.max_conversation_turns,
+		"router_enabled": settings.router_enabled,
+		"edge_expansion_enabled": settings.edge_expansion_enabled,
+		"answerability_gate_enabled": settings.answerability_gate_enabled,
+		"enable_query_rewriting": settings.enable_query_rewriting,
+		"faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
+		"later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
+		"aws_region": settings.aws_region,
+	}
 	

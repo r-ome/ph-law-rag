@@ -23,12 +23,32 @@ def _locator(m: dict) -> str | None:
 def build_context(results: list[RetrievalResult]) -> tuple[str, list[dict]]:
       blocks = []
       sources = []
-      for i, r in enumerate(results, start=1):
+      ref_by_source: dict[tuple[str, str, str, str | None, str | None], int] = {}
+      for r in results:
           title = r.metadata.get("title", "Unknown source")
           url = r.metadata.get("url", "")
           locator = _locator(r.metadata)
           via = r.metadata.get("_edge_relation")
-          header = f"[{i}] {title}"
+          source_key = (
+              r.metadata.get("source_id", ""),
+              title,
+              url,
+              locator,
+              via,
+          )
+          ref = ref_by_source.get(source_key)
+          if ref is None:
+              ref = len(sources) + 1
+              ref_by_source[source_key] = ref
+              sources.append({
+                  "ref": ref,
+                  "title": title,
+                  "url": url,
+                  "source_id": r.metadata.get("source_id", ""),
+                  "locator": locator,
+                  "via": via,
+              })
+          header = f"[{ref}] {title}"
           if locator:
               header += f", {locator}"
           if via:
@@ -36,12 +56,4 @@ def build_context(results: list[RetrievalResult]) -> tuple[str, list[dict]]:
           if url:
               header += f" — {url}"
           blocks.append(f"{header}\n{r.text}")
-          sources.append({
-              "ref": i,
-              "title": title,
-              "url": url,
-              "source_id": r.metadata.get("source_id", ""),
-              "locator": locator,
-              "via": via,
-          })
       return "\n\n".join(blocks), sources

@@ -36,7 +36,7 @@ def test_ingestion_does_not_import_downstream_layers():
 		for module in _imports(path):
 			assert not any(
 				_matches(module, prefix)
-				for prefix in ("app.indexing", "app.retriever", "app.evals", "app.api", "app.ui")
+				for prefix in ("app.indexing", "app.retriever", "app.evals", "app.api")
 			), f"{path.relative_to(ROOT)} imports forbidden module {module}"
 
 
@@ -45,14 +45,13 @@ def test_indexing_does_not_import_adapters_or_ingestion_sync():
 		for module in _imports(path):
 			assert not any(
 				_matches(module, prefix)
-				for prefix in ("app.api", "app.ui", "app.ingestion.sync")
+				for prefix in ("app.api", "app.ingestion.sync")
 			), f"{path.relative_to(ROOT)} imports forbidden module {module}"
 
 
-def test_api_and_ui_import_only_allowed_app_prefixes():
+def test_api_imports_only_allowed_app_prefixes():
 	allowed = (
 		"app.api",
-		"app.ui",
 		"app.config",
 		"app.sync_service",
 		"app.retriever.answer_service",
@@ -61,15 +60,22 @@ def test_api_and_ui_import_only_allowed_app_prefixes():
 		"app.db",
 		"app.conversation.session",
 		"app.observability",
+		# Service-layer modules the thin routes delegate to (business logic
+		# lives here, not in the adapters). Added as the React frontend program
+		# introduced read/serving endpoints (Phases 1–5).
+		"app.corpus_service",
+		"app.stats_service",
+		"app.trace_store",
+		"app.log_reader",
+		"app.eval_store",
 	)
-	for folder in ("api", "ui"):
-		for path in _python_files("app", folder):
-			for module in _imports(path):
-				if not _matches(module, "app"):
-					continue
-				assert any(_matches(module, prefix) for prefix in allowed), (
-					f"{path.relative_to(ROOT)} imports forbidden module {module}"
-				)
+	for path in _python_files("app", "api"):
+		for module in _imports(path):
+			if not _matches(module, "app"):
+				continue
+			assert any(_matches(module, prefix) for prefix in allowed), (
+				f"{path.relative_to(ROOT)} imports forbidden module {module}"
+			)
 
 
 def test_retriever_strategy_does_not_import_downstream_layers():
@@ -77,5 +83,5 @@ def test_retriever_strategy_does_not_import_downstream_layers():
 	for module in _imports(path):
 		assert not any(
 			_matches(module, prefix)
-			for prefix in ("app.api", "app.ui", "app.evals", "app.ingestion", "app.indexing")
+			for prefix in ("app.api", "app.evals", "app.ingestion", "app.indexing")
 		), f"{path.relative_to(ROOT)} imports forbidden module {module}"

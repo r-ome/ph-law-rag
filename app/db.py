@@ -114,6 +114,13 @@ MIGRATIONS = [
 		);
 		""",
 	),
+	(
+		4,
+		"add sources_json to conversation_turns",
+		"""
+		ALTER TABLE conversation_turns ADD COLUMN sources_json TEXT;
+		""",
+	),
 
 ]
 
@@ -167,5 +174,90 @@ def list_documents() -> list[dict]:
 			"""
 		).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def get_document(doc_id: str) -> dict | None:
+    conn = get_connection()
+    try:
+        row = conn.execute(
+			"""
+				SELECT
+					d.doc_id, d.source_id, d.title, d.url, d.doc_type, d.category,
+					d.enabled, d.updated_at,
+					v.fetched_at AS last_fetched, v.content_hash, v.content_length,
+					v.extraction_method, v.http_status, v.normalized_path,
+					(SELECT COUNT(*) FROM chunks c WHERE c.doc_id = d.doc_id) AS chunk_count
+				FROM documents d
+				LEFT JOIN document_versions v ON v.doc_id = d.doc_id
+				WHERE d.doc_id = ?
+				ORDER BY v.fetched_at DESC
+				LIMIT 1
+			""",
+            (doc_id,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+def list_chunks(doc_id: str) -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+			"""
+				SELECT chunk_id, chunk_index, text, char_count, token_estimate, qdrant_id
+				FROM chunks
+				WHERE doc_id = ?
+				ORDER BY chunk_index
+			""",
+            (doc_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def list_sync_runs(limit: int = 20) -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+                SELECT sync_run_id, started_at, completed_at, status,
+                       scanned_count, changed_count, unchanged_count, failed_count
+                FROM sync_runs
+                ORDER BY started_at DESC
+                LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+def corpus_counts() -> dict:
+    """Cheap SQLite aggregates for the dashboard."""
+    conn = get_connection()
+    try:
+        doc_total = conn.execute("SELECT COUNT(*) AS n FROM documents").fetchone()["n"]
+        doc_enabled = conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE enabled = 1"
+        ).fetchone()["n"]
+        chunk_total = conn.execute("SELECT COUNT(*) AS n FROM chunks").fetchone()["n"]
+        conversation_total = conn.execute(
+            "SELECT COUNT(*) AS n FROM conversations"
+        ).fetchone()["n"]
+        by_category = [
+            {"category": r["category"], "count": r["n"]}
+            for r in conn.execute(
+                "SELECT category, COUNT(*) AS n FROM documents "
+                "GROUP BY category ORDER BY category"
+            ).fetchall()
+        ]
+        return {
+            "documents_total": doc_total,
+            "documents_enabled": doc_enabled,
+            "chunks_total": chunk_total,
+            "conversations_total": conversation_total,
+            "by_category": by_category,
+        }
     finally:
         conn.close()
