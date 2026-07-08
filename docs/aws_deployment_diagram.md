@@ -11,9 +11,9 @@ and prebuilt SQLite/BM25 artifacts baked into the container image.
 flowchart LR
     user["User or hiring manager"] -->|HTTPS phlaw.jeromeagapay.com| alb["Application Load Balancer"]
 
-    alb -->|UI only| ui["ECS Fargate task - Streamlit UI"]
+    alb -->|web only| ui["ECS Fargate task - React SPA (nginx)"]
 
-    ui -->|Service Connect http://api:8000| api["ECS Fargate task - FastAPI (internal only)"]
+    ui -->|nginx proxies /api via Service Connect http://api:8000| api["ECS Fargate task - FastAPI (internal only)"]
 
     api -->|Read metadata, create sessions, persist turns| sqlite["SQLite DB - seeded docs + conversation tables"]
     api -->|Rewrite follow-up question| anthropic
@@ -66,7 +66,7 @@ flowchart TD
 %%{init: {"theme": "dark", "themeVariables": {"background": "#111827", "primaryColor": "#1f2937", "primaryTextColor": "#f9fafb", "primaryBorderColor": "#60a5fa", "lineColor": "#93c5fd", "actorBkg": "#1f2937", "actorTextColor": "#f9fafb", "actorBorder": "#60a5fa", "signalColor": "#f9fafb", "signalTextColor": "#f9fafb", "labelBoxBkgColor": "#111827", "labelTextColor": "#f9fafb"}}}%%
 sequenceDiagram
     actor User
-    participant UI as Streamlit UI
+    participant UI as React SPA (nginx)
     participant API as FastAPI
     participant Conv as SQLite conversation tables
     participant Titan as Bedrock Titan
@@ -75,8 +75,8 @@ sequenceDiagram
     participant DB as SQLite metadata tables
     participant Claude as Anthropic Claude
 
-    User->>UI: Ask a legal question
-    UI->>API: POST query ask with optional session_id
+    User->>UI: Ask a legal question (browser calls /api)
+    UI->>API: nginx proxies POST /api/query/ask (optional session_id)
     API->>Conv: Create session or load recent turns
     Conv-->>API: Conversation history
     API->>Claude: Rewrite follow-up into standalone query
@@ -94,7 +94,7 @@ sequenceDiagram
     Claude-->>API: Answer with citations
     API->>Conv: Persist question, rewritten question, answer, chunk IDs
     API-->>UI: Answer, sources, and session_id
-    UI-->>User: Display answer and citations
+    UI-->>User: Render answer and citations in the browser
 ```
 
 ## Deployment Notes
@@ -102,12 +102,15 @@ sequenceDiagram
 - Phase 4 is implemented and live at `https://phlaw.jeromeagapay.com` (Python
   CDK, see `infra/`). It is normally torn down between demos (`cdk destroy
   PhlawAppStack`) and restored in minutes with `cdk deploy PhlawAppStack`.
-- ECS Fargate runs the API and UI containers (ARM64).
-- The ALB fronts the **UI only**. The API is **not** an ALB target — the UI
-  reaches it server-side over ECS Service Connect at `http://api:8000` (the
-  short Service Connect `dns_name`, not `api.local`). The API has a public IP
-  for egress only; its security group allows inbound solely from the UI, so it
-  is unreachable from the internet. No ALB path rules are needed.
+- ECS Fargate runs the API and web (React/nginx) containers (ARM64). The web
+  image is built by CDK from `frontend/` (`ContainerImage.from_asset`, ARM64) —
+  a separate asset from the Python API image in ECR.
+- The ALB fronts the **web container only**. The API is **not** an ALB target —
+  the browser only ever talks to nginx, which **reverse-proxies `/api`**
+  server-side over ECS Service Connect to `http://api:8000` (the short Service
+  Connect `dns_name`, not `api.local`). The API has a public IP for egress only;
+  its security group allows inbound solely from the web container, so it is
+  unreachable from the internet. No ALB path rules or CORS are needed.
 - HTTPS is provisioned: an ACM cert for `phlaw.jeromeagapay.com` (DNS-validated
   in a delegated Route 53 child zone, NS-delegated once from Spaceship), an
   HTTPS:443 listener, and an HTTP:80 -> 443 redirect. A Route 53 alias (A/AAAA)
@@ -155,7 +158,7 @@ answer, and `/health` is `ok` with `ollama: null`.
 
 ## Cost Estimate
 
-Approximate, `us-east-1`, single ALB + 2 ARM64 Fargate tasks (api + ui),
+Approximate, `us-east-1`, single ALB + 2 ARM64 Fargate tasks (api + web),
 Bedrock for embeddings, first-party Anthropic for generation, Qdrant Cloud free
 tier. Verify final numbers in the AWS Pricing Calculator — pricing varies by
 region and usage. The dominant cost is **ALB + Fargate + public IPv4**; Bedrock,
@@ -166,7 +169,7 @@ Anthropic, and Qdrant are small at demo volume.
 | ALB                          | $0.0225/hr + light LCU                        | ~$18                 |
 | Public IPv4                  | ALB addresses + 2 task public IPs             | ~$14–15              |
 | Fargate – API                | ARM64, 0.5 vCPU / 2 GB, reranker + torch room | ~$17                 |
-| Fargate – UI                 | ARM64, 0.25 vCPU / 0.5 GB, Streamlit          | ~$7                  |
+| Fargate – web                | ARM64, 0.25 vCPU / 0.5 GB, React SPA + nginx   | ~$7                  |
 | ECR                          | ~3 GB image storage                           | ~$0.50               |
 | Secrets Manager              | 3 secrets (qdrant key/url, anthropic key)     | ~$1.20               |
 | CloudWatch Logs              | low volume                                    | ~$1–2                |
@@ -200,8 +203,9 @@ NAT, same functionality for a demo. Bake this into the CDK stack from day one.
 3. **Right-size the API task** — the cross-encoder reranker + torch is what forces
    2 GB. Dropping the reranker (or a lighter retrieval path) in the deployed demo
    fits 0.25 vCPU / 0.5 GB and lowers the API task toward ~$18/mo total.
-4. **One ALB fronting the UI only** — the API is internal via Service Connect,
-   so there is no second ALB and no public API target group.
+4. **One ALB fronting the web container only** — the API is internal via
+   Service Connect (nginx proxies `/api`), so there is no second ALB and no
+   public API target group.
 
 ### Teardown behavior
 

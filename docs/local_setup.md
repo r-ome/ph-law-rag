@@ -103,9 +103,12 @@ raglab healthcheck
 # Command line
 raglab ask "What are the requisites of a valid contract under the Civil Code?"
 
-# Web UI
-streamlit run app/ui/home.py        # http://localhost:8501
+# Web UI (React workbench) — run from the frontend/ dir
+cd frontend && npm install --legacy-peer-deps && npm run dev   # http://localhost:5173
 ```
+
+The Vite dev server proxies `/api` to the FastAPI backend on `:8000`, so start
+`uvicorn app.api.main:app` (or the docker `api` service) alongside it.
 
 ---
 
@@ -124,12 +127,13 @@ raglab eval
 ## 8. Run the full stack in containers
 
 ```bash
-docker compose up        # Qdrant + FastAPI (:8000) + Streamlit (:8501)
+docker compose up        # Qdrant + FastAPI (:8000) + React web UI (:8080)
 ```
 
-With host Ollama running, the Streamlit demo answers an end-to-end query. The
-cross-encoder reranker is pre-baked into the image at build time, so the first
-query is not blocked on a slow model download.
+With host Ollama running, the web UI (nginx serving the React SPA, reverse-
+proxying `/api` to the API) answers an end-to-end query. The cross-encoder
+reranker is pre-baked into the API image at build time, so the first query is
+not blocked on a slow model download.
 
 The data volume is shared from the host, so run `raglab sync` (locally or via
 `docker compose exec api raglab sync`) before querying.

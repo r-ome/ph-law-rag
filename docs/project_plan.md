@@ -21,7 +21,7 @@ Build a serious local-first Python portfolio project that demonstrates:
 - Incremental sync with content hashing
 - Local LLM generation via Ollama with pluggable backends
 - Semantic eval scoring via RAGAS
-- Interactive Streamlit frontend
+- Interactive React web frontend (workbench)
 - Good software engineering structure
 
 This should feel like a credible production-grade retrieval system over a real legal corpus, not a tutorial demo.
@@ -42,7 +42,7 @@ It should:
 6. Cite source documents and article/section numbers
 7. Abstain when evidence is insufficient
 8. Support semantic eval scoring via RAGAS
-9. Expose a Streamlit UI for interactive querying
+9. Expose a React web UI (workbench) for interactive querying
 
 ---
 
@@ -70,8 +70,8 @@ It should:
 | PDF ingestion         | `pdfplumber` via LlamaIndex            | Better table and layout handling than PyPDF2                                                              |
 | HTML ingestion        | `trafilatura`                          | Strips navigation boilerplate better than BeautifulSoup                                                   |
 | Evals                 | RAGAS                                  | Semantic eval scoring: faithfulness, answer relevance, context precision, context recall                  |
-| Frontend              | Streamlit                              | Fast, Python-native, enough for a portfolio demo UI                                                       |
-| API                   | FastAPI                                | Same service modules as Streamlit; thin adapter                                                           |
+| Frontend              | React + Vite + Tailwind (nginx-served) | Decoupled SPA workbench over the typed REST API; per-phase specs in `docs/frontend/`. (Was Streamlit through M5; see git/devlog for that history.) |
+| API                   | FastAPI                                | Thin adapter over shared service modules; feeds the React frontend via OpenAPI-generated types            |
 | Config                | pydantic-settings                      | `.env`-driven config with type validation and defaults                                                    |
 | Metadata / versioning | SQLite                                 | Zero-setup, ships with Python, sufficient for the workload                                                |
 | Dependency management | uv                                     | Fast, lockfile-based                                                                                      |
@@ -134,9 +134,9 @@ The system has 5 parts:
 
 ### 5. Interface Layer
 
-- **Streamlit app** — chat-style UI with sidebar for settings and source browser
-- **FastAPI** — `/health`, `/query/ask`, `/documents`, `/sync` (for the API layer)
-- Both call the same shared service modules; no business logic in either adapter. Runtime probes live in `app.runtime.health`, not in API adapters.
+- **React web UI** (`frontend/`) — a decoupled SPA "workbench" (chat, corpus browser, dashboard, retrieval lab, evals) consuming the typed REST API; built and nginx-served in Docker. Per-phase specs in `docs/frontend/`.
+- **FastAPI** — the typed REST surface the frontend generates against (`/query/ask`, `/documents`, `/conversations`, `/stats`, `/traces`, `/evals`, `/config`, `/health`, …), every route with a Pydantic `response_model`.
+- The frontend holds no business logic; FastAPI routes are thin adapters over shared service modules. Runtime probes live in `app.runtime.health`, not in API adapters.
 
 ---
 
@@ -210,10 +210,9 @@ ph-law-rag/
 │   │   ├── runner.py             # runs questions through ask pipeline
 │   │   ├── ragas_scorer.py       # RAGAS metric computation
 │   │   └── report.py             # aggregates + prints category report
-│   ├── api/
-│   │   └── main.py               # FastAPI routes
-│   └── ui/
-│       └── app.py                # Streamlit app
+│   └── api/
+│       └── main.py               # FastAPI routes
+├── frontend/                     # React + Vite web UI (nginx-served in Docker)
 ├── data/
 │   ├── eval_dataset.jsonl        # tracked; eval questions + expected answers
 │   ├── raw/                      # gitignored; downloaded HTML/PDF files
@@ -248,14 +247,14 @@ Build:
 - `db.py` with SQLite bootstrap and migration table
 - Typer CLI stub with `init`, `sync`, `ask`, `eval`, `healthcheck`, `show-config` commands
 - FastAPI app with `/health` route
-- Streamlit stub with placeholder UI
+- React web UI (`frontend/`) scaffolded as a separate program (per `docs/frontend/` specs)
 - `raglab init` creates data directories and bootstraps DB
 
 Definition of done:
 
 - CLI runs without error
 - FastAPI starts
-- Streamlit starts
+- React web UI builds and serves (`npm run dev`, or nginx in Docker)
 - Config loads from `.env`
 - DB initializes cleanly
 
@@ -352,27 +351,31 @@ Definition of done:
 
 ---
 
-### Milestone 5: Streamlit UI and FastAPI Wiring
+### Milestone 5: Web UI and FastAPI Wiring
 
 Goal: interactive UI works; API is usable.
 
+> The web UI is now the **React workbench** (`frontend/`), built out as its own
+> phased program — see *Future Feature: React + Vite Frontend* below and the
+> execution specs in `docs/frontend/`. (M5 originally shipped a Streamlit chat
+> UI; it was retired once the React chat + corpus workflows reached parity.
+> git history and the devlog hold that lineage.)
+
 Build:
 
-- `app/ui/home.py` — Streamlit chat interface:
-  - Query input with submit
-  - Answer display with inline citation links
-  - Sidebar: model selector, top-k slider, debug toggle
-  - Source browser tab: list indexed documents with sync status
-- `app/api/main.py` — FastAPI routes:
+- `frontend/` — React SPA consuming the typed REST API: chat with inline
+  citations, corpus browser, dashboard, retrieval lab, evals.
+- `app/api/main.py` — FastAPI routes, each with a Pydantic `response_model`:
   - `GET /health`
   - `POST /query/ask` — calls `answer_service`
   - `GET /documents` — lists all documents from SQLite
-  - `POST /sync` — triggers sync (background task)
-- Both Streamlit and FastAPI call the same shared service modules
+  - `POST /documents/sync` — triggers sync (background task)
+- The frontend generates its API types from `/openapi.json`; both it and any
+  programmatic client hit the same shared service modules.
 
 Definition of done:
 
-- Streamlit app runs and returns answers in a browser
+- The React app runs and returns answers in a browser
 - FastAPI `/query/ask` returns the same response programmatically
 - No business logic lives in either adapter
 
@@ -419,21 +422,21 @@ Build:
 - `docs/local_setup.md` — detailed Qdrant Docker setup, Ollama model pull, first run
 - Tests (unit for normalizer, chunker, hash logic; integration for sync and ask pipeline)
 - `.env.example` with all configurable values documented
-- `docker-compose.yml` for the full stack: **Qdrant + FastAPI + Streamlit** (3 services, one container each — not one container running all three). Ollama is **not** containerized.
+- `docker-compose.yaml` for the full stack: **Qdrant + FastAPI + React web (nginx)** (3 services, one container each — not one container running all three). Ollama is **not** containerized.
 
 #### Full-stack docker-compose design
 
-Three services run in containers; Ollama runs natively on the host so it keeps Apple Silicon GPU access via Metal (containers run in a Linux VM with no Metal/GPU passthrough — a containerized Ollama would be CPU-only and slow). Qdrant/FastAPI/Streamlit are CPU+RAM only and do not use the GPU.
+Three services run in containers; Ollama runs natively on the host so it keeps Apple Silicon GPU access via Metal (containers run in a Linux VM with no Metal/GPU passthrough — a containerized Ollama would be CPU-only and slow). Qdrant/FastAPI/web are CPU+RAM only and do not use the GPU.
 
 Services:
 
 - `qdrant` — image `qdrant/qdrant`, ports `6333:6333` / `6334:6334`, volume for `/qdrant/storage` so vectors persist across restarts.
 - `api` — FastAPI (uvicorn), port `8000:8000`, depends_on `qdrant`.
-- `ui` — Streamlit, port `8501:8501`, depends_on `api`.
+- `web` — React SPA built and served by nginx (`frontend/Dockerfile`), port `8080:80`, depends_on `api`. nginx reverse-proxies `/api` → `api:8000` (see `frontend/nginx.conf`), so the browser only talks to `web`. For frontend iteration, run `npm run dev` on the host (Vite :5173) instead of rebuilding.
 
 Networking rules (Compose puts services on a shared network where the **service name is the hostname**):
 
-- `ui` → `api` at `http://api:8000` (not `localhost`).
+- `web` (nginx) → `api` at `http://api:8000` (not `localhost`).
 - `api` → `qdrant` at `http://qdrant:6333` (not `localhost`).
 - `api` → host-native Ollama at `http://host.docker.internal:11434`. Add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `api` service so this resolves on Colima and Docker Desktop alike.
 
@@ -452,13 +455,13 @@ These are existing `Settings` fields (`app/config.py`); override via environment
 | `qdrant_url`      | `http://localhost:6333`  | `http://qdrant:6333`                        |
 | `ollama_base_url` | `http://localhost:11434` | `http://host.docker.internal:11434`         |
 
-The Streamlit `ui` service needs the FastAPI base URL pointed at `http://api:8000` (via whatever env var the UI adapter uses for the API endpoint). Document each override in `.env.example` with a comment noting the Docker vs. local distinction.
+The `web` service needs no API-URL env var — nginx has the `api:8000` upstream baked into `frontend/nginx.conf` and proxies `/api` server-side. Document the `api`-service overrides in `.env.example` with a comment noting the Docker vs. local distinction.
 
 Definition of done:
 
 - Repo is presentation-ready
 - A reviewer can clone, follow README, and have a working system in under 15 minutes
-- `docker compose up` starts Qdrant + FastAPI + Streamlit; with host Ollama running, the Streamlit demo answers an end-to-end query
+- `docker compose up` starts Qdrant + FastAPI + the React web UI; with host Ollama running, the web UI answers an end-to-end query at `http://localhost:8080`
 
 ---
 
@@ -471,8 +474,9 @@ and is documented separately in [`docs/aws_deployment_diagram.md`](aws_deploymen
   selected by `embedding_backend=bedrock`.
 - **Generation** → first-party Anthropic API (Claude Haiku).
 - **Vectors** → Qdrant Cloud (collection `ph_law-titan1024`); SQLite + BM25 baked into the image as seed artifacts.
-- **Runtime** → one image, two entrypoints (FastAPI `api` + Streamlit `ui`) on Fargate behind an ALB; secrets via
-  Secrets Manager / task role, never baked.
+- **Runtime** → two images on Fargate behind an ALB: the FastAPI `api` (Python, from ECR) and the `web` container
+  (React SPA + nginx, built by CDK `from_asset("frontend")`). The ALB fronts `web` only; nginx reverse-proxies `/api`
+  to the internal API over Service Connect. Secrets via Secrets Manager / task role, never baked.
 - **Serving reranker** → `reranker_backend=minilm`; evals/host default to Bedrock Rerank (ADR-021), which matches
   Qwen3 quality but is quota-capped at 2 calls/min — not servable for interactive traffic.
 - **Local cloud-smoke** → `docker compose -f docker-compose.cloud.yaml up --build` with
@@ -488,7 +492,7 @@ Staged rollout (Phase 1 cloud seams → Phase 2 zero-Ollama gate → Phase 3 Doc
 3. Create `config.py`
 4. Create `db.py` with migrations
 5. Create CLI and FastAPI stubs
-6. Create Streamlit stub
+6. Scaffold the React web UI (`frontend/`, its own phased program — see `docs/frontend/`)
 7. Build source YAML allowlist
 8. Implement fetcher
 9. Implement `pdf_parser.py` and `html_parser.py`
@@ -506,7 +510,7 @@ Staged rollout (Phase 1 cloud seams → Phase 2 zero-Ollama gate → Phase 3 Doc
 21. Implement context_builder and prompts
 22. Implement llm_client and answer_service
 23. Wire CLI `ask` command end-to-end
-24. Build Streamlit UI
+24. Build the React web UI (`frontend/`, per `docs/frontend/` specs)
 25. Wire FastAPI routes
 26. Build eval dataset
 27. Implement RAGAS scorer and eval runner
@@ -516,7 +520,7 @@ Staged rollout (Phase 1 cloud seams → Phase 2 zero-Ollama gate → Phase 3 Doc
 31. Update `answer_service.py` for session-aware pipeline
 32. Update CLI `raglab ask` with `--session` option
 33. Update FastAPI `/query/ask` for threaded sessions
-34. Update Streamlit UI for multi-turn chat state
+34. Build multi-turn chat state into the React web UI (conversation threading)
 
 ---
 
@@ -868,25 +872,21 @@ The tracked eval dataset currently has 70 questions across categories. Keep the 
 
 ---
 
-## Streamlit UI Design
+## Web UI Design (React workbench)
 
-### Chat Tab
+The frontend is a decoupled React + Vite SPA — a "legal RAG workbench," not a
+generic admin dashboard. Full design and the phased build are in
+*Future Feature: React + Vite Frontend* (below) and the execution specs in
+`docs/frontend/`. Surface at a glance:
 
-- Text input for questions
-- Answer display with cited sources as clickable links
-- Expandable "Debug" section showing retrieved chunks, distances, rerank scores
+- **Chat** — questions with inline `[n]` citations resolving to source cards; read-only conversation history/replay.
+- **Corpus browser** — filterable document table + detail (metadata, amendment edges, normalized text, chunks).
+- **Dashboard / Ingestion / Health** — corpus & index stats, config summary, sync-run history + Run-sync, service status.
+- **Retrieval Lab / Observability** — inspect a query's full trace (retrieved → reranked → selected, scores, strategy), browse persisted traces, tail logs.
+- **Evaluations** — eval-run list, per-question drill-down, run-to-run metrics diff.
 
-### Sources Tab
-
-- Table of all indexed documents (title, doc_type, category, last synced, status)
-- Filter by doc_type and category
-
-### Settings Sidebar
-
-- LLM model selector (reads available Ollama models)
-- top-k and rerank_top_n sliders
-- Debug mode toggle
-- `Sync Now` button (calls FastAPI `/sync`)
+> Retired Streamlit predecessor: a two-tab chat/sources app (`app/ui/home.py`),
+> replaced once React reached parity. git history + the devlog hold that lineage.
 
 ---
 
@@ -936,8 +936,8 @@ raglab sync
 # 7. Ask a question
 raglab ask "What are the elements of a valid contract under the Civil Code?"
 
-# 8. Run Streamlit
-streamlit run app/ui/home.py
+# 8. Run the React web UI (from frontend/)
+cd frontend && npm install --legacy-peer-deps && npm run dev   # http://localhost:5173
 
 # 9. Run evals
 raglab eval
@@ -989,7 +989,7 @@ enable_query_rewriting: bool = True   # toggle rewriting off for debugging
 - `answer_service.py` — accept optional `session_id: str | None`; if provided, load history, rewrite query, run pipeline on rewritten query, persist turn to `conversation_turns`
 - `app/cli/main.py` — `raglab ask` gains `--session TEXT` option; if omitted, creates a new session each invocation (stateless); if provided, loads and continues that session
 - `app/api/main.py` — `POST /query/ask` request body gains optional `session_id`; response includes `session_id` so clients can thread turns
-- `app/ui/home.py` — maintain `session_id` in `st.session_state`; display full conversation history in the chat tab; "New conversation" button resets state
+- React web UI (`frontend/`) — thread `session_id` through the chat; display full conversation history and replay; "New conversation" resets state (see the Chat phase in `docs/frontend/`)
 
 **Query rewriting prompt (in `prompts.py`):**
 
@@ -1009,7 +1009,7 @@ Standalone question:
 Definition of done:
 
 - `raglab ask --session abc "what about section 5?"` correctly resolves "section 5" against prior turns in session `abc`
-- Streamlit chat tab maintains conversation state across turns in the browser
+- The React web UI maintains conversation state across turns in the browser
 - `POST /query/ask` with `session_id` returns a threaded response
 - Sessions with no history bypass rewriting (no unnecessary LLM call)
 - `max_conversation_turns` caps how much history is passed to the rewriter
@@ -1218,7 +1218,7 @@ When reviewing code:
 
 1. Compare implementation against this plan
 2. Flag unnecessary complexity — LlamaIndex abstractions should simplify, not obscure
-3. Keep business logic out of the Streamlit and FastAPI adapters
+3. Keep business logic out of the React frontend and FastAPI adapters
 4. Preserve incremental-sync architecture
 5. Preserve local-first design
 6. Prefer explicit retrieval traces over silent failures. Debug mode may expose
@@ -1235,15 +1235,16 @@ If the current implementation differs from this plan, note whether the differenc
 
 ---
 
-## Future Feature: React + Vite Frontend (Legal RAG Workbench)
+## React + Vite Frontend (Legal RAG Workbench)
 
-A polished React frontend to eventually replace the Streamlit UI. The product should feel like a **legal RAG workbench**, not a generic SaaS admin dashboard: chat, corpus browsing, citations, retrieval traces, eval quality, source lifecycle, and cost visibility are the differentiators.
+The web UI. A React SPA that feels like a **legal RAG workbench**, not a generic SaaS admin dashboard: chat, corpus browsing, citations, retrieval traces, eval quality, source lifecycle, and cost visibility are the differentiators. Built as a phased program (execution specs in `docs/frontend/`), it replaced the original Streamlit UI once chat + corpus workflows reached parity.
 
-Current implementation state:
+Implementation state (Phases 1–5 shipped; 6 deferred):
 
-- Streamlit already provides a basic two-tab chat/source UI in `app/ui/home.py`.
-- FastAPI currently exposes only the minimum serving surface: `GET /health`, `POST /query/ask`, `GET /documents`, and a background sync trigger under the documents router.
-- Richer UI data already exists locally but is not fully exposed over API:
+- Phases 1–5 are built and reviewed: corpus browser, chat + citations + conversations, dashboard/ingestion/health, retrieval lab + observability, and evaluations. Phase 6 (Cost & Usage) is deferred pending token accounting (see `docs/frontend/README.md`).
+- FastAPI now exposes the full read/serving surface the workbench needs — documents/chunks, conversations, stats, sync runs, traces, logs, evals, config, retrieval inspect — each with a Pydantic `response_model`.
+- The predecessor Streamlit app (`app/ui/home.py`) has been removed; git history + the devlog hold that lineage.
+- The underlying data these endpoints expose:
   - SQLite: `documents`, `document_versions`, `chunks`, `sync_runs`, `conversations`, `conversation_turns`, `chunk_parents`.
   - Logs: `data/logs/app.log`.
   - Retrieval traces: `data/logs/traces/*.jsonl`.
@@ -1257,14 +1258,30 @@ Keep this as an adapter swap: business logic stays in Python service modules; Re
 - **React Router** — list → detail routing.
 - **TanStack Query** — data fetching/caching/loading-states for the GETs.
 - **TanStack Table** — the document list is a filter-by-`doc_type`/`category` table.
-- **Tailwind + shadcn/ui** — Radix primitives copied into the repo; polished tables/inputs fast.
-- **Vite dev proxy** `/api → http://localhost:8000` — sidesteps CORS in dev (no FastAPI middleware). Prod build served static via the compose `ui` service.
+- **Tailwind v4 + shadcn/ui** — Tailwind via the `@tailwindcss/vite` plugin (CSS-first, no `tailwind.config.js`); Radix primitives copied into the repo; polished tables/inputs fast.
+- **Vite dev proxy** `/api → http://localhost:8000` — sidesteps CORS in dev (no FastAPI middleware). Prod build served static by the compose/CDK `web` service (nginx), which reverse-proxies `/api` → `api:8000` the same way (`frontend/nginx.conf`).
 
 shadcn/ui setup notes: needs Tailwind configured **and** path aliases (`@/*`) in both `tsconfig.json` and `vite.config.ts` before `npx shadcn@latest init`. Components copied into `src/components/ui/` on demand; Phase 1 pulls `table button badge input select scroll-area`.
 
-### Backend gap (gating dependency)
+### TypeScript & API typing (decided)
 
-The React app needs more read APIs before it can be useful. Build and curl-verify these before investing heavily in components:
+The API boundary is typed end-to-end, not hand-declared:
+
+- **Strict TS everywhere.** On top of the `react-ts` template's `strict: true`, enable `noUncheckedIndexedAccess`, `noImplicitReturns`, and `exactOptionalPropertyTypes`. Applies to all app code **and** the copied-in `src/components/ui/**` — patch shadcn files inline as strictness errors surface (no per-directory relaxation). Note `exactOptionalPropertyTypes` forces explicit `| undefined` on optional props in a few places.
+- **Types generated from OpenAPI.** `openapi-typescript` runs against FastAPI's `/openapi.json` and emits `frontend/src/api/schema.ts` (committed). `src/api/client.ts` imports the generated `paths` types; no hand-written request/response models. Workflow: `npm run gen:types` (script → `openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.ts`) after any route change.
+- **Every route needs a Pydantic `response_model`.** This is the gate for useful codegen — routes returning bare dicts emit as untyped `object`. Adding/typing `response_model` is part of each backend phase's work, including retrofitting the existing `GET /documents`, `POST /query/ask`, and health routes.
+
+### API docs & testing (decided)
+
+One OpenAPI schema drives everything downstream — generated TS types, Swagger, and ReDoc all derive from the same Pydantic `response_model`s, so they cannot drift.
+
+- **Swagger UI / ReDoc — already shipped by FastAPI.** Served at `/docs` and `/redoc`; no new dependency. Work is enrichment only: per-route `tags`, `summary`/`description`, and response `examples` so `/docs` reads as real documentation. Keep `/docs` enabled in prod (portfolio surface).
+- **Unit/component — Vitest + React Testing Library.** Covers filters, citation rendering, and `client.ts` wrappers. Fast feedback loop; runs under the same strict TS config as app code.
+- **E2E — Playwright, hybrid backend.** Default CI lane mocks `/api/*` via route interception against committed fixtures (deterministic, fast, no Qdrant/Ollama/LLM, no token cost). A separate small real-backend smoke lane (corpus browse + one chat) drives the true stack, run manually or nightly to catch contract/pipeline breaks. Fixtures are derived from the generated schema so mocks stay shape-accurate.
+
+### Backend read surface (built)
+
+The read APIs the workbench needs — all shipped across Phases 1–5, each with a Pydantic `response_model` (paths reflect the as-built routes):
 
 - `GET /documents/{doc_id}` — metadata + latest normalized text from `document_versions.normalized_path`.
 - `GET /documents/{doc_id}/chunks` — chunk list with metadata and qdrant IDs.
@@ -1275,7 +1292,7 @@ The React app needs more read APIs before it can be useful. Build and curl-verif
 - `GET /conversations` and `GET /conversations/{session_id}` — stored chat sessions and turns.
 - `GET /config` — read-only current settings with secrets redacted.
 
-The file reads and SQLite queries should live in `db.py` or small service modules. FastAPI routes remain thin adapters.
+The file reads and SQLite queries should live in `db.py` or small service modules. FastAPI routes remain thin adapters. Each endpoint above ships with a Pydantic `response_model` so it lands in the OpenAPI schema and flows into the generated TS types.
 
 ### Information architecture
 
@@ -1331,27 +1348,39 @@ frontend/                      # sibling to app/, own package.json
 
 ### Phasing
 
-- **Phase 1:** corpus browser — list + filters + detail view + source metadata. Build the document detail endpoint first.
-- **Phase 2:** chat + citations on `/query/ask`, with conversation state and optional debug trace display.
-- **Phase 3:** dashboard + ingestion + health using SQLite sync rows, document/chunk counts, and runtime probes.
-- **Phase 4:** retrieval lab + observability using trace JSONL and app logs.
-- **Phase 5:** evaluations using `data/eval_results/manifest.jsonl` and bundled summaries/scored outputs.
-- **Phase 6:** cost and usage after adding a proper usage ledger or token accounting to traces.
-- **Retirement rule:** retire Streamlit only on parity, not day 1. Keep Streamlit available until React chat and corpus workflows are stable, then repoint the compose `ui` service from Streamlit to the React static build.
+- **Phase 1 (done):** corpus browser — list + filters + detail view + source metadata.
+- **Phase 2 (done):** chat + inline `[n]` citations on `/query/ask`, with conversation state + read-only conversation replay.
+- **Phase 3 (done):** dashboard + ingestion + health using SQLite sync rows, document/chunk counts, and runtime probes.
+- **Phase 4 (done):** retrieval lab + observability using trace JSONL and app logs.
+- **Phase 5 (done):** evaluations using `data/eval_results/manifest.jsonl` and bundled summaries/scored outputs.
+- **Phase 6 (deferred):** cost and usage — blocked on token accounting (generators discard `resp.usage`; traces carry `prompt_length` chars, not tokens). Needs backend instrumentation first.
+- **Retirement (done):** Streamlit was retired on parity — the compose/CDK UI service was repointed from Streamlit to the React nginx build, and `app/ui/` removed.
 
 ### Build order
 
-1. `GET /documents/{doc_id}` + `db.py` reader → curl check.
-2. `npm create vite@latest frontend -- --template react-ts`; install deps; Tailwind + shadcn init; path aliases.
-3. `vite.config.ts` proxy `/api → http://localhost:8000`.
-4. `src/api/client.ts` — typed `Document` / `DocumentDetail` + fetch wrappers.
-5. CorpusList (TanStack Table + `doc_type`/`category`/status/source filters).
-6. CorpusDetail (metadata header + scrollable normalized text pane).
-7. Chat page on `/query/ask` with citation rendering and debug trace panel.
-8. Dashboard, Ingestion, and Health pages backed by overview/sync/health endpoints.
-9. Retrieval Lab and Observability pages backed by trace/log endpoints.
-10. Evaluations page backed by eval manifest and summary endpoints.
-11. Cost & Usage only after token/provider usage data is captured reliably.
+Execution-fidelity specs (one file per phase, with acceptance criteria) live in [`frontend/`](frontend/) — see [`frontend/README.md`](frontend/README.md). Those specs are the handoff artifacts for delegated execution; this section is the summary.
+
+Per-phase loop for every endpoint: **add route with Pydantic `response_model` → curl-verify → `npm run gen:types` → build the frontend slice against generated types.**
+
+**Phase 0 — scaffold (one-time):**
+
+1. `npm create vite@latest frontend -- --template react-ts`; install deps (`react-router-dom @tanstack/react-query @tanstack/react-table`; dev: `openapi-typescript @types/node vitest @testing-library/react @testing-library/jest-dom jsdom @playwright/test`).
+2. Tailwind v4: `npm i tailwindcss @tailwindcss/vite`; add plugin to `vite.config.ts`; `@import "tailwindcss";` in `src/index.css`.
+3. Path aliases `@/*` in `tsconfig.json` **and** `vite.config.ts` (before shadcn); `npx shadcn@latest init`; `add table button badge input select scroll-area`.
+4. `vite.config.ts` proxy `/api → http://localhost:8000`.
+5. tsconfig strict extras (`noUncheckedIndexedAccess`, `noImplicitReturns`, `exactOptionalPropertyTypes`).
+6. Add Pydantic `response_model` to existing `GET /documents`; `npm run gen:types` → `src/api/schema.ts`; `src/api/client.ts` imports generated `paths` types. Done when `tsc --noEmit` is clean and the shell renders live data through the proxy.
+
+**Phase 1+ (features):**
+
+7. `GET /documents/{doc_id}` + `db.py` reader (with `response_model`) → curl → regen types.
+8. CorpusList (TanStack Table + `doc_type`/`category`/status/source filters).
+9. CorpusDetail (metadata header + scrollable normalized text pane).
+10. Chat page on `/query/ask` with citation rendering and debug trace panel.
+11. Dashboard, Ingestion, and Health pages backed by overview/sync/health endpoints.
+12. Retrieval Lab and Observability pages backed by trace/log endpoints.
+13. Evaluations page backed by eval manifest and summary endpoints.
+14. Cost & Usage only after token/provider usage data is captured reliably.
 
 ### Open question / tradeoff (deferred)
 

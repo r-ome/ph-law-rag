@@ -39,16 +39,14 @@ Embedding config rule: `embedding_backend` is the source of truth for standard e
 7. **`app/api/main.py`** — FastAPI app with a single route:
    - `GET /health` → returns `{"status": "ok"}`.
 
-8. **`app/ui/app.py`** — Streamlit stub:
-   - Title: "PH Law RAG"
-   - A single `st.write("UI not yet implemented.")` placeholder.
+8. **Web UI** — the React app (`frontend/`) is scaffolded as its own phased
+   program (see `docs/frontend/`), not part of this backend scaffold milestone.
 
 ### Definition of done
 
 - `raglab init` runs without error, creates data directories, and bootstraps the DB.
 - `raglab show-config` prints the loaded config as JSON.
 - `uvicorn app.api.main:app` starts and `GET /health` returns `{"status": "ok"}`.
-- `streamlit run app/ui/app.py` opens the browser stub without error.
 - Config loads correctly from a `.env` file.
 - DB initializes cleanly (no errors on repeated `raglab init` runs — idempotent).
 
@@ -56,7 +54,7 @@ Embedding config rule: `embedding_backend` is the source of truth for standard e
 
 - Do not start on ingestion, retrieval, or indexing logic yet — those are Milestone 2+.
 - Keep all imports lazy where possible so the CLI doesn't fail at startup if optional deps (Qdrant, Ollama clients) are missing.
-- No business logic in `app/api/main.py` or `app/ui/app.py` — they are adapters only.
+- No business logic in `app/api/main.py` or the React frontend (`frontend/`) — they are adapters only.
 - Use `uv` for dependency management.
 
 ---
@@ -414,7 +412,7 @@ When reviewing code:
 
 1. Compare implementation against `docs/project_plan.md`.
 2. Flag unnecessary complexity — LlamaIndex abstractions should simplify, not obscure.
-3. Keep business logic out of Streamlit and FastAPI adapters.
+3. Keep business logic out of the React frontend and FastAPI adapters.
 4. Preserve incremental-sync architecture.
 5. Preserve local-first design.
 6. Prefer explicit retrieval trace in debug mode over silent failures.

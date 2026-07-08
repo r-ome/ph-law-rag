@@ -15,7 +15,7 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 5. Cites source documents and article/section numbers
 6. Abstains when the corpus doesn't support a grounded answer
 7. Scores answer quality via RAGAS semantic eval metrics
-8. Exposes a Streamlit chat UI and a FastAPI for programmatic access
+8. Exposes a React web UI (workbench) and a FastAPI for programmatic access
 
 ---
 
@@ -32,7 +32,7 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 | PDF ingestion | `pdfplumber` |
 | HTML ingestion | `trafilatura` + BeautifulSoup fallback |
 | Evals | RAGAS (Anthropic judge) |
-| Frontend | Streamlit |
+| Frontend | React + Vite + Tailwind (nginx-served) |
 | API | FastAPI |
 | Config | pydantic-settings |
 | Metadata / versioning | SQLite |
@@ -80,8 +80,8 @@ raglab sync
 # 7. Ask a question
 raglab ask "What are the requisites of a valid contract under the Civil Code?"
 
-# 8. Launch the UI
-streamlit run app/ui/home.py
+# 8. Launch the web UI (React workbench)
+cd frontend && npm install --legacy-peer-deps && npm run dev   # http://localhost:5173 (proxies /api -> :8000)
 
 # 9. Run evals (requires anthropic_api_key in .env)
 raglab eval
@@ -95,11 +95,15 @@ For a step-by-step walkthrough and troubleshooting, see [`docs/local_setup.md`](
 
 ## Run the full stack with docker-compose
 
-Runs Qdrant + FastAPI + Streamlit as three containers. Ollama stays on the host.
+Runs Qdrant + FastAPI + the React web UI (nginx) as three containers. Ollama stays on the host.
 
 ```bash
-docker compose up        # Qdrant (:6333), API (:8000), UI (:8501)
+docker compose up        # Qdrant (:6333), API (:8000), web UI (:8080)
 ```
+
+The `web` container serves the built SPA and reverse-proxies `/api` to the API
+(see `frontend/nginx.conf`). For frontend iteration, run `npm run dev` on the
+host instead (Vite on :5173) rather than rebuilding the image.
 
 Notes:
 - Start host Ollama with `OLLAMA_HOST=0.0.0.0:11434 ollama serve` so the containers can reach it (the default `127.0.0.1` binding rejects container traffic).
@@ -239,8 +243,8 @@ ph-law-rag/
 │   ├── indexing/               # chunk → embed → upsert (Qdrant + BM25)
 │   ├── retriever/              # dense + sparse → RRF → rerank → prompt → answer
 │   ├── evals/                  # RAGAS scoring + report
-│   ├── api/                    # FastAPI adapter
-│   └── ui/                     # Streamlit adapter (home.py)
+│   └── api/                    # FastAPI adapter
+├── frontend/                   # React + Vite web UI (nginx-served in Docker)
 ├── data/
 │   ├── eval_dataset.jsonl      # eval questions (tracked)
 │   ├── raw/                    # downloaded HTML/PDF (gitignored)
@@ -280,7 +284,7 @@ Integration tests `skipif` cleanly when services are unavailable.
 | 2 — Document sync and normalization | ✅ complete |
 | 3 — Chunking, embeddings, indexing | ✅ complete |
 | 4 — Hybrid retrieval and generation | ✅ complete |
-| 5 — Streamlit UI and FastAPI wiring | ✅ complete |
+| 5 — Web UI (React) and FastAPI wiring | ✅ complete |
 | 6 — Evals (RAGAS) | ✅ complete |
 | 7 — Polish, docs, tests, docker-compose | ✅ complete |
 | 8 — Conversation context (multi-turn, query rewriting) | ⬜ planned |

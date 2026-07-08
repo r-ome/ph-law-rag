@@ -1,14 +1,14 @@
 # Overview
 
-- A RAG Pipeline with the Philippine law as its corpus. A personal project that I want to work and experiment on. Currently, it runs using Streamlit as the UI and FastAPI as the API. You can ask questions related to the Philippine law and the model will answer your question and cite the sources, articles, etc where it's located in the Philippine Law. 23 Philippine-law primary sources are indexed (the allowlist in `sources/ph_law_sources.yaml`).
+- A RAG Pipeline with the Philippine law as its corpus. A personal project that I want to work and experiment on. Currently, it runs using a React + Vite web UI (a "workbench" served by nginx in Docker) over a FastAPI backend. You can ask questions related to the Philippine law and the model will answer your question and cite the sources, articles, etc where it's located in the Philippine Law. 23 Philippine-law primary sources are indexed (the allowlist in `sources/ph_law_sources.yaml`).
 
 # System Diagram
 
 ```mermaid
 flowchart LR
 %%{init: {'theme':'dark'}}%%
-User([User]) --> UI[Streamlit UI<br/>home.py]
-UI -->|HTTP| API[FastAPI<br/>routes_query.py]
+User([User]) --> UI[React web UI<br/>nginx-served SPA]
+UI -->|HTTP, /api proxied| API[FastAPI<br/>routes_query.py]
 API -->|create or continue session| Conv[(SQLite<br/>conversations<br/>conversation_turns)]
 API --> AS[answer_service]
 AS -->|load recent turns| Conv
@@ -95,7 +95,7 @@ ragas --> report;
 
 # Data Flow
 
-1. User asks a question in a Streamlit chat session.
+1. User asks a question in the React web UI's chat (the browser calls `/api`, which nginx reverse-proxies to FastAPI).
 2. The API creates or continues a `session_id`, then `answer_service` loads recent turns from SQLite.
 3. Follow-up questions are rewritten into a standalone query before retrieval.
 4. The rewritten query passes through BM25 retrieval (sparse) and Qdrant retrieval (dense cosine similarity).

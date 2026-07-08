@@ -16,11 +16,12 @@ Devlog: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-dev
 - Be concise. Implementation first, minimal explanation unless asked. Plain language over jargon.
 - Use `uv` for deps (`uv add <pkg>`). Python 3.11+.
 - Lazy/in-function imports for optional deps (Qdrant, Ollama, ingestion, indexing) so the CLI never fails at startup when a service or package is missing.
-- Adapters (`app/api`, `app/ui`) hold no business logic.
+- Adapters (`app/api`, `frontend/`) hold no business logic.
 - Config field names/defaults come from the plan's Config System section — match exactly.
 - `embedding_backend` is the source of truth for embedding defaults. Do not require separate model/dim exports for the standard Ollama or Bedrock paths; `Settings` derives and validates them.
 - Work the current milestone only; don't pull work forward.
 - The user codes the milestones themselves. Default to showing code or pseudocode in the chat — do NOT write, create, or edit files unless the user explicitly says to (e.g. "write it", "create the file", "update X"). "Give me the code" / "show me" means display it, not apply it.
+  - **Exception — delegated executor sessions.** For the React frontend program, execution is delegated to a cheaper model (default Sonnet) running from an execution-fidelity spec in `docs/frontend/`. An executor session's job is to implement the spec, so it writes/edits files autonomously — the show-don't-write rule does not apply to it. Planning/architecture sessions (Opus) still follow the default rule: draft specs and plans, don't implement.
 - Don't assume. When intent, scope, or approach is ambiguous, ask first rather than acting — unless the user has explicitly told you to proceed.
 
 ---
@@ -38,9 +39,9 @@ Build:
 - `app/db.py`: connect to `settings.db_path` (create file + parent dirs); `schema_migrations` table; apply migrations in order, skipping applied ones. Migration 1 creates `documents`, `document_versions`, `chunks`, `sync_runs` per plan's Data Model.
 - CLI (Typer, registered as `raglab`). All commands stubs except: `init` (creates the `data/*` dirs, bootstraps DB via `db.py`, prints confirmation) and `show-config` (prints `settings.model_dump()` as JSON). Stubs: `sync`, `ask`, `eval`, `healthcheck`.
 - `app/api/main.py`: FastAPI, `GET /health` → `{"status": "ok"}`.
-- `app/ui/app.py`: Streamlit stub, title "PH Law RAG", placeholder text.
+- Web UI: the React app (`frontend/`) is scaffolded as its own phased program (see `docs/frontend/`), not part of this backend milestone.
 
-**Done when:** `raglab init` runs error-free and is idempotent on repeat; `raglab show-config` prints config JSON; `uvicorn app.api.main:app` serves `/health`; `streamlit run app/ui/app.py` opens without error; config loads from `.env`.
+**Done when:** `raglab init` runs error-free and is idempotent on repeat; `raglab show-config` prints config JSON; `uvicorn app.api.main:app` serves `/health`; config loads from `.env`.
 
 **Don't:** start ingestion/retrieval/indexing.
 
@@ -97,6 +98,6 @@ Build:
 
 ## Review checklist
 
-Compare against `docs/project_plan.md`. Flag unnecessary complexity (LlamaIndex should simplify, not obscure). Keep business logic out of Streamlit/FastAPI. Preserve incremental-sync and local-first design. Prefer an explicit retrieval trace in debug mode over silent failure.
+Compare against `docs/project_plan.md`. Flag unnecessary complexity (LlamaIndex should simplify, not obscure). Keep business logic out of the React frontend/FastAPI adapters. Preserve incremental-sync and local-first design. Prefer an explicit retrieval trace in debug mode over silent failure.
 
 For any divergence from the plan, label it: acceptable simplification / tech debt / bug / scope creep / improvement.
