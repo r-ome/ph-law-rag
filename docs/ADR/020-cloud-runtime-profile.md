@@ -6,7 +6,7 @@
 
 ## Status
 
-Accepted
+Accepted — UI entrypoint amended by [ADR-023](023-react-vite-frontend.md) (Streamlit → React/nginx); the rest of this runtime profile stands.
 
 ## Plain English
 
