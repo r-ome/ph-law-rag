@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from app.config import settings
+from app.retriever.intent_router import INTENTS
 
 IntentLabel = Literal[
     "default",
@@ -13,13 +14,7 @@ IntentLabel = Literal[
     "out_of_scope",
 ]
 
-VALID_INTENTS: set[str] = {
-    "default",
-    "citation_lookup",
-    "list_or_rule_synthesis",
-    "amendment_or_current_law",
-    "out_of_scope",
-}
+VALID_INTENTS: set[str] = set(INTENTS)
 
 
 def _read_jsonl(path: Path) -> list[dict]:

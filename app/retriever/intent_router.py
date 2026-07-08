@@ -147,8 +147,8 @@ DEFAULT_DECISION_FIELDS = dict(
 )
 
 
-def classify(question: str) -> RouterDecision:
-    """Classify a standalone question. Never raises; failures route to default."""
+def classify_with_raw(question: str) -> tuple[RouterDecision, str | None]:
+    """Classify a standalone question and return the raw LLM text for eval audits."""
     from app.retriever.llm_client import generate
 
     system, user = render_llm_prompts(question)
@@ -208,4 +208,10 @@ def classify(question: str) -> RouterDecision:
             error=decision.error,
             fallback_reason=decision.fallback_reason,
         )
+    return decision, raw
+
+
+def classify(question: str) -> RouterDecision:
+    """Classify a standalone question. Never raises; failures route to default."""
+    decision, _raw = classify_with_raw(question)
     return decision

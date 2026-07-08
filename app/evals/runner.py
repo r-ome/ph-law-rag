@@ -54,36 +54,35 @@ def _active_config() -> dict:
     }
 
 
-def run_eval_set() -> tuple[list[dict], Path, str]:
-    from app.observability.logger import configure_logging
-
-    configure_logging()
-
-    dataset = load_dataset(settings.eval_dataset_path)
+def run_rows(
+    rows: list[dict],
+    out_path: Path,
+    *,
+    strategy_override: str | None = None,
+    trace_label: str | None = "eval",
+) -> list[dict]:
     results = []
+    total = len(rows)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    started_at = datetime.now().astimezone()
-    model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
-    run_tag = artifacts.make_run_tag(model_slug, settings.eval_run_label, started_at)
-    paths = artifacts.create_run_paths(run_tag, started_at)
-    out_path = paths.run
-
-    # Print the effective config BEFORE warmup: warmup already exercises the reranker
-    # (a remote backend spends money on it), and a stale .env has silently confounded a
-    # run before (dense_top_k=10 during the Haiku A/B). Eyeball this, then let it spend.
-    print("Active config:")
-    print(json.dumps(_active_config(), indent=2), flush=True)
-
-    answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
-
-    for i, item in enumerate(dataset, start=1):
+    for i, item in enumerate(rows, start=1):
         start = time.perf_counter()
-        resp = answer(item["question"], trace_label="eval")
+        resp = answer(
+            item["question"],
+            debug=True,
+            trace_label=trace_label,
+            strategy_override=strategy_override,
+        )
         elapsed = time.perf_counter() - start
+        debug_chunks = resp.get("debug", {}).get("chunks", [])
+        debug_stages = resp.get("debug", {}).get("stages", [])
         row = {
+            **({"eval_id": item["eval_id"]} if "eval_id" in item else {}),
             "question": item["question"],
             "answer": resp["answer"],
             "contexts": resp["contexts"],
+            "selected_chunk_ids": [c["chunk_id"] for c in debug_chunks],
+            "debug_stages": debug_stages,
             "ground_truth": item["ground_truth"],
             "expected_sources": item.get("expected_sources", []),
             "category": item["category"],
@@ -104,7 +103,33 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
         with out_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
         flag = "ABSTAIN" if row["abstained"] else "answered"
-        print(f"[{i}/{len(dataset)}] {row['category']:12} {flag:8} {elapsed:6.2f}s", flush=True)
+        print(f"[{i}/{total}] {row['category']:12} {flag:8} {elapsed:6.2f}s", flush=True)
+
+    return results
+
+
+def run_eval_set() -> tuple[list[dict], Path, str]:
+    from app.observability.logger import configure_logging
+
+    configure_logging()
+
+    dataset = load_dataset(settings.eval_dataset_path)
+
+    started_at = datetime.now().astimezone()
+    model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
+    run_tag = artifacts.make_run_tag(model_slug, settings.eval_run_label, started_at)
+    paths = artifacts.create_run_paths(run_tag, started_at)
+    out_path = paths.run
+
+    # Print the effective config BEFORE warmup: warmup already exercises the reranker
+    # (a remote backend spends money on it), and a stale .env has silently confounded a
+    # run before (dense_top_k=10 during the Haiku A/B). Eyeball this, then let it spend.
+    print("Active config:")
+    print(json.dumps(_active_config(), indent=2), flush=True)
+
+    answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
+
+    results = run_rows(dataset, out_path)
 
     times = [r["elapsed_s"] for r in results]
     print(f"\nTiming — median {statistics.median(times):.2f}s | mean {statistics.mean(times):.2f}s | "

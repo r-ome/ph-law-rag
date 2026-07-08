@@ -88,6 +88,31 @@ def test_answer_router_on_uses_current_law_strategy_knobs(monkeypatch):
     assert captured["knobs"] == resolve_knobs("current_law")
 
 
+def test_answer_strategy_override_skips_router_and_traces_reason(monkeypatch):
+    records = _capture_traces(monkeypatch)
+    captured = {}
+    monkeypatch.setattr(settings, "router_enabled", True)
+
+    def fail_classify(question):
+        raise AssertionError("router should not classify when strategy is overridden")
+
+    def fake_run_pipeline(question, debug_enabled, strategy_name, strategy_knobs):
+        captured["strategy_name"] = strategy_name
+        captured["knobs"] = strategy_knobs
+        return _response(), SelectionResult(retrieved=[], pre_expansion=[], selected=[]), "prompt"
+
+    monkeypatch.setattr(intent_router, "classify", fail_classify)
+    monkeypatch.setattr(answer_service, "_run_pipeline", fake_run_pipeline)
+
+    answer_service.answer("Which law controls after the amendment?", trace=True, strategy_override="current_law")
+
+    assert captured["strategy_name"] == "current_law"
+    assert captured["knobs"] == resolve_knobs("current_law")
+    assert records[0]["intent_router"]["decision"] is None
+    assert records[0]["intent_router"]["skipped_reason"] == "strategy_override"
+    assert records[0]["retrieval_strategy"]["strategy"] == "current_law"
+
+
 def test_answer_greeting_router_on_does_not_classify(monkeypatch):
     records = _capture_traces(monkeypatch)
     monkeypatch.setattr(settings, "router_enabled", True)

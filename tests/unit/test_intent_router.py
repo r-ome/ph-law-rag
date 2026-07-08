@@ -61,6 +61,16 @@ def test_classify_routes_current_law_on_high_confidence(monkeypatch):
     assert decision.error is None
 
 
+def test_classify_with_raw_preserves_classifier_output(monkeypatch):
+    raw = '{"intent": "default", "confidence": "high"}'
+    _mock_generate(monkeypatch, result=raw)
+
+    decision, returned_raw = intent_router.classify_with_raw("question")
+
+    assert decision.routed_intent == "default"
+    assert returned_raw == raw
+
+
 def test_classify_low_confidence_preserves_intent_but_routes_default(monkeypatch):
     _mock_generate(
         monkeypatch,

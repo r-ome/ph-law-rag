@@ -87,6 +87,7 @@ def _build_trace_record(
     strategy_name: str,
     strategy_knobs: RetrievalKnobs,
     router_decision: "RouterDecision | None",
+    router_skipped_reason: str | None = None,
 ) -> dict:
     preview_chars = settings.trace_max_text_preview
     return {
@@ -112,6 +113,7 @@ def _build_trace_record(
             "enabled": settings.router_enabled,
             "model": settings.router_model if settings.router_enabled else None,
             "decision": router_decision.as_trace_dict() if router_decision else None,
+            **({"skipped_reason": router_skipped_reason} if router_skipped_reason else {}),
         },
         "feature_flags": _feature_flags(),
         "abstained": response.get("abstained", False),
@@ -230,17 +232,19 @@ def answer(
     session_id: str | None = None,
     trace: bool = True,
     trace_label: str | None = None,
+    strategy_override: str | None = None,
     ) -> dict:
     trace_id = new_trace_id()
-    collector = TraceCollector() if trace and settings.trace_logging_enabled else None
     started = time.perf_counter()
     debug_enabled = settings.debug if debug is None else debug
+    collector = TraceCollector() if (trace and settings.trace_logging_enabled) or debug_enabled else None
     effective_question = question
     prompt: str | None = None
     selection = SelectionResult(retrieved=[], pre_expansion=[], selected=[])
     strategy_name = "default"
     strategy_knobs = resolve_knobs(strategy_name)
     router_decision = None
+    router_skipped_reason = None
 
     with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):
         logger.info("answer_started", trace_label=trace_label)
@@ -267,7 +271,11 @@ def answer(
                 from app.conversation.query_rewriter import rewrite_query
                 history = get_history(session_id, settings.max_conversation_turns)
                 effective_question = rewrite_query(question, history)
-            if settings.router_enabled:
+            if strategy_override is not None:
+                strategy_name = strategy_override
+                strategy_knobs = resolve_knobs(strategy_name)
+                router_skipped_reason = "strategy_override"
+            elif settings.router_enabled:
                 from app.retriever.intent_router import classify
 
                 router_decision = classify(effective_question)
@@ -279,6 +287,9 @@ def answer(
                 strategy_name,
                 strategy_knobs,
             )
+
+        if debug_enabled and collector:
+            response.setdefault("debug", {})["stages"] = list(collector.stages)
 
         if session_id:
             import json
@@ -316,6 +327,7 @@ def answer(
                     strategy_name=strategy_name,
                     strategy_knobs=strategy_knobs,
                     router_decision=router_decision,
+                    router_skipped_reason=router_skipped_reason,
                 )
             )
         return response

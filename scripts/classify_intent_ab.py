@@ -20,7 +20,6 @@ from app.retriever.intent_router import (
     SYSTEM_PROMPT,
     parse_prediction,
     render_llm_prompts,
-    strip_code_fence,
 )
 
 LLM_ARMS = {"mistral", "haiku", "qwen3", "gemma3"}
