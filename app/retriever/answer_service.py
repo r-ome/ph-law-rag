@@ -233,7 +233,7 @@ def answer(
     trace: bool = True,
     trace_label: str | None = None,
     strategy_override: str | None = None,
-    ) -> dict:
+) -> dict:
     trace_id = new_trace_id()
     started = time.perf_counter()
     debug_enabled = settings.debug if debug is None else debug

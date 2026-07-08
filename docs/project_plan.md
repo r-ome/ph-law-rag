@@ -186,8 +186,7 @@ ph-law-rag/
 │   │   └── health.py        # Qdrant/Ollama HTTP probes shared by CLI/API/reindex
 │   ├── ingestion/
 │   │   ├── fetcher.py       # httpx downloader → FetchResult
-│   │   ├── pdf_parser.py    # pdfplumber extraction
-│   │   ├── html_parser.py   # trafilatura extraction
+│   │   ├── parser.py        # html/pdf extraction helpers
 │   │   ├── normalizer.py    # whitespace cleanup
 │   │   ├── storage.py       # hash compare, disk write, SQLite write
 │   │   └── sync.py          # ingest one source; no indexing or sync_runs ownership
@@ -197,16 +196,15 @@ ph-law-rag/
 │   │   ├── vector_store.py  # Qdrant wrapper (upsert, delete, query)
 │   │   ├── bm25_store.py    # BM25Retriever build/persist/load
 │   │   └── index_service.py # orchestrator: chunk → embed → upsert
-│   ├── retrieval/
+│   ├── retriever/
 │   │   ├── dense_retriever.py    # Qdrant top-k dense retrieval
 │   │   ├── sparse_retriever.py   # BM25 top-k retrieval
 │   │   ├── hybrid_retriever.py   # RRF fusion of dense + sparse
 │   │   ├── reranker.py           # cross-encoder rescoring
-│   │   └── context_builder.py    # numbered prompt + source list
-│   ├── generation/
 │   │   ├── llm_client.py         # Ollama HTTP client
 │   │   ├── prompts.py            # system + grounding prompt templates
-│   │   └── answer_service.py     # full ask pipeline orchestrator
+│   │   ├── answer_service.py     # full ask pipeline orchestrator
+│   │   └── context_builder.py    # numbered prompt + source list
 │   ├── evals/
 │   │   ├── artifacts.py          # eval artifact paths, legacy fallback, manifest
 │   │   ├── runner.py             # runs questions through ask pipeline
@@ -1237,9 +1235,21 @@ If the current implementation differs from this plan, note whether the differenc
 
 ---
 
-## Future Feature: React + Vite Frontend (Corpus Browser)
+## Future Feature: React + Vite Frontend (Legal RAG Workbench)
 
-A polished React frontend to eventually replace the Streamlit UI. Primary Phase-1 goal: a **source/corpus browser** — browse indexed law documents, filter by `doc_type`/`category`, view normalized text + sync status. This is a clean adapter swap: FastAPI is untouched except for one new endpoint; business logic stays out of the frontend.
+A polished React frontend to eventually replace the Streamlit UI. The product should feel like a **legal RAG workbench**, not a generic SaaS admin dashboard: chat, corpus browsing, citations, retrieval traces, eval quality, source lifecycle, and cost visibility are the differentiators.
+
+Current implementation state:
+
+- Streamlit already provides a basic two-tab chat/source UI in `app/ui/home.py`.
+- FastAPI currently exposes only the minimum serving surface: `GET /health`, `POST /query/ask`, `GET /documents`, and a background sync trigger under the documents router.
+- Richer UI data already exists locally but is not fully exposed over API:
+  - SQLite: `documents`, `document_versions`, `chunks`, `sync_runs`, `conversations`, `conversation_turns`, `chunk_parents`.
+  - Logs: `data/logs/app.log`.
+  - Retrieval traces: `data/logs/traces/*.jsonl`.
+  - Eval artifacts: `data/eval_results/manifest.jsonl`, bundled run directories, summaries, scored outputs, and diffs.
+
+Keep this as an adapter swap: business logic stays in Python service modules; React calls thin FastAPI endpoints.
 
 ### Stack (decided)
 
@@ -1254,17 +1264,64 @@ shadcn/ui setup notes: needs Tailwind configured **and** path aliases (`@/*`) in
 
 ### Backend gap (gating dependency)
 
-The corpus browser needs to view a document, but no endpoint serves the normalized text. Build **`GET /documents/{doc_id}`** (metadata + contents of `document_versions.normalized_path`) first, and `curl`-verify before touching React. The file-read goes in a `db.py`/service function; the route stays a thin adapter. (This endpoint is already listed in the FastAPI Endpoints table but is currently unbuilt.)
+The React app needs more read APIs before it can be useful. Build and curl-verify these before investing heavily in components:
+
+- `GET /documents/{doc_id}` — metadata + latest normalized text from `document_versions.normalized_path`.
+- `GET /documents/{doc_id}/chunks` — chunk list with metadata and qdrant IDs.
+- `GET /stats/overview` — corpus totals, chunk totals, latest sync, recent query counts, basic latency and error metrics from traces/logs.
+- `GET /sync/runs` — latest rows from `sync_runs`.
+- `GET /traces` and `GET /traces/{trace_id}` — list and inspect JSONL retrieval traces.
+- `GET /evals/runs` and `GET /evals/runs/{tag}` — expose `manifest.jsonl`, summary, scored artifacts, and paths.
+- `GET /conversations` and `GET /conversations/{session_id}` — stored chat sessions and turns.
+- `GET /config` — read-only current settings with secrets redacted.
+
+The file reads and SQLite queries should live in `db.py` or small service modules. FastAPI routes remain thin adapters.
+
+### Information architecture
+
+Recommended React pages:
+
+- **Chat** — primary user-facing legal assistant with citations, debug toggle, conversation state, and retrieved context inspection.
+- **Corpus** — public-readable source/document browser. This can absorb the original `Documents` page: filters by category, doc type, legal status, tags, and source index; detail view with normalized text and source URL.
+- **Sources** — curated source config view from `sources/ph_law_sources.yaml`: enabled/disabled, availability, source index, official number, legal status, tags, amendment/supersession relationships.
+- **Ingestion** — source sync operations and history: manual sync button, latest sync runs, failed fetches, changed/unchanged counts, version history.
+- **Retrieval Lab** — developer/research view for one query: dense results, BM25 results, fused candidates, reranked results, selected context, scores, chunk previews, and stage timings.
+- **Evaluations** — eval run index and detail: faithfulness, answer relevancy, context precision, context recall, abstention accuracy, by-category breakdowns, and diff links.
+- **Observability** — logs, traces, query latency, retrieval stages, errors, and trace search.
+- **Conversations** — browse stored sessions from `conversations` and `conversation_turns`; useful for debugging follow-up rewriting.
+- **Health** — Qdrant, Ollama/LLM backend, DB, BM25 files, API status, and current runtime profile.
+- **Settings** — read-only config first; later editable local feature flags for reranker backend, top-k values, parent expansion, query rewriting, answerability gate, and self-check.
+- **Cost & Usage** — internal cost accounting by model/backend/day/trace label. Do not call this "Pricing" unless it becomes customer-facing. Current traces include prompt length and latency but do not yet provide reliable input/output token accounting; add a usage ledger before treating this as authoritative.
+- **Amendment Timeline** — visualize operative/superseded/repealed chains and provision-level relationships. This is a legal-domain differentiator and should be more prominent than generic user-count stats.
+
+Page feedback:
+
+- Keep **Dashboard** as the landing overview: health, corpus size, latest sync, latest eval score, recent queries, error rate, and latency.
+- Rename broad **Statistics** to **Analytics** unless real user/account tracking exists.
+- Rename **Pricing** to **Cost & Usage** for internal model/provider accounting.
+- Keep **Ingestion** focused on source lifecycle; keep **Corpus/Documents** focused on reading and inspecting legal text.
 
 ### Folder layout
 
 ```
 frontend/                      # sibling to app/, own package.json
   src/
-    api/client.ts              # fetch wrapper + types (Document, DocumentDetail)
+    api/client.ts              # fetch wrapper + typed API models
     routes/
-      DocumentsList.tsx        # table + filters + Sync button
-      DocumentDetail.tsx       # metadata header + normalized text pane
+      Dashboard.tsx
+      Chat.tsx
+      CorpusList.tsx           # table + filters
+      CorpusDetail.tsx         # metadata header + normalized text pane
+      Sources.tsx
+      Ingestion.tsx
+      RetrievalLab.tsx
+      Evaluations.tsx
+      Observability.tsx
+      Conversations.tsx
+      Health.tsx
+      Settings.tsx
+      CostUsage.tsx
+      AmendmentTimeline.tsx
     components/                # shared + components/ui/ (shadcn)
     App.tsx                    # router
     main.tsx
@@ -1274,8 +1331,13 @@ frontend/                      # sibling to app/, own package.json
 
 ### Phasing
 
-- **Phase 1:** corpus browser — list + filters + detail view + Sync button.
-- **Phase 2:** chat + citations on `/query/ask`, then retire Streamlit. **Retire-on-parity, not day-1** — keep Streamlit (which currently also serves chat) alive until the React chat ships, so the demo is never broken. Then repoint the compose `ui` service from Streamlit to the React static build.
+- **Phase 1:** corpus browser — list + filters + detail view + source metadata. Build the document detail endpoint first.
+- **Phase 2:** chat + citations on `/query/ask`, with conversation state and optional debug trace display.
+- **Phase 3:** dashboard + ingestion + health using SQLite sync rows, document/chunk counts, and runtime probes.
+- **Phase 4:** retrieval lab + observability using trace JSONL and app logs.
+- **Phase 5:** evaluations using `data/eval_results/manifest.jsonl` and bundled summaries/scored outputs.
+- **Phase 6:** cost and usage after adding a proper usage ledger or token accounting to traces.
+- **Retirement rule:** retire Streamlit only on parity, not day 1. Keep Streamlit available until React chat and corpus workflows are stable, then repoint the compose `ui` service from Streamlit to the React static build.
 
 ### Build order
 
@@ -1283,9 +1345,14 @@ frontend/                      # sibling to app/, own package.json
 2. `npm create vite@latest frontend -- --template react-ts`; install deps; Tailwind + shadcn init; path aliases.
 3. `vite.config.ts` proxy `/api → http://localhost:8000`.
 4. `src/api/client.ts` — typed `Document` / `DocumentDetail` + fetch wrappers.
-5. DocumentsList (TanStack Table + `doc_type`/`category` filters + Sync).
-6. DocumentDetail (metadata header + scrollable text pane).
+5. CorpusList (TanStack Table + `doc_type`/`category`/status/source filters).
+6. CorpusDetail (metadata header + scrollable normalized text pane).
+7. Chat page on `/query/ask` with citation rendering and debug trace panel.
+8. Dashboard, Ingestion, and Health pages backed by overview/sync/health endpoints.
+9. Retrieval Lab and Observability pages backed by trace/log endpoints.
+10. Evaluations page backed by eval manifest and summary endpoints.
+11. Cost & Usage only after token/provider usage data is captured reliably.
 
 ### Open question / tradeoff (deferred)
 
-A React rebuild competes for time with the bar-exam grader, which is a rarer portfolio differentiator than a frontend. Treat this as polish, sequence it accordingly.
+A React rebuild competes for time with deeper legal-RAG capabilities. Treat it as polish unless the frontend itself becomes the portfolio focus. The strongest UI angle is not generic analytics; it is making retrieval quality, legal source lifecycle, citations, and eval evidence inspectable.

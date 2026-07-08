@@ -58,6 +58,7 @@ def run_rows(
     rows: list[dict],
     out_path: Path,
     *,
+    debug: bool = True,
     strategy_override: str | None = None,
     trace_label: str | None = "eval",
 ) -> list[dict]:
@@ -69,7 +70,7 @@ def run_rows(
         start = time.perf_counter()
         resp = answer(
             item["question"],
-            debug=True,
+            debug=debug,
             trace_label=trace_label,
             strategy_override=strategy_override,
         )
