@@ -76,6 +76,11 @@ class Settings(BaseSettings):
 	# llm_model: str = "deepseek-r1:8b"
 	llm_model: str = "mistral"
 	# llm_model: str = "qwen3:4b"
+	# Intent router (R4): Haiku classifier in front of non-greeting queries,
+	# mapping intent -> strategy preset. Off by default so local surfaces stay
+	# routerless; cloud/demo surfaces opt in via router_enabled=true.
+	router_enabled: bool = False
+	router_model: str = "claude-haiku-4-5"
 	reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 	# Selector backend default (graduated 2026-07-07, ADR-021): Bedrock Rerank API,
 	# serverless per-call. Matched qwen3 retrieval quality in the judged A/B (prec +.023,

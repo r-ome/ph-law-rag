@@ -86,6 +86,7 @@ def _build_trace_record(
     elapsed_ms: float,
     strategy_name: str,
     strategy_knobs: RetrievalKnobs,
+    router_decision: "RouterDecision | None",
 ) -> dict:
     preview_chars = settings.trace_max_text_preview
     return {
@@ -106,6 +107,11 @@ def _build_trace_record(
         "retrieval_strategy": {
             "strategy": strategy_name,
             "knobs": strategy_knobs.as_trace_dict(),
+        },
+        "intent_router": {
+            "enabled": settings.router_enabled,
+            "model": settings.router_model if settings.router_enabled else None,
+            "decision": router_decision.as_trace_dict() if router_decision else None,
         },
         "feature_flags": _feature_flags(),
         "abstained": response.get("abstained", False),
@@ -234,6 +240,7 @@ def answer(
     selection = SelectionResult(retrieved=[], pre_expansion=[], selected=[])
     strategy_name = "default"
     strategy_knobs = resolve_knobs(strategy_name)
+    router_decision = None
 
     with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):
         logger.info("answer_started", trace_label=trace_label)
@@ -260,6 +267,12 @@ def answer(
                 from app.conversation.query_rewriter import rewrite_query
                 history = get_history(session_id, settings.max_conversation_turns)
                 effective_question = rewrite_query(question, history)
+            if settings.router_enabled:
+                from app.retriever.intent_router import classify
+
+                router_decision = classify(effective_question)
+                strategy_name = router_decision.strategy
+                strategy_knobs = resolve_knobs(strategy_name)
             response, selection, prompt = _run_pipeline(
                 effective_question,
                 debug_enabled,
@@ -302,6 +315,7 @@ def answer(
                     elapsed_ms=elapsed_ms,
                     strategy_name=strategy_name,
                     strategy_knobs=strategy_knobs,
+                    router_decision=router_decision,
                 )
             )
         return response

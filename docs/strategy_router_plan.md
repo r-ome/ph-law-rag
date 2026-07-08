@@ -1,6 +1,6 @@
 # Strategy Router — Plan
 
-**Status:** locked 2026-07-07. R1 tooling (00cb232, benchmark run pending), R2 (d07fef8, zero-diff preflight), and R3 (traced + decided, see R3 outcome) are implemented; R4/R5 are not. Build constraints amended after external reviews (see per-milestone "Binding" notes).
+**Status:** locked 2026-07-07. R1 tooling (00cb232, benchmark run pending), R2 (d07fef8, zero-diff preflight), R3 (traced + decided, see R3 outcome), and R4 (router in serving, default-off locally) are implemented; R5 is not. Build constraints amended after external reviews (see per-milestone "Binding" notes).
 
 ## Motivation
 
@@ -136,7 +136,9 @@ Refactor before router: strategies must be deterministic and testable before the
 
 **Build:** relocate the greeting-guard call site under the router; condensation -> classifier (R1's winning arm, temperature 0) -> `INTENT_TO_STRATEGY` -> strategy execution. Low confidence or parse failure -> `default`. Intent, confidence, and strategy name in the trace (distinct namespaces per rule 4).
 
-**Done when:** every `raglab ask` / API query traces an intent and a resolved strategy; greetings still short-circuit; behavior is identical to R2 for any intent mapped to `default`.
+**Done when:** every `raglab ask` / API query traces the resolved strategy and router enabled-state; every routed (non-greeting, router-on) query traces an intent and confidence; greetings still short-circuit; behavior is identical to R2 for any intent mapped to `default`.
+
+**R4 outcome (2026-07-08):** router module owns the R1 v1 prompt/parser and a hash-pin test locks the moved prompt to `01056915c48c518f1a677980be4253e1f221103e3c5f29a8b98e3b060404a78a`. `answer_service.answer()` classifies only after query rewriting and only when `router_enabled=true`; greetings and router-off queries trace `decision: null` by design. Router/backend failures, parse failures, and low confidence fall back to `default` with `fallback_reason` in the trace. Cloud/demo surfaces enable the router and trace logging; local defaults remain routerless.
 
 ### R5 — Predicted-strategy eval
 

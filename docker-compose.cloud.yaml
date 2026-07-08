@@ -19,6 +19,9 @@ services:
       # Match the deployed demo (infra API_ENVIRONMENT): serving uses MiniLM;
       # bedrock (eval/host default) is quota-capped 2 calls/min. See ADR-021.
       reranker_backend: minilm
+      trace_logging_enabled: "true"
+      router_enabled: "true"
+      router_model: claude-haiku-4-5
     volumes:
       - ${HOME}/.aws:/root/.aws:ro
 

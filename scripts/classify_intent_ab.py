@@ -13,16 +13,15 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
-from app.evals.intent_labels import VALID_INTENTS, load_intent_labels
-
-
-INTENTS = [
-    "default",
-    "citation_lookup",
-    "list_or_rule_synthesis",
-    "amendment_or_current_law",
-    "out_of_scope",
-]
+from app.evals.intent_labels import load_intent_labels
+from app.retriever.intent_router import (
+    FEW_SHOTS,
+    INTENTS,
+    SYSTEM_PROMPT,
+    parse_prediction,
+    render_llm_prompts,
+    strip_code_fence,
+)
 
 LLM_ARMS = {"mistral", "haiku", "qwen3", "gemma3"}
 ALL_ARMS = ["mistral", "haiku", "nli", "qwen3", "gemma3"]
@@ -36,19 +35,6 @@ DEFAULT_MODELS = {
 }
 
 DEFAULT_NLI_MARGIN_THRESHOLD = 0.15
-
-FEW_SHOTS = [
-    ("Can police make a warrantless arrest right after seeing a theft?", "default"),
-    ("Is a notarized contract automatically enforceable in court?", "default"),
-    ("What does Article 315 of the Revised Penal Code say?", "citation_lookup"),
-    ("What does Section 5 of RA 9165 provide?", "citation_lookup"),
-    ("List the essential elements of donation under Philippine civil law.", "list_or_rule_synthesis"),
-    ("What are the just causes for terminating employment?", "list_or_rule_synthesis"),
-    ("Which rule controls now after a later statute changed an old penalty amount?", "amendment_or_current_law"),
-    ("Was the age threshold for sexual consent changed by a later law?", "amendment_or_current_law"),
-    ("How do I file my income tax return this year?", "out_of_scope"),
-    ("What documents do I need for a Canadian tourist visa?", "out_of_scope"),
-]
 
 SMOKE_QUESTIONS = [
     ("Can a person refuse to testify against himself in a criminal case?", "default"),
@@ -65,28 +51,6 @@ NLI_HYPOTHESES = {
     "amendment_or_current_law": "This question asks which law is currently operative after an amendment, repeal, supersession, or later-enacted change.",
     "out_of_scope": "This question asks about a topic outside the indexed Philippine law corpus.",
 }
-
-SYSTEM_PROMPT = """You classify Philippine-law questions for a retrieval router.
-
-Return exactly one JSON object and nothing else:
-{{"intent": "...", "confidence": "high"|"low"}}
-
-Valid intents:
-- default: ordinary legal information, paraphrase, case-law, or cross-source questions that do not require a special router lane.
-- citation_lookup: asks what a specific article, section, statute, rule, or legal citation says. This is about locating cited text, not deciding whether the cited law is still current.
-- list_or_rule_synthesis: asks for a list, elements, requisites, grounds, rights, duties, factors, or a rule set.
-- amendment_or_current_law: asks whether law has changed, what current law controls, how an old rule was amended, repealed, superseded, or replaced, or how a later law affects an older one.
-- out_of_scope: asks about a topic outside the indexed Philippine law corpus, such as tax computation, visas, local permit details, social benefits computation, customs rates, securities registration, or procedural deadlines not covered by the corpus.
-
-Tie-breaking:
-- If a question asks whether an old cited provision is still current, choose amendment_or_current_law, not citation_lookup.
-- If an out-of-scope topic is legal but the corpus does not cover it, choose out_of_scope.
-- Use confidence "low" only when the router should fall back to default retrieval.
-
-Few-shot examples:
-{few_shots}
-"""
-
 
 def _json_dumps(payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -120,50 +84,6 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 def _write_json(path: Path, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def strip_code_fence(raw: str) -> str:
-    text = raw.strip()
-    if not text.startswith("```") or not text.endswith("```"):
-        return text
-
-    lines = text.splitlines()
-    if len(lines) < 2:
-        return text
-    first = lines[0].strip()
-    last = lines[-1].strip()
-    if first.startswith("```") and last == "```":
-        return "\n".join(lines[1:-1]).strip()
-    return text
-
-
-def parse_prediction(raw: str) -> tuple[str, str] | None:
-    try:
-        data = json.loads(strip_code_fence(raw))
-    except json.JSONDecodeError:
-        return None
-
-    if not isinstance(data, dict) or set(data) != {"intent", "confidence"}:
-        return None
-    intent = data.get("intent")
-    confidence = data.get("confidence")
-    if intent not in VALID_INTENTS or confidence not in {"high", "low"}:
-        return None
-    return intent, confidence
-
-
-def rendered_few_shots() -> str:
-    lines = []
-    for question, intent in FEW_SHOTS:
-        lines.append(f"Q: {question}")
-        lines.append(f'A: {{"intent": "{intent}", "confidence": "high"}}')
-    return "\n".join(lines)
-
-
-def render_llm_prompts(question: str) -> tuple[str, str]:
-    system = SYSTEM_PROMPT.format(few_shots=rendered_few_shots())
-    user = f"Question: {question}\nReturn the JSON object only."
-    return system, user
 
 
 def render_nli_prompt() -> str:
@@ -605,7 +525,7 @@ def main() -> None:
         "cache_dir": str(cache_dir),
         "prompt_hash": _sha256(prompt_text),
         "nli_hypotheses_hash": _sha256(render_nli_prompt()),
-        "few_shot_source": "hand-authored non-eval examples in scripts/classify_intent_ab.py",
+        "few_shot_source": "hand-authored non-eval examples in app/retriever/intent_router.py",
         "smoke_question_source": "hand-authored non-eval smoke pool in scripts/classify_intent_ab.py",
         "prompt_iteration_policy": "Prompt and hypotheses are authored once, smoke-tested off-benchmark, then benchmarked once. Cache is for crash/resume only.",
         "nli_margin_threshold": args.nli_margin_threshold,

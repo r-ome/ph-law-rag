@@ -31,7 +31,8 @@ API_ENVIRONMENT = {
     "answerability_gate_enabled": "false",
     "faithfulness_selfcheck_enabled": "false",
     "query_decomposition_enabled": "false",
-    "trace_logging_enabled": "false",
+    "trace_logging_enabled": "true",
+    "router_enabled": "true",
 }
 
 
