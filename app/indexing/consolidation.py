@@ -64,6 +64,9 @@ def build_splice_plan(conn) -> SplicePlan:
 		if insertion.provision_partial:
 			exclusions.append(_exclusion(key, "partial", _entry_detail([insertion])))
 			continue
+		if key in overrides:
+			exclusions.append(_exclusion(key, "override_collision", _entry_detail([insertion])))
+			continue
 		if insertion.length_ratio is None or not (
 			MIN_LENGTH_RATIO <= insertion.length_ratio <= MAX_LENGTH_RATIO
 		):
@@ -77,9 +80,6 @@ def build_splice_plan(conn) -> SplicePlan:
 					},
 				)
 			)
-			continue
-		if key in overrides:
-			exclusions.append(_exclusion(key, "override_collision", _entry_detail([insertion])))
 			continue
 
 		preflight = _preflight_partial(

@@ -173,7 +173,7 @@ def test_bucket_classification_reports_exclusions(tmp_path, monkeypatch):
 	_chunk(conn, pid="base:article:3", source_id="amend_chain_b", number="3", inserted_into="base")
 	_chunk(conn, pid="base:article:4", source_id="amend_outlier", number="4", inserted_into="base", char_count=50)
 	_chunk(conn, pid="base:article:5", source_id="amend_nobase", number="5", inserted_into="base")
-	_chunk(conn, pid="base:article:6", source_id="amend_override", number="6", inserted_into="base")
+	_chunk(conn, pid="base:article:6", source_id="amend_override", number="6", inserted_into="base", char_count=250)
 
 	plan = build_splice_plan(conn)
 

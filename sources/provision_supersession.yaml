@@ -9,6 +9,8 @@
 # provision_id). ids below are DB-derived from the live chunks table (2026-07-02):
 #   SELECT DISTINCT json_extract(metadata_json,'$.provision_id') FROM chunks
 #   WHERE json_extract(metadata_json,'$.source_id') = '<source_id>';
+# Add pairs only when stale text remains retrievable, usually partial restatements.
+# Fully hidden families intentionally omit inert pairs.
 supersessions:
   # RA 10640 preserves its quotation marks in extraction, so its inserted Section 21
   # carries the TARGET-namespace id (dangerous_drugs_act:section:21, path-less) while the
@@ -33,4 +35,105 @@ supersessions:
       - "judiciary_reorganization_amendments_2021:section:1"   # chapeau
       - "judiciary_reorganization_act:section:19"              # inserted operative RTC jurisdiction text
       - "judiciary_reorganization_act:section:33"              # inserted operative MTC jurisdiction text
+    kind: amendment
+
+  # RA 11053 restatement: inserted sections carry TARGET-namespace path-less ids that
+  # exactly collide with the base ids (first true same-id collision in the corpus).
+  # Base is also hidden at index time via provision_status.yaml. This predates the
+  # no-inert-pairs rule for fully hidden families and is grandfathered as harmless.
+  - base_source_id: anti_hazing
+    base_provision_ids:
+      - "anti_hazing:section:1"
+      - "anti_hazing:section:2"
+      - "anti_hazing:section:3"
+      - "anti_hazing:section:4"
+      - "anti_hazing:section:5"
+      - "anti_hazing:section:6"
+      - "anti_hazing:section:7"
+    operative_source_id: anti_hazing_amendments_2018
+    operative_provision_ids:
+      - "anti_hazing:section:1"                              # inserted operative text
+      - "anti_hazing:section:2"
+      - "anti_hazing:section:3"
+      - "anti_hazing:section:4"
+      - "anti_hazing:section:5"
+      - "anti_hazing:section:6"
+      - "anti_hazing:section:7"
+      - "anti_hazing:section:8"
+      - "anti_hazing:section:9"
+      - "anti_hazing:section:10"
+      - "anti_hazing:section:11"
+      - "anti_hazing:section:12"
+      - "anti_hazing:section:13"
+      - "anti_hazing:section:14"
+      - "anti_hazing:section:15"
+      - "anti_hazing_amendments_2018:section:1"              # chapeau
+      - "anti_hazing_amendments_2018:section:2"
+      - "anti_hazing_amendments_2018:section:3"
+      - "anti_hazing_amendments_2018:section:4"
+      - "anti_hazing_amendments_2018:section:5"
+      - "anti_hazing_amendments_2018:section:6"
+      - "anti_hazing_amendments_2018:section:7"
+      - "anti_hazing_amendments_2018:section:8"
+      - "anti_hazing_amendments_2018:section:9"
+      - "anti_hazing_amendments_2018:section:10"
+      - "anti_hazing_amendments_2018:section:11"
+      - "anti_hazing_amendments_2018:section:12"
+      - "anti_hazing_amendments_2018:section:13"
+      - "anti_hazing_amendments_2018:section:14"
+      - "anti_hazing_amendments_2018:section:15"
+    kind: amendment
+
+  # RA 11648 partial restatements: base chunks stay live because they carry operative text
+  # the amendment elides ('x x x'). Query-time downrank is the only available mechanism;
+  # stale age-12 text in these chunks remains retrievable in the default lane.
+  - base_source_id: anti_rape_law_1997
+    base_provision_ids: ["revised_penal_code:article:266-a"]
+    operative_source_id: statutory_rape_amendments_2022
+    operative_provision_ids:
+      - "revised_penal_code:article:266-a"                 # inserted operative text, paragraph 1(d), age 16
+      - "statutory_rape_amendments_2022:section:1"         # chapeau
+    kind: amendment
+
+  - base_source_id: child_abuse_act
+    base_provision_ids: ["child_abuse_act:article-v-title-policy-principles-and-definitions-of-terms:section:9"]
+    operative_source_id: statutory_rape_amendments_2022
+    operative_provision_ids:
+      - "revised_penal_code:section:9"                     # wrong-namespace id from amends_namespace limitation
+      - "statutory_rape_amendments_2022:section:3"         # chapeau
+    kind: amendment
+
+  # RA 11862 partially restated these anti-trafficking sections; the RA 10364
+  # copies stay live as the fullest operative text but are demoted when 2022 text
+  # is retrieved. One rule per section: prefer_operative demotes every listed base
+  # id when any listed operative id matches. Fully hidden families intentionally
+  # have no belt-and-suspenders pairs.
+  - base_source_id: anti_trafficking_expanded_2013
+    base_provision_ids: ["anti_trafficking:section:3"]
+    operative_source_id: anti_trafficking_amendments_2022
+    operative_provision_ids: ["anti_trafficking:section:3"]
+    kind: amendment
+
+  - base_source_id: anti_trafficking_expanded_2013
+    base_provision_ids: ["anti_trafficking:section:4"]
+    operative_source_id: anti_trafficking_amendments_2022
+    operative_provision_ids: ["anti_trafficking:section:4"]
+    kind: amendment
+
+  - base_source_id: anti_trafficking_expanded_2013
+    base_provision_ids: ["anti_trafficking:section:10"]
+    operative_source_id: anti_trafficking_amendments_2022
+    operative_provision_ids: ["anti_trafficking:section:10"]
+    kind: amendment
+
+  - base_source_id: anti_trafficking_expanded_2013
+    base_provision_ids: ["anti_trafficking:section:16"]
+    operative_source_id: anti_trafficking_amendments_2022
+    operative_provision_ids: ["anti_trafficking:section:16"]
+    kind: amendment
+
+  - base_source_id: anti_trafficking_expanded_2013
+    base_provision_ids: ["anti_trafficking:section:22"]
+    operative_source_id: anti_trafficking_amendments_2022
+    operative_provision_ids: ["anti_trafficking:section:22"]
     kind: amendment

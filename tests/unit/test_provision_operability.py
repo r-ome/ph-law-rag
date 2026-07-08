@@ -81,6 +81,19 @@ def _section_21_overrides(labels=("Section 21", "Section 21(1)", "Section 21(2)"
 	),)}
 
 
+def _anti_hazing_section_2_override():
+	return {"anti_hazing:section:2": (ProvisionOverride(
+		provision_id="anti_hazing:section:2",
+		source_id="anti_hazing",
+		unit_labels=None,
+		provision_status="superseded",
+		operability_action="hide",
+		basis_source_id="anti_hazing_amendments_2018",
+		effective_date="2018-06-29",
+		note="RA 11053 bans hazing outright.",
+	),)}
+
+
 def test_apply_overrides_stamps_without_touching_status():
 	meta = {"provision_id": "revised_penal_code:article:335", "status": "operative", "operability_action": "show"}
 	apply_overrides(meta, _overrides())
@@ -158,6 +171,29 @@ def test_apply_overrides_source_id_mismatch_is_complete_noop():
 		"source_id": "dangerous_drugs_amendments_2014",
 		"unit_label": "Section 21(1)",
 	}
+
+
+def test_apply_overrides_same_id_collision_hide_is_source_scoped():
+	base = {
+		"provision_id": "anti_hazing:section:2",
+		"source_id": "anti_hazing",
+		"status": "operative",
+		"operability_action": "show",
+	}
+	operative = {
+		"provision_id": "anti_hazing:section:2",
+		"source_id": "anti_hazing_amendments_2018",
+		"status": "operative",
+		"operability_action": "show",
+	}
+	apply_overrides(base, _anti_hazing_section_2_override())
+	apply_overrides(operative, _anti_hazing_section_2_override())
+
+	assert base["provision_status"] == "superseded"
+	assert base["operability_action"] == "hide"
+	assert base["operability_basis_source_id"] == "anti_hazing_amendments_2018"
+	assert "provision_status" not in operative
+	assert operative["operability_action"] == "show"
 
 
 def test_apply_overrides_legacy_whole_provision_hides_without_flag():

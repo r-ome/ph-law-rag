@@ -8,9 +8,12 @@
 # (exact label match, never prefix), only when the replacement text is indexed and operative
 # (basis_source_id). Whole-provision entries remain forbidden for partials. Leaf-scoped entries also
 # stamp parent_has_hidden_leaves on surviving siblings.
-# HARD RULE: if an amendment inserts a same-id replacement that collides with a base provision_id,
-# add a curated rule to provision_supersession.yaml instead. Same-id collisions must never become
-# provision_status.yaml overrides because overrides match bare provision_id across source_id values.
+# HARD RULE: same-id collisions (an amendment inserts a replacement carrying the same
+# provision_id as a base provision) must never become BARE overrides - bare entries match
+# provision_id across source_id values and would hide the inserted replacement too.
+# A source_id-scoped entry is safe (apply_overrides skips non-matching source_id). For
+# collisions, use a source_id-scoped hide when the base provision is wholly dead. Add a
+# provision_supersession.yaml pair only when stale text remains retrievable.
 # status of the document is NEVER changed here; only provision_status + operability_action.
 # Applied at INDEX time — edits require `raglab reindex` (sync will not detect override drift).
 
@@ -34,6 +37,393 @@ overrides:
     basis_source_id: dangerous_drugs_amendments_2014
     effective_date: "2014-07-15"
     note: "RA 10640 rewrote §21's chapeau and items (1)-(3) ('x x x.' partial restatement); items (4)-(8) remain operative."
+
+  # RA 11053 (Anti-Hazing Act of 2018) restated RA 8049 section-by-section; no base section
+  # survives. Inserted replacements carry the SAME target-namespace ids in
+  # anti_hazing_amendments_2018, so these entries MUST stay source_id-scoped.
+  - provision_id: anti_hazing:section:1
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "Definition of hazing rewritten by RA 11053."
+
+  - provision_id: anti_hazing:section:2
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "Permitted regulated initiation rites with prior written notice; RA 11053 bans hazing outright."
+
+  - provision_id: anti_hazing:section:3
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "School-representative presence rule; superseded by RA 11053 regime."
+
+  - provision_id: anti_hazing:section:4
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "Penalty structure fully restructured by RA 11053."
+
+  - provision_id: anti_hazing:section:5
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "Boilerplate (separability / repealing clause / effectivity) of the 1995 act; act restated by RA 11053."
+
+  - provision_id: anti_hazing:section:6
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "Boilerplate (separability / repealing clause / effectivity) of the 1995 act; act restated by RA 11053."
+
+  - provision_id: anti_hazing:section:7
+    source_id: anti_hazing
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_hazing_amendments_2018
+    effective_date: "2018-06-29"   # RA 11053 approval date; UNUSED by v1 retrieval
+    note: "Boilerplate (separability / repealing clause / effectivity) of the 1995 act; act restated by RA 11053."
+
+  # RA 11648 partial restatements. No hide for anti_rape_law_1997 Article 266-A
+  # or RA 7610 Section 9 because their base chunks hold operative text the amendment
+  # elides. RA 7610 Section 10(e)(3)'s age-12 text is untouched: RA 11648 amended
+  # only Sections 5(b), 7, 9, and 10(b).
+  - provision_id: child_abuse_act:article-iv-title-policy-principles-and-definitions-of-terms:section:7
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: statutory_rape_amendments_2022
+    effective_date: "2022-03-04"
+    note: "RA 7610 Section 7 (child trafficking) fully restated by RA 11648 Section 3; age threshold 12 -> 16. Base chunk contains only the restated paragraph."
+
+  - provision_id: child_abuse_act:article-iii-title-policy-principles-and-definitions-of-terms:section:5
+    source_id: child_abuse_act
+    unit_labels:
+      - "Section 5(b)"
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: statutory_rape_amendments_2022
+    effective_date: "2022-03-04"
+    note: "RA 11648 Section 3 restated Section 5(b) only (age 12 -> 16); (a) and (c) remain operative ('x x x' elision)."
+
+  - provision_id: child_abuse_act:article-vi-title-policy-principles-and-definitions-of-terms:section:10
+    source_id: child_abuse_act
+    unit_labels:
+      - "Section 10(b)"
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: statutory_rape_amendments_2022
+    effective_date: "2022-03-04"
+    note: "RA 11648 Section 3 restated Section 10(b) only (age 12 -> 16 plus ten-years-junior change); sibling leaves remain operative."
+
+  # Anti-trafficking chain, RA 9208 -> RA 10364 -> RA 11862. Same provision_id
+  # values appear in all three docs, so every hide below is source_id-scoped.
+  # Existing consolidation-managed hides are untouched: 2013 Sections 12/32/33
+  # and 2022 Sections 1/19 insertion chunks.
+  - provision_id: anti_trafficking:section:2
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 2; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:2
+    source_id: anti_trafficking_expanded_2013
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 2; hide the 2013 copy."
+
+  - provision_id: anti_trafficking:section:5
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 5; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:5
+    source_id: anti_trafficking_expanded_2013
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 5; hide the 2013 copy."
+
+  - provision_id: anti_trafficking:section:8
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 8; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:8
+    source_id: anti_trafficking_expanded_2013
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 8; hide the 2013 copy."
+
+  - provision_id: anti_trafficking:section:20
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 20; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:20
+    source_id: anti_trafficking_expanded_2013
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 20; hide the 2013 copy."
+
+  - provision_id: anti_trafficking:section:28
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 28 appropriations text; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:28
+    source_id: anti_trafficking_expanded_2013
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 28 appropriations text; hide the 2013 copy."
+
+  - provision_id: anti_trafficking:section:3
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 3; RA 11862 later partially restated it, so the 2013 copy stays live."
+
+  - provision_id: anti_trafficking:section:4
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 4; RA 11862 later partially restated it, so the 2013 copy stays live."
+
+  - provision_id: anti_trafficking:section:10
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 10; RA 11862 later partially restated it, so the 2013 copy stays live."
+
+  - provision_id: anti_trafficking:section:16
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 16; RA 11862 later partially restated it, so the 2013 copy stays live."
+
+  - provision_id: anti_trafficking:section:22
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 22; RA 11862 later partially restated it, so the 2013 copy stays live."
+
+  # No hide or supersession pair for Section 6 yet: anti_trafficking:section:6
+  # currently labels both Confidentiality text and Qualified Trafficking text,
+  # while supersession matching has no unit_label support.
+
+  # RA 10951 (2017) fully restated these articles with adjusted amounts/fines
+  # and some substantive modernization, e.g. Art 114 treason no longer references
+  # the United States. The consolidation ratio guard blocked their splices
+  # because spelled-out peso amounts inflate length; insertions carry the SAME
+  # article ids, so entries are source_id-scoped.
+  - provision_id: revised_penal_code:article:114
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 114 (treason) fully restated by RA 10951; base text still references allegiance to the United States."
+
+  - provision_id: revised_penal_code:article:136
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 136 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:141
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 141 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:142
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 142 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:143
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 143 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:150
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 150 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:201
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 201 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:202
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 202 fully restated by RA 10951; restatement covers prostitution only and vagrancy is decriminalized."
+
+  - provision_id: revised_penal_code:article:217
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 217 fully restated by RA 10951 with updated value brackets and fine amounts."
+
+  - provision_id: revised_penal_code:article:286
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 286 fully restated by RA 10951 with updated fine amounts."
+
+  - provision_id: revised_penal_code:article:315
+    source_id: revised_penal_code
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: rpc_penalty_amendments_2017
+    effective_date: "2017-08-29"
+    note: "Art 315 fully restated by RA 10951; estafa value brackets updated from 1930 amounts."
+
+  # RA 10707 fully restated these Probation Law sections. Insertions carry the
+  # same target-namespace ids, so entries are source_id-scoped.
+  - provision_id: probation_law:section:4
+    source_id: probation_law
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: probation_amendments_2015
+    effective_date: "2015-11-26"
+    note: "Sec 4 fully restated by RA 10707, including the probation-after-appeal rule."
+
+  - provision_id: probation_law:section:28
+    source_id: probation_law
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: probation_amendments_2015
+    effective_date: "2015-11-26"
+    note: "Sec 28 fully restated by RA 10707, including the renaming of Probation Aides to Volunteer Probation Assistants."
+
+  # RA 10630 fully restated these Juvenile Justice provisions. Base ids are
+  # path-scoped while inserted ids are path-less, so no source_id scope is needed.
+  - provision_id: juvenile_justice:title-iv:section:20
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: juvenile_justice_amendments_2013
+    effective_date: "2013-10-03"
+    note: "Sec 20 fully restated by RA 10630, including below-age-of-criminal-responsibility handling and Bahay Pag-asa referral."
+
+  - provision_id: juvenile_justice:title-vi:section:49
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: juvenile_justice_amendments_2013
+    effective_date: "2013-10-03"
+    note: "Sec 49 fully restated by RA 10630 and retitled from Youth Detention Homes to Bahay Pag-asa."
+
+  - provision_id: juvenile_justice:chapter-4:section:63
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: juvenile_justice_amendments_2013
+    effective_date: "2013-10-03"
+    note: "Sec 63 appropriations provision fully restated by RA 10630."
+
+  # Additional anti-trafficking full restatements missed by the ratio guard.
+  # Same provision_id values appear in the 2003, 2013, and 2022 documents, so
+  # every hide here is source_id-scoped to the 2003 base.
+  - provision_id: anti_trafficking:section:11
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 11; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:17
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_expanded_2013
+    effective_date: "2013-02-06"
+    note: "RA 10364 fully restated Section 17; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:29
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 fully restated Section 29 implementing-rules text; hide the 2003 copy."
+
+  - provision_id: anti_trafficking:section:9
+    source_id: anti_trafficking
+    provision_status: superseded
+    operability_action: hide
+    basis_source_id: anti_trafficking_amendments_2022
+    effective_date: "2022-06-23"
+    note: "RA 11862 Section 8 deleted RA 9208's Section 9 (venue) and replaced it with private-sector duties; the venue rule survives as Section 8(i) in the live 2022 text."
 
 generated_overrides:
   - source_id: civil_code
