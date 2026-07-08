@@ -14,9 +14,6 @@ services:
       - ./sources:/app/sources
       - ${HOME}/.cache/huggingface:/root/.cache/huggingface
 
-  ui:
-    command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501 --server.runOnSave true
-    volumes:
-      - ./app:/app/app
-      - ./sources:/app/sources
-      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+  # No dev override for `web`: the nginx image serves a static build with no
+  # hot reload. Iterate on the frontend with `npm run dev` on the host (Vite
+  # :5173 proxies /api -> localhost:8000); rebuild `web` only to mirror prod.

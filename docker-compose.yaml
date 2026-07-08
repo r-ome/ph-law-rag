@@ -28,12 +28,13 @@ services:
     volumes:
       - ./data:/app/data
 
-  ui:
-    image: ph-law-rag:latest
+  web:
+    build: ./frontend
+    image: ph-law-rag-web:latest
     depends_on:
       - api
-    command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501
+    # nginx serves the built SPA and reverse-proxies /api -> api:8000
+    # (see frontend/nginx.conf). Browse to http://localhost:8080.
+    # For frontend iteration, run `npm run dev` on the host instead (Vite :5173).
     ports:
-      - "8501:8501"
-    environment:
-      api_base_url: http://api:8000
+      - "8080:80"

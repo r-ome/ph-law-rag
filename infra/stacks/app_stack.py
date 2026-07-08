@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import aws_cdk as cdk
 from aws_cdk import Stack
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecs as ecs
 from aws_cdk import aws_ecr as ecr
+from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_elasticloadbalancingv2 as elbv2
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_logs as logs
@@ -83,26 +86,26 @@ class AppStack(Stack):
             ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "HTTP (redirect to 443)"
         )
 
-        self.ui_sg = ec2.SecurityGroup(
+        self.web_sg = ec2.SecurityGroup(
             self,
-            "UiSg",
+            "WebSg",
             vpc=self.vpc,
-            description="UI task: only from ALB",
+            description="Web (React/nginx) task: only from ALB",
             allow_all_outbound=True,
         )
-        self.ui_sg.add_ingress_rule(
-            self.alb_sg, ec2.Port.tcp(8501), "Streamlit from ALB only"
+        self.web_sg.add_ingress_rule(
+            self.alb_sg, ec2.Port.tcp(80), "nginx from ALB only"
         )
 
         self.api_sg = ec2.SecurityGroup(
             self,
             "ApiSg",
             vpc=self.vpc,
-            description="API task: only from UI, NO public ingress",
+            description="API task: only from web, NO public ingress",
             allow_all_outbound=True,
         )
         self.api_sg.add_ingress_rule(
-            self.ui_sg, ec2.Port.tcp(8000), "FastAPI from UI only"
+            self.web_sg, ec2.Port.tcp(8000), "FastAPI from web only"
         )
 
         # ---------- ECS cluster + Service Connect namespace ----------
@@ -116,9 +119,17 @@ class AppStack(Stack):
             name="local",
         )
 
-        # shared image (one image, two entrypoints)
+        # API image: the Python backend from ECR (built/pushed out of band).
         repo = ecr.Repository.from_repository_name(self, "EcrRepo", ECR_REPO)
         image = ecs.ContainerImage.from_ecr_repository(repo, IMAGE_TAG)
+
+        # Web image: the React SPA behind nginx, built by CDK from ./frontend
+        # (multi-stage node build -> nginx). nginx reverse-proxies /api ->
+        # api:8000 via Service Connect, so no client-side API URL is baked in.
+        web_image = ecs.ContainerImage.from_asset(
+            str(Path(__file__).resolve().parents[2] / "frontend"),
+            platform=ecr_assets.Platform.LINUX_ARM64,
+        )
 
         arm64 = ecs.RuntimePlatform(
             cpu_architecture=ecs.CpuArchitecture.ARM64,
@@ -198,41 +209,29 @@ class AppStack(Stack):
             ecs.PortMapping(name="api", container_port=8000)
         )
 
-        # ---------- UI task def ----------
-        self.ui_log = logs.LogGroup(
+        # ---------- Web task def (React SPA + nginx) ----------
+        self.web_log = logs.LogGroup(
             self,
-            "UiLogGroup",
+            "WebLogGroup",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=cdk.RemovalPolicy.DESTROY,
         )
 
-        self.ui_task = ecs.FargateTaskDefinition(
+        self.web_task = ecs.FargateTaskDefinition(
             self,
-            "UiTaskDef",
+            "WebTaskDef",
             cpu=256,
             memory_limit_mib=512,
             runtime_platform=arm64,
         )
-        ui_container = self.ui_task.add_container(
-            "ui",
-            image=image,
-            command=[
-                "streamlit",
-                "run",
-                "app/ui/home.py",
-                "--server.address",
-                "0.0.0.0",
-                "--server.port",
-                "8501",
-            ],
-            logging=ecs.LogDriver.aws_logs(stream_prefix="ui", log_group=self.ui_log),
-            environment={
-                # Service Connect resolves the short dns_name "api" (not api.local)
-                "api_base_url": "http://api:8000",
-                "llm_model": "claude-haiku-4-5-20251001",
-            },
+        web_container = self.web_task.add_container(
+            "web",
+            image=web_image,
+            # nginx image uses its default CMD; upstream "api" is resolved via
+            # Service Connect (frontend/nginx.conf proxies /api -> api:8000).
+            logging=ecs.LogDriver.aws_logs(stream_prefix="web", log_group=self.web_log),
         )
-        ui_container.add_port_mappings(ecs.PortMapping(name="ui", container_port=8501))
+        web_container.add_port_mappings(ecs.PortMapping(name="web", container_port=80))
 
         # ---------- API service (internal-only; advertises api.local:8000) ----------
         self.api_service = ecs.FargateService(
@@ -259,14 +258,14 @@ class AppStack(Stack):
             ),
         )
 
-        # ---------- UI service (client of api.local; ALB target added later) ----------
-        self.ui_service = ecs.FargateService(
+        # ---------- Web service (client of api.local; ALB target added later) ----------
+        self.web_service = ecs.FargateService(
             self,
-            "UiService",
+            "WebService",
             cluster=self.cluster,
-            task_definition=self.ui_task,
+            task_definition=self.web_task,
             desired_count=1,
-            security_groups=[self.ui_sg],
+            security_groups=[self.web_sg],
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
             assign_public_ip=True,
             min_healthy_percent=100,
@@ -277,7 +276,7 @@ class AppStack(Stack):
             ),  # client only
         )
 
-        # ---------- ALB (fronts UI only; API is internal via Service Connect) -----
+        # ---------- ALB (fronts web only; API is internal via Service Connect) -----
         self.alb = elbv2.ApplicationLoadBalancer(
             self,
             "Alb",
@@ -287,7 +286,7 @@ class AppStack(Stack):
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
         )
 
-        # HTTPS:443 with the persistent ACM cert -> UI target group
+        # HTTPS:443 with the persistent ACM cert -> web target group
         https = self.alb.add_listener(
             "Https",
             port=443,
@@ -298,17 +297,17 @@ class AppStack(Stack):
             open=False,
         )
         https.add_targets(
-            "UiTarget",
-            port=8501,
+            "WebTarget",
+            port=80,
             protocol=elbv2.ApplicationProtocol.HTTP,
             targets=[
-                self.ui_service.load_balancer_target(
-                    container_name="ui",
-                    container_port=8501,
+                self.web_service.load_balancer_target(
+                    container_name="web",
+                    container_port=80,
                 )
             ],
             health_check=elbv2.HealthCheck(
-                path="/_stcore/health",
+                path="/healthz",
                 healthy_http_codes="200",
             ),
         )

@@ -25,12 +25,11 @@ services:
     volumes:
       - ${HOME}/.aws:/root/.aws:ro
 
-  ui:
+  web:
     platform: linux/arm64
-    image: ph-law-rag:cloud
+    build:
+      context: ./frontend
+    image: ph-law-rag-web:cloud
     depends_on: [api]
-    command: streamlit run app/ui/home.py --server.address 0.0.0.0 --server.port 8501
-    ports: ["8501:8501"]
-    environment:
-      api_base_url: http://api:8000
-      llm_model: claude-haiku-4-5
+    # nginx SPA + /api reverse-proxy to api:8000 (frontend/nginx.conf).
+    ports: ["8080:80"]
