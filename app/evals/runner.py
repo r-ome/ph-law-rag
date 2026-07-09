@@ -38,6 +38,9 @@ def _active_config() -> dict:
         "policy_overrides": resolution.policy_overrides,
         "env_ignored": resolution.env_ignored,
         "llm_model": policy.generator_model,
+        "strong_model": policy.strong_model,
+        "escalate_intents": sorted(policy.escalate_intents),
+        "escalate_on_partial_evidence": policy.escalate_on_partial_evidence,
         "query_decomposition_enabled": policy.query_decomposition_enabled,
         "reranker_backend": settings.reranker_backend,
         "bedrock_rerank_model": settings.bedrock_rerank_model,
@@ -84,6 +87,10 @@ def run_rows(
         elapsed = time.perf_counter() - start
         debug_chunks = resp.get("debug", {}).get("chunks", [])
         debug_stages = resp.get("debug", {}).get("stages", [])
+        model_choice = resp.get("model_choice") or {
+            "model": resp.get("generator_model", policy.generator_model),
+            "reason": "not_generated" if resp.get("abstained") else "policy_default",
+        }
         row = {
             **({"eval_id": item["eval_id"]} if "eval_id" in item else {}),
             "question": item["question"],
@@ -96,8 +103,10 @@ def run_rows(
             "category": item["category"],
             "abstained": resp["abstained"],
             "profile": policy.name,
-            "model": policy.generator_model,
-            "generator_model": policy.generator_model,
+            "model": model_choice["model"],
+            "generator_model": model_choice["model"],
+            "model_choice": model_choice,
+            "model_choice_reason": model_choice["reason"],
             "query_decomposition": policy.query_decomposition_enabled,
             "elapsed_s": round(elapsed, 2),
             "cited_sources": [s.get("source_id", "") for s in resp.get("sources", [])],

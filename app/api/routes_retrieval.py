@@ -44,6 +44,7 @@ class TraceRecord(BaseModel):
     latency_ms: float | None = None
     prompt_length: int | None = None
     generator_model: str | None = None
+    model_choice: dict[str, Any] | None = None
 
 
 class InspectRequest(BaseModel):

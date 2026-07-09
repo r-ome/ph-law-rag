@@ -202,6 +202,7 @@ def _base_profile(name: str) -> AnswerPolicy:
         return replace(
             base,
             router_enabled=True,
+            router_model="qwen3:4b",
             strong_model="qwen3:4b",
             escalate_intents=frozenset(
                 {"list_or_rule_synthesis", "amendment_or_current_law"}

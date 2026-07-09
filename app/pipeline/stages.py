@@ -193,8 +193,17 @@ def gate_evidence(state: AnswerState) -> None:
         )
 
 
+def route_model(state: AnswerState) -> None:
+    from app.pipeline.model_router import select_model
+
+    state.model_choice = select_model(_policy(state), state)
+
+
 def generate_answer(state: AnswerState) -> None:
     policy = _policy(state)
+    if state.model_choice is None:
+        route_model(state)
+    model = state.model_choice.model
     question = state.effective_question or state.question
     context_block, sources = build_context(state.selection.selected)
 
@@ -204,9 +213,9 @@ def generate_answer(state: AnswerState) -> None:
     if policy.later_enacted_preference_enabled:
         system_prompt = SYSTEM_PROMPT + LATER_ENACTED_RULE
     try:
-        answer_text = generate(system_prompt, user_prompt, model=policy.generator_model)
+        answer_text = generate(system_prompt, user_prompt, model=model)
     except LLMError as e:
-        logger.warning("generation_failed", error=str(e), model=policy.generator_model)
+        logger.warning("generation_failed", error=str(e), model=model)
         state.response = _package(
             f"The language model could not be reached: {e}",
             sources=[],
@@ -225,7 +234,7 @@ def generate_answer(state: AnswerState) -> None:
             revised = generate(
                 SELFCHECK_SYSTEM,
                 build_selfcheck_prompt(question, context_block, answer_text),
-                model=policy.generator_model,
+                model=model,
             )
             if revised.strip():
                 answer_text = revised

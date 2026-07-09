@@ -1,6 +1,7 @@
 # Pipeline refactor plan — decouple before CRAG
 
-Status: PR1 FROZEN (2026-07-09); PR2+ draft
+Status: PR1 FROZEN (2026-07-09); PR3 machinery implemented (2026-07-09);
+cascade experiments pending; PR4+ draft
 Owner: Jerome. Claude drafted; Jerome codes.
 
 Goal: make each answer-pipeline stage replaceable and traceable so model cascading,
@@ -390,10 +391,12 @@ is updated in the same PR. Verify `local` is bit-identical to PR1 and add
 field-precedence tests for behavior-vs-infra env conflicts.
 
 **PR3 — ModelRouter + cascade experiments.** `model_router.py`, `route_model`
-stage, `cascade` + `local-cascade` profiles. Run §4a (cloud A/B) and §4b (local
-router benchmark + local strong-generator benchmark). Graduation per profile on
-its own evidence; negative results logged. Eval rows/meta and trace records carry
-actual `model_choice` so mixed-model cascade runs are auditable.
+stage, `cascade` + `local-cascade` profiles. Machinery landed 2026-07-09:
+profiles are wired and auditable, not graduated. Still pending: run §4a (cloud
+A/B) and §4b (local router benchmark + local strong-generator benchmark).
+Graduation per profile on its own evidence; negative results logged. Eval
+rows/meta and trace records carry actual `model_choice` so mixed-model cascade
+runs are auditable.
 
 **PR4 — evidence stage + corrective slot.** `EvidenceReport`, `gate_evidence`
 subsuming min-chunks + answerability, `corrective_retrieve` no-op, trace fields.

@@ -134,6 +134,58 @@ def test_answer_strategy_override_skips_router_and_traces_reason(monkeypatch):
     assert records[0]["retrieval_strategy"]["strategy"] == "current_law"
 
 
+def test_cascade_profile_routes_generation_to_strong_model(monkeypatch):
+    records = _capture_traces(monkeypatch)
+    generated = {}
+    monkeypatch.setattr(settings, "raglab_profile", "cascade")
+
+    decision = intent_router.RouterDecision(
+        intent="amendment_or_current_law",
+        confidence="high",
+        routed_intent="amendment_or_current_law",
+        strategy="current_law",
+        parse_ok=True,
+        fallback_reason=None,
+        error=None,
+        latency_ms=1.0,
+    )
+    monkeypatch.setattr(intent_router, "classify", lambda question, model=None: decision)
+
+    class FakeStrategy:
+        name = "current_law"
+
+        def execute(self, question, knobs=None):
+            return SelectionResult(
+                retrieved=[],
+                pre_expansion=[RetrievalResult("c1", "context", 1.0, {})],
+                selected=[RetrievalResult("c1", "context", 1.0, {})],
+            )
+
+    monkeypatch.setitem(stages.STRATEGIES, "current_law", FakeStrategy())
+    monkeypatch.setattr(stages, "build_context", lambda selected: ("context", []))
+
+    def fake_generate(system_prompt, user_prompt, model=None):
+        generated["model"] = model
+        return "Answer [1]"
+
+    monkeypatch.setattr(stages, "generate", fake_generate)
+
+    response, trace_record = answer_service.run_answer(
+        "Which law controls after the amendment?",
+        trace=True,
+    )
+
+    assert generated["model"] == "claude-haiku-4-5"
+    assert response["generator_model"] == "claude-haiku-4-5"
+    assert response["model_choice"] == {
+        "model": "claude-haiku-4-5",
+        "reason": "intent:amendment_or_current_law",
+    }
+    assert trace_record == records[0]
+    assert trace_record["generator_model"] == "claude-haiku-4-5"
+    assert trace_record["model_choice"] == response["model_choice"]
+
+
 def test_answer_greeting_router_on_does_not_classify(monkeypatch):
     records = _capture_traces(monkeypatch)
     monkeypatch.setattr(settings, "router_enabled", True)

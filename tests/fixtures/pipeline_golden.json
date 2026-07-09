@@ -40,6 +40,7 @@
         "enabled": false,
         "model": null
       },
+      "model_choice": null,
       "policy": {
         "corrective_retrieval_enabled": false,
         "escalate_intents": [],
@@ -367,7 +368,12 @@
           }
         ]
       },
-      "error": false
+      "error": false,
+      "generator_model": "mistral",
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
+      }
     },
     "trace_record": {
       "abstained": false,
@@ -390,6 +396,10 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
       },
       "policy": {
         "corrective_retrieval_enabled": false,
@@ -1378,7 +1388,12 @@
           }
         ]
       },
-      "error": false
+      "error": false,
+      "generator_model": "mistral",
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
+      }
     },
     "trace_record": {
       "abstained": false,
@@ -1401,6 +1416,10 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
       },
       "policy": {
         "corrective_retrieval_enabled": false,
@@ -2413,7 +2432,12 @@
           }
         ]
       },
-      "error": false
+      "error": false,
+      "generator_model": "mistral",
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
+      }
     },
     "trace_record": {
       "abstained": true,
@@ -2436,6 +2460,10 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
       },
       "policy": {
         "corrective_retrieval_enabled": false,
@@ -3460,7 +3488,12 @@
           }
         ]
       },
-      "error": false
+      "error": false,
+      "generator_model": "mistral",
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
+      }
     },
     "trace_record": {
       "abstained": true,
@@ -3483,6 +3516,10 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
       },
       "policy": {
         "corrective_retrieval_enabled": false,
@@ -4496,7 +4533,12 @@
           }
         ]
       },
-      "error": false
+      "error": false,
+      "generator_model": "mistral",
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
+      }
     },
     "trace_record": {
       "abstained": false,
@@ -4519,6 +4561,10 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "model_choice": {
+        "model": "mistral",
+        "reason": "policy_default"
       },
       "policy": {
         "corrective_retrieval_enabled": false,

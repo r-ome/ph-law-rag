@@ -14,6 +14,9 @@ class ConfigView(BaseModel):
     embedding_model: str | None = None
     embedding_dim: int | None = None
     llm_model: str
+    strong_model: str | None = None
+    escalate_intents: list[str] = []
+    escalate_on_partial_evidence: bool
     generator_backend: str
     reranker_backend: str
     qdrant_collection: str

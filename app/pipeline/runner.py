@@ -83,7 +83,12 @@ def _build_trace_record(
         "stages": list(collector.stages) if collector else [],
         "latency_ms": round(elapsed_ms, 2),
         "prompt_length": len(state.prompt) if state.prompt else 0,
-        "generator_model": policy.generator_model,
+        "generator_model": (
+            state.model_choice.model if state.model_choice else policy.generator_model
+        ),
+        "model_choice": (
+            state.model_choice.as_trace_dict() if state.model_choice else None
+        ),
     }
 
 
@@ -118,6 +123,13 @@ def _attach_debug_stages(state: AnswerState, collector: TraceCollector | None) -
         state.response.setdefault("debug", {})["stages"] = list(collector.stages)
 
 
+def _attach_model_metadata(state: AnswerState) -> None:
+    if state.response is None or state.model_choice is None:
+        return
+    state.response["model_choice"] = state.model_choice.as_trace_dict()
+    state.response["generator_model"] = state.model_choice.model
+
+
 def _finalize(
     *,
     state: AnswerState,
@@ -130,6 +142,7 @@ def _finalize(
     if state.response is None:
         return None
 
+    _attach_model_metadata(state)
     _attach_debug_stages(state, collector)
     _append_session_turn(state)
 
@@ -192,6 +205,7 @@ def run_answer(
             stages.retrieve_context(state)
             stages.gate_evidence(state)
             if state.response is None:
+                stages.route_model(state)
                 stages.generate_answer(state)
 
         trace_record = _finalize(

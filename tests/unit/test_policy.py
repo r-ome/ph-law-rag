@@ -83,6 +83,26 @@ def test_eval_profile_does_not_turn_on_router(monkeypatch):
     assert resolution.env_ignored["router_enabled"] is True
 
 
+def test_cascade_profiles_define_expected_escalation(monkeypatch):
+    monkeypatch.setattr(settings, "raglab_profile", "cascade")
+    cascade = resolve_policy().policy
+
+    assert cascade.router_enabled is True
+    assert cascade.router_model == "claude-haiku-4-5"
+    assert cascade.strong_model == "claude-haiku-4-5"
+    assert cascade.escalate_intents == frozenset(
+        {"list_or_rule_synthesis", "amendment_or_current_law"}
+    )
+
+    monkeypatch.setattr(settings, "raglab_profile", "local-cascade")
+    local_cascade = resolve_policy().policy
+
+    assert local_cascade.router_enabled is True
+    assert local_cascade.router_model == "qwen3:4b"
+    assert local_cascade.strong_model == "qwen3:4b"
+    assert local_cascade.escalate_intents == cascade.escalate_intents
+
+
 def test_policy_trace_dict_serializes_frozenset_and_knobs():
     policy = replace(
         AnswerPolicy.from_settings(settings),

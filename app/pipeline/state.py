@@ -1,8 +1,17 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from app.pipeline.policy import AnswerPolicy
 from app.retriever.context_selection import SelectionResult
 from app.retriever.strategy import RetrievalKnobs, resolve_knobs
+
+
+@dataclass(frozen=True)
+class ModelChoice:
+    model: str
+    reason: str
+
+    def as_trace_dict(self) -> dict:
+        return asdict(self)
 
 
 @dataclass
@@ -18,6 +27,7 @@ class AnswerState:
     )
     router_decision: object | None = None
     router_skipped_reason: str | None = None
+    model_choice: ModelChoice | None = None
     prompt: str | None = None
     response: dict | None = None
     policy: AnswerPolicy | None = None
