@@ -147,16 +147,17 @@ DEFAULT_DECISION_FIELDS = dict(
 )
 
 
-def classify_with_raw(question: str) -> tuple[RouterDecision, str | None]:
+def classify_with_raw(question: str, model: str | None = None) -> tuple[RouterDecision, str | None]:
     """Classify a standalone question and return the raw LLM text for eval audits."""
     from app.retriever.llm_client import generate
 
+    model = model or settings.router_model
     system, user = render_llm_prompts(question)
     start = time.perf_counter()
     error: str | None = None
     raw: str | None = None
     try:
-        raw = generate(system, user, model=settings.router_model)
+        raw = generate(system, user, model=model)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
     elapsed_ms = (time.perf_counter() - start) * 1000
@@ -194,7 +195,7 @@ def classify_with_raw(question: str) -> tuple[RouterDecision, str | None]:
     record_stage(
         "intent_router",
         ms=elapsed_ms,
-        model=settings.router_model,
+        model=model,
         intent=decision.intent,
         confidence=decision.confidence,
         routed_intent=decision.routed_intent,
@@ -211,7 +212,7 @@ def classify_with_raw(question: str) -> tuple[RouterDecision, str | None]:
     return decision, raw
 
 
-def classify(question: str) -> RouterDecision:
+def classify(question: str, model: str | None = None) -> RouterDecision:
     """Classify a standalone question. Never raises; failures route to default."""
-    decision, _raw = classify_with_raw(question)
+    decision, _raw = classify_with_raw(question, model=model)
     return decision

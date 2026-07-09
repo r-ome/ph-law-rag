@@ -36,6 +36,8 @@ class TraceRecord(BaseModel):
     retrieval_strategy: dict[str, Any] = {}
     intent_router: dict[str, Any] = {}
     feature_flags: dict[str, Any] = {}
+    profile: str | None = None
+    policy: dict[str, Any] = {}
     abstained: bool = False
     error: bool = False
     stages: list[Any] = []

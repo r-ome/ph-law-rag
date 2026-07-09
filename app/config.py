@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 	raw_data_dir: str = "data/raw"
 	normalized_data_dir: str = "data/normalized"
 	request_timeout: int = 30
+	raglab_profile: str = "local"
 	# Qdrant Config
 	qdrant_collection: str = "ph_law"
 	qdrant_url: str = "http://localhost:6333"
@@ -262,26 +263,33 @@ def load_allowed_sources() -> list[SourceConfig]:
 
 def config_view() -> dict:
 	"""Curated, secret-free config for the dashboard."""
+	from app.pipeline.policy import resolve_policy
+
+	resolution = resolve_policy()
+	policy = resolution.policy
 	return {
+		"profile": policy.name,
+		"policy_overrides": resolution.policy_overrides,
+		"env_ignored": resolution.env_ignored,
 		"embedding_backend": settings.embedding_backend,
 		"embedding_model": settings.embedding_model,
 		"embedding_dim": settings.embedding_dim,
-		"llm_model": settings.llm_model,
-		"generator_backend": "anthropic" if settings.llm_model.startswith("claude") else "ollama",
+		"llm_model": policy.generator_model,
+		"generator_backend": "anthropic" if policy.generator_model.startswith("claude") else "ollama",
 		"reranker_backend": settings.reranker_backend,
 		"qdrant_collection": settings.qdrant_collection,
 		"qdrant_url": settings.qdrant_url,
 		"ollama_base_url": settings.ollama_base_url,
 		"chunk_size": settings.chunk_size,
 		"chunk_overlap": settings.chunk_overlap,
-		"min_chunks_for_answer": settings.min_chunks_for_answer,
+		"min_chunks_for_answer": policy.min_chunks_for_answer,
 		"max_conversation_turns": settings.max_conversation_turns,
-		"router_enabled": settings.router_enabled,
-		"edge_expansion_enabled": settings.edge_expansion_enabled,
-		"answerability_gate_enabled": settings.answerability_gate_enabled,
-		"enable_query_rewriting": settings.enable_query_rewriting,
-		"faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
-		"later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
+		"router_enabled": policy.router_enabled,
+		"edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
+		"answerability_gate_enabled": policy.evidence_gate == "answerability",
+		"enable_query_rewriting": policy.query_rewriting_enabled,
+		"faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
+		"later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
 		"aws_region": settings.aws_region,
 	}
 	

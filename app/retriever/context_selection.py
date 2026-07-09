@@ -32,7 +32,10 @@ def select_context(
     question: str,
     knobs: RetrievalKnobs | None = None,
 ) -> SelectionResult:
-    if settings.subquery_packaging_enabled:
+    subquery_packaging_enabled = (
+        knobs.subquery_packaging_enabled if knobs else settings.subquery_packaging_enabled
+    )
+    if subquery_packaging_enabled:
         from app.retriever.subquery_retrieval import packaged_retrieve
 
         with stage_timer("packaged_retrieve") as stage:
@@ -49,7 +52,10 @@ def select_context(
             pre_expansion = rerank(question, retrieved, knobs=knobs)
             stage["out_n"] = len(pre_expansion)
 
-    if settings.edge_expansion_enabled:
+    edge_expansion_enabled = (
+        knobs.edge_expansion_enabled if knobs else settings.edge_expansion_enabled
+    )
+    if edge_expansion_enabled:
         before = len(pre_expansion)
         with stage_timer("edge_expansion", in_n=before) as stage:
             pre_expansion = expand_with_edges(question, pre_expansion, knobs=knobs)

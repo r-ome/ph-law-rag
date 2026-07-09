@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.evals import artifacts
+from app.pipeline.policy import resolve_policy
 from app.retriever.answer_service import answer
 
 def load_dataset(path: str) -> list[dict]:
@@ -30,27 +31,32 @@ def _git_sha() -> str | None:
 
 
 def _active_config() -> dict:
+    resolution = resolve_policy()
+    policy = resolution.policy
     return {
-        "llm_model": settings.llm_model,
-        "query_decomposition_enabled": settings.query_decomposition_enabled,
+        "profile": policy.name,
+        "policy_overrides": resolution.policy_overrides,
+        "env_ignored": resolution.env_ignored,
+        "llm_model": policy.generator_model,
+        "query_decomposition_enabled": policy.query_decomposition_enabled,
         "reranker_backend": settings.reranker_backend,
         "bedrock_rerank_model": settings.bedrock_rerank_model,
         "bedrock_rerank_region": settings.bedrock_rerank_region,
         "embedding_backend": settings.embedding_backend,
         "embedding_model": settings.embedding_model,
         "qdrant_collection": settings.qdrant_collection,
-        "dense_top_k": settings.dense_top_k,
-        "sparse_top_k": settings.sparse_top_k,
-        "rerank_top_n": settings.rerank_top_n,
-        "retrieval_operative_only": settings.retrieval_operative_only,
-        "parent_expansion_enabled": settings.parent_expansion_enabled,
-        "prefer_operative_enabled": settings.prefer_operative_enabled,
-        "consolidated_dedup_enabled": settings.consolidated_dedup_enabled,
-        "edge_expansion_enabled": settings.edge_expansion_enabled,
-        "answerability_gate_enabled": settings.answerability_gate_enabled,
-        "faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
-        "later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
-        "subquery_packaging_enabled": settings.subquery_packaging_enabled,
+        "dense_top_k": policy.retrieval_defaults.dense_top_k,
+        "sparse_top_k": policy.retrieval_defaults.sparse_top_k,
+        "rerank_top_n": policy.retrieval_defaults.rerank_top_n,
+        "retrieval_operative_only": policy.retrieval_defaults.retrieval_operative_only,
+        "parent_expansion_enabled": policy.retrieval_defaults.parent_expansion_enabled,
+        "prefer_operative_enabled": policy.retrieval_defaults.prefer_operative_enabled,
+        "consolidated_dedup_enabled": policy.retrieval_defaults.consolidated_dedup_enabled,
+        "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
+        "answerability_gate_enabled": policy.evidence_gate == "answerability",
+        "faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
+        "later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
+        "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
     }
 
 
@@ -65,6 +71,7 @@ def run_rows(
     results = []
     total = len(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    policy = resolve_policy().policy
 
     for i, item in enumerate(rows, start=1):
         start = time.perf_counter()
@@ -88,8 +95,10 @@ def run_rows(
             "expected_sources": item.get("expected_sources", []),
             "category": item["category"],
             "abstained": resp["abstained"],
-            "model": settings.llm_model,
-            "query_decomposition": settings.query_decomposition_enabled,
+            "profile": policy.name,
+            "model": policy.generator_model,
+            "generator_model": policy.generator_model,
+            "query_decomposition": policy.query_decomposition_enabled,
             "elapsed_s": round(elapsed, 2),
             "cited_sources": [s.get("source_id", "") for s in resp.get("sources", [])],
             "context_sources": resp.get("context_sources", []),
@@ -115,9 +124,10 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
     configure_logging()
 
     dataset = load_dataset(settings.eval_dataset_path)
+    policy = resolve_policy().policy
 
     started_at = datetime.now().astimezone()
-    model_slug = settings.llm_model.replace(":", "-").replace("/", "-")
+    model_slug = policy.generator_model.replace(":", "-").replace("/", "-")
     run_tag = artifacts.make_run_tag(model_slug, settings.eval_run_label, started_at)
     paths = artifacts.create_run_paths(run_tag, started_at)
     out_path = paths.run
@@ -147,7 +157,9 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
         "date": started_at.strftime("%Y-%m-%d"),
         "started_at": started_at.isoformat(),
         "completed_at": datetime.now().astimezone().isoformat(),
-        "model": settings.llm_model,
+        "profile": policy.name,
+        "model": policy.generator_model,
+        "generator_model": policy.generator_model,
         "model_slug": model_slug,
         "label": settings.eval_run_label,
         "question_count": len(results),

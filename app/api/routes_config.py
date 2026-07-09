@@ -7,6 +7,9 @@ router = APIRouter(prefix="/config", tags=["config"])
 
 
 class ConfigView(BaseModel):
+    profile: str
+    policy_overrides: dict[str, object]
+    env_ignored: dict[str, object]
     embedding_backend: str
     embedding_model: str | None = None
     embedding_dim: int | None = None

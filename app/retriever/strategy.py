@@ -18,21 +18,55 @@ class RetrievalKnobs:
     prefer_operative_enabled: bool
     retrieval_operative_only: bool
     consolidated_dedup_enabled: bool
+    sparse_overfetch_k: int = 100
+    rerank_score_margin: float = 6.0
+    max_distance: float = 0.5
+    edge_expansion_enabled: bool = True
+    edge_hop_top_k: int = 3
+    parent_expansion_min_children: int = 2
+    parent_expansion_max_chars: int = 8000
+    query_planner_model: str = "mistral"
+    query_planner_max_subqueries: int = 3
+    subquery_packaging_enabled: bool = False
+    subquery_reserve_n: int = 2
 
     @classmethod
-    def from_settings(cls) -> "RetrievalKnobs":
+    def from_settings(cls, settings_obj=settings) -> "RetrievalKnobs":
         return cls(
-            dense_top_k=settings.dense_top_k,
-            sparse_top_k=settings.sparse_top_k,
-            rerank_top_n=settings.rerank_top_n,
-            parent_expansion_enabled=settings.parent_expansion_enabled,
-            prefer_operative_enabled=settings.prefer_operative_enabled,
-            retrieval_operative_only=settings.retrieval_operative_only,
-            consolidated_dedup_enabled=settings.consolidated_dedup_enabled,
+            dense_top_k=settings_obj.dense_top_k,
+            sparse_top_k=settings_obj.sparse_top_k,
+            sparse_overfetch_k=settings_obj.sparse_overfetch_k,
+            rerank_top_n=settings_obj.rerank_top_n,
+            rerank_score_margin=settings_obj.rerank_score_margin,
+            max_distance=settings_obj.max_distance,
+            edge_expansion_enabled=settings_obj.edge_expansion_enabled,
+            edge_hop_top_k=settings_obj.edge_hop_top_k,
+            parent_expansion_enabled=settings_obj.parent_expansion_enabled,
+            parent_expansion_min_children=settings_obj.parent_expansion_min_children,
+            parent_expansion_max_chars=settings_obj.parent_expansion_max_chars,
+            query_planner_model=settings_obj.query_planner_model,
+            query_planner_max_subqueries=settings_obj.query_planner_max_subqueries,
+            prefer_operative_enabled=settings_obj.prefer_operative_enabled,
+            retrieval_operative_only=settings_obj.retrieval_operative_only,
+            consolidated_dedup_enabled=settings_obj.consolidated_dedup_enabled,
+            subquery_packaging_enabled=settings_obj.subquery_packaging_enabled,
+            subquery_reserve_n=settings_obj.subquery_reserve_n,
         )
 
     def as_trace_dict(self) -> dict:
-        return asdict(self)
+        data = asdict(self)
+        return {
+            key: data[key]
+            for key in (
+                "dense_top_k",
+                "sparse_top_k",
+                "rerank_top_n",
+                "parent_expansion_enabled",
+                "prefer_operative_enabled",
+                "retrieval_operative_only",
+                "consolidated_dedup_enabled",
+            )
+        }
 
 
 class Strategy(Protocol):
@@ -57,11 +91,22 @@ _PRESET_KNOBS: dict[str, RetrievalKnobs | None] = {
     "current_law": RetrievalKnobs(
         dense_top_k=30,
         sparse_top_k=10,
+        sparse_overfetch_k=100,
         rerank_top_n=8,
+        rerank_score_margin=6.0,
+        max_distance=0.5,
+        edge_expansion_enabled=True,
+        edge_hop_top_k=3,
         parent_expansion_enabled=True,
+        parent_expansion_min_children=2,
+        parent_expansion_max_chars=8000,
+        query_planner_model="mistral",
+        query_planner_max_subqueries=3,
         prefer_operative_enabled=True,
         retrieval_operative_only=True,
         consolidated_dedup_enabled=True,
+        subquery_packaging_enabled=False,
+        subquery_reserve_n=2,
     ),
 }
 

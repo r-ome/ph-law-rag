@@ -1,0 +1,262 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, replace
+from typing import Literal
+
+from app.config import settings
+from app.retriever.strategy import RetrievalKnobs
+
+EvidenceGate = Literal["min_chunks", "answerability", "crag"]
+
+BEHAVIOR_FIELDS: frozenset[str] = frozenset(
+    {
+        "llm_model",
+        "router_enabled",
+        "router_model",
+        "dense_top_k",
+        "sparse_top_k",
+        "sparse_overfetch_k",
+        "rerank_top_n",
+        "rerank_score_margin",
+        "max_distance",
+        "edge_expansion_enabled",
+        "edge_hop_top_k",
+        "parent_expansion_enabled",
+        "parent_expansion_min_children",
+        "parent_expansion_max_chars",
+        "prefer_operative_enabled",
+        "retrieval_operative_only",
+        "consolidated_dedup_enabled",
+        "min_chunks_for_answer",
+        "answerability_gate_enabled",
+        "faithfulness_selfcheck_enabled",
+        "later_enacted_preference_enabled",
+        "query_decomposition_enabled",
+        "query_planner_model",
+        "query_planner_max_subqueries",
+        "subquery_packaging_enabled",
+        "subquery_reserve_n",
+        "enable_query_rewriting",
+    }
+)
+
+INFRA_FIELDS: frozenset[str] = frozenset(
+    {
+        "source_config_path",
+        "db_path",
+        "raw_data_dir",
+        "normalized_data_dir",
+        "request_timeout",
+        "qdrant_collection",
+        "qdrant_url",
+        "qdrant_api_key",
+        "bm25_path",
+        "chunk_size",
+        "chunk_overlap",
+        "embedding_backend",
+        "embedding_model",
+        "embedding_dim",
+        "ollama_base_url",
+        "reranker_backend",
+        "reranker_model",
+        "qwen3_reranker_model",
+        "bedrock_rerank_model",
+        "bedrock_rerank_region",
+        "provision_supersession_path",
+        "provision_status_path",
+        "debug",
+        "log_dir",
+        "log_level",
+        "log_to_file",
+        "log_max_bytes",
+        "log_backup_count",
+        "trace_logging_enabled",
+        "trace_max_text_preview",
+        "eval_dataset_path",
+        "eval_intent_labels_path",
+        "eval_results_dir",
+        "eval_run_label",
+        "ragas_score_cache_path",
+        "ragas_llm_model",
+        "ragas_embedding_model",
+        "anthropic_api_key",
+        "max_conversation_turns",
+        "answerability_gate_model",
+        "aws_region",
+    }
+)
+
+
+@dataclass(frozen=True)
+class AnswerPolicy:
+    name: str
+    generator_model: str
+    strong_model: str | None
+    router_enabled: bool
+    router_model: str
+    escalate_intents: frozenset[str]
+    escalate_on_partial_evidence: bool
+    retrieval_defaults: RetrievalKnobs
+    evidence_gate: EvidenceGate
+    min_chunks_for_answer: int
+    corrective_retrieval_enabled: bool
+    selfcheck_enabled: bool
+    later_enacted_preference_enabled: bool
+    query_decomposition_enabled: bool
+    query_rewriting_enabled: bool
+
+    @classmethod
+    def from_settings(cls, settings_obj=settings, name: str = "local") -> "AnswerPolicy":
+        return cls(
+            name=name,
+            generator_model=settings_obj.llm_model,
+            strong_model=None,
+            router_enabled=settings_obj.router_enabled,
+            router_model=settings_obj.router_model,
+            escalate_intents=frozenset(),
+            escalate_on_partial_evidence=False,
+            retrieval_defaults=RetrievalKnobs.from_settings(settings_obj),
+            evidence_gate=(
+                "answerability" if settings_obj.answerability_gate_enabled else "min_chunks"
+            ),
+            min_chunks_for_answer=settings_obj.min_chunks_for_answer,
+            corrective_retrieval_enabled=False,
+            selfcheck_enabled=settings_obj.faithfulness_selfcheck_enabled,
+            later_enacted_preference_enabled=settings_obj.later_enacted_preference_enabled,
+            query_decomposition_enabled=settings_obj.query_decomposition_enabled,
+            query_rewriting_enabled=settings_obj.enable_query_rewriting,
+        )
+
+    def as_trace_dict(self) -> dict:
+        data = asdict(self)
+        data["escalate_intents"] = sorted(self.escalate_intents)
+        data["retrieval_defaults"] = asdict(self.retrieval_defaults)
+        return data
+
+
+@dataclass(frozen=True)
+class PolicyResolution:
+    policy: AnswerPolicy
+    policy_overrides: dict[str, object]
+    env_ignored: dict[str, object]
+
+    def summary(self) -> dict:
+        return {
+            "profile": self.policy.name,
+            "policy_overrides": self.policy_overrides,
+            "env_ignored": self.env_ignored,
+        }
+
+
+def _base_profile(name: str) -> AnswerPolicy:
+    base = AnswerPolicy(
+        name=name,
+        generator_model="mistral",
+        strong_model=None,
+        router_enabled=False,
+        router_model="claude-haiku-4-5",
+        escalate_intents=frozenset(),
+        escalate_on_partial_evidence=False,
+        retrieval_defaults=RetrievalKnobs(
+            dense_top_k=30,
+            sparse_top_k=10,
+            sparse_overfetch_k=100,
+            rerank_top_n=8,
+            rerank_score_margin=6.0,
+            max_distance=0.5,
+            edge_expansion_enabled=True,
+            edge_hop_top_k=3,
+            parent_expansion_enabled=True,
+            parent_expansion_min_children=2,
+            parent_expansion_max_chars=8000,
+            query_planner_model="mistral",
+            query_planner_max_subqueries=3,
+            prefer_operative_enabled=False,
+            retrieval_operative_only=True,
+            consolidated_dedup_enabled=True,
+            subquery_packaging_enabled=False,
+            subquery_reserve_n=2,
+        ),
+        evidence_gate="min_chunks",
+        min_chunks_for_answer=1,
+        corrective_retrieval_enabled=False,
+        selfcheck_enabled=False,
+        later_enacted_preference_enabled=False,
+        query_decomposition_enabled=False,
+        query_rewriting_enabled=True,
+    )
+    if name == "cloud":
+        return replace(base, router_enabled=True)
+    if name == "eval":
+        return base
+    if name == "cascade":
+        return replace(
+            base,
+            router_enabled=True,
+            strong_model="claude-haiku-4-5",
+            escalate_intents=frozenset(
+                {"list_or_rule_synthesis", "amendment_or_current_law"}
+            ),
+        )
+    if name == "local-cascade":
+        return replace(
+            base,
+            router_enabled=True,
+            strong_model="qwen3:4b",
+            escalate_intents=frozenset(
+                {"list_or_rule_synthesis", "amendment_or_current_law"}
+            ),
+        )
+    if name == "crag-experimental":
+        return replace(
+            base,
+            router_enabled=True,
+            evidence_gate="crag",
+            corrective_retrieval_enabled=True,
+        )
+    raise ValueError(f"Unknown RAGLAB_PROFILE: {name}")
+
+
+def _policy_value(policy: AnswerPolicy, field: str) -> object:
+    if field == "llm_model":
+        return policy.generator_model
+    if field == "answerability_gate_enabled":
+        return policy.evidence_gate == "answerability"
+    if field == "faithfulness_selfcheck_enabled":
+        return policy.selfcheck_enabled
+    if field == "enable_query_rewriting":
+        return policy.query_rewriting_enabled
+    if hasattr(policy, field):
+        return getattr(policy, field)
+    if hasattr(policy.retrieval_defaults, field):
+        return getattr(policy.retrieval_defaults, field)
+    raise KeyError(field)
+
+
+def resolve_policy(settings_obj=settings) -> PolicyResolution:
+    profile_name = settings_obj.raglab_profile
+    if profile_name == "local":
+        return PolicyResolution(
+            policy=AnswerPolicy.from_settings(settings_obj),
+            policy_overrides={},
+            env_ignored={},
+        )
+
+    policy = _base_profile(profile_name)
+    if policy.evidence_gate == "crag":
+        raise NotImplementedError(
+            "RAGLAB_PROFILE=crag-experimental is registered, but the CRAG evidence gate "
+            "is not implemented until PR5."
+        )
+    overrides: dict[str, object] = {}
+    ignored: dict[str, object] = {}
+    local_policy = AnswerPolicy.from_settings(settings_obj, name=profile_name)
+
+    for field in sorted(BEHAVIOR_FIELDS):
+        policy_value = _policy_value(policy, field)
+        settings_value = _policy_value(local_policy, field)
+        if policy_value != settings_value:
+            overrides[field] = policy_value
+            ignored[field] = settings_value
+
+    return PolicyResolution(policy=policy, policy_overrides=overrides, env_ignored=ignored)

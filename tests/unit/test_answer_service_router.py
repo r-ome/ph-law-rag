@@ -38,7 +38,7 @@ def test_answer_router_off_does_not_classify_and_traces_disabled_decision(monkey
     records = _capture_traces(monkeypatch)
     monkeypatch.setattr(settings, "router_enabled", False)
 
-    def fail_classify(question):
+    def fail_classify(question, model=None):
         raise AssertionError("router should not classify when disabled")
 
     def fake_retrieve_context(state):
@@ -82,7 +82,7 @@ def test_answer_router_on_uses_current_law_strategy_knobs(monkeypatch):
         error=None,
         latency_ms=1.0,
     )
-    monkeypatch.setattr(intent_router, "classify", lambda question: decision)
+    monkeypatch.setattr(intent_router, "classify", lambda question, model=None: decision)
 
     class FakeStrategy:
         name = "current_law"
@@ -105,7 +105,7 @@ def test_answer_strategy_override_skips_router_and_traces_reason(monkeypatch):
     captured = {}
     monkeypatch.setattr(settings, "router_enabled", True)
 
-    def fail_classify(question):
+    def fail_classify(question, model=None):
         raise AssertionError("router should not classify when strategy is overridden")
 
     def fake_retrieve_context(state):
@@ -138,7 +138,7 @@ def test_answer_greeting_router_on_does_not_classify(monkeypatch):
     records = _capture_traces(monkeypatch)
     monkeypatch.setattr(settings, "router_enabled", True)
 
-    def fail_classify(question):
+    def fail_classify(question, model=None):
         raise AssertionError("greeting should short-circuit before classify")
 
     monkeypatch.setattr(intent_router, "classify", fail_classify)
@@ -192,7 +192,7 @@ def test_llm_error_path_returns_error_response(monkeypatch):
     monkeypatch.setitem(stages.STRATEGIES, "default", FakeStrategy())
     monkeypatch.setattr(stages, "build_context", lambda selected: ("context", []))
 
-    def fail_generate(system_prompt, user_prompt):
+    def fail_generate(system_prompt, user_prompt, model=None):
         raise LLMError("offline")
 
     monkeypatch.setattr(stages, "generate", fail_generate)

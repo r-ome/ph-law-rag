@@ -16,11 +16,12 @@ def sparse_retriever(
     retrieval_operative_only = (
         knobs.retrieval_operative_only if knobs else settings.retrieval_operative_only
     )
+    sparse_overfetch_k = knobs.sparse_overfetch_k if knobs else settings.sparse_overfetch_k
     # BM25 can't filter server-side, so over-fetch a deep candidate pool and post-filter.
     # A shallow 2x cutoff can starve operative hits when superseded chunks (e.g. historical
     # constitutions) dominate the top ranks; sparse_overfetch_k keeps enough below them.
     retriever.similarity_top_k = (
-        max(settings.sparse_overfetch_k, k) if retrieval_operative_only else k
+        max(sparse_overfetch_k, k) if retrieval_operative_only else k
     )
     nodes = retriever.retrieve(query_text)
 

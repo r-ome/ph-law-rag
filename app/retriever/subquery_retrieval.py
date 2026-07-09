@@ -18,8 +18,13 @@ def packaged_retrieve(
     reserve top-N per facet, merge round-robin (rank-1 of every facet first, then
     rank-2 ...), then cap to rerank_top_n so context budget matches baseline.
     """
-    subqueries = _plan(question)
+    subqueries = _plan(
+        question,
+        model=knobs.query_planner_model if knobs else None,
+        max_subqueries=knobs.query_planner_max_subqueries if knobs else None,
+    )
     top_n = knobs.rerank_top_n if knobs else settings.rerank_top_n
+    reserve_n = knobs.subquery_reserve_n if knobs else settings.subquery_reserve_n
 
     if len(subqueries) <= 1:                       # baseline path (output-identical)
         fused = _fuse([
@@ -34,11 +39,11 @@ def packaged_retrieve(
             dense_retriever(sub, knobs=knobs),
             sparse_retriever(sub, knobs=knobs),
         ])
-        per_sub.append(rerank(sub, fused, knobs=knobs)[: settings.subquery_reserve_n])
+        per_sub.append(rerank(sub, fused, knobs=knobs)[:reserve_n])
 
     seen: set[str] = set()
     ordered: list[RetrievalResult] = []
-    for rank in range(settings.subquery_reserve_n):     # round-robin, no cross-query score sort
+    for rank in range(reserve_n):     # round-robin, no cross-query score sort
         for lst in per_sub:
             if rank < len(lst) and lst[rank].chunk_id not in seen:
                 seen.add(lst[rank].chunk_id)

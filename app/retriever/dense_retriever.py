@@ -26,9 +26,10 @@ def dense_retriever(
         ),
     )
     results = []
+    max_distance = knobs.max_distance if knobs else settings.max_distance
     for p in points:
         distance = 1 - p.score
-        if distance <= settings.max_distance:
+        if distance <= max_distance:
             results.append(RetrievalResult(
                 chunk_id=str(p.id),
                 text=p.payload["text"],

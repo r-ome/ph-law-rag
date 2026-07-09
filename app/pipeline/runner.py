@@ -6,6 +6,7 @@ from app.config import settings
 from app.observability.context import TraceCollector, new_trace_id, trace_context
 from app.observability.logger import get_logger
 from app.observability.trace import TraceWriter
+from app.pipeline.policy import AnswerPolicy, resolve_policy
 from app.pipeline import stages
 from app.pipeline.stages import _chunk_trace
 from app.pipeline.state import AnswerState
@@ -14,19 +15,19 @@ from app.retriever.prompts import is_conversational
 logger = get_logger(__name__)
 
 
-def _feature_flags() -> dict:
+def _feature_flags(policy: AnswerPolicy) -> dict:
     return {
         "debug": settings.debug,
         "trace_logging_enabled": settings.trace_logging_enabled,
-        "edge_expansion_enabled": settings.edge_expansion_enabled,
-        "answerability_gate_enabled": settings.answerability_gate_enabled,
-        "query_decomposition_enabled": settings.query_decomposition_enabled,
-        "subquery_packaging_enabled": settings.subquery_packaging_enabled,
-        "enable_query_rewriting": settings.enable_query_rewriting,
-        "faithfulness_selfcheck_enabled": settings.faithfulness_selfcheck_enabled,
-        "later_enacted_preference_enabled": settings.later_enacted_preference_enabled,
+        "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
+        "answerability_gate_enabled": policy.evidence_gate == "answerability",
+        "query_decomposition_enabled": policy.query_decomposition_enabled,
+        "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
+        "enable_query_rewriting": policy.query_rewriting_enabled,
+        "faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
+        "later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
         "reranker_backend": settings.reranker_backend,
-        "min_chunks_for_answer": settings.min_chunks_for_answer,
+        "min_chunks_for_answer": policy.min_chunks_for_answer,
     }
 
 
@@ -40,6 +41,7 @@ def _build_trace_record(
 ) -> dict:
     preview_chars = settings.trace_max_text_preview
     response = state.response or {}
+    policy = state.policy or resolve_policy().policy
     return {
         "trace_id": trace_id,
         "trace_label": trace_label,
@@ -62,8 +64,8 @@ def _build_trace_record(
             "knobs": state.strategy_knobs.as_trace_dict(),
         },
         "intent_router": {
-            "enabled": settings.router_enabled,
-            "model": settings.router_model if settings.router_enabled else None,
+            "enabled": policy.router_enabled,
+            "model": policy.router_model if policy.router_enabled else None,
             "decision": (
                 state.router_decision.as_trace_dict() if state.router_decision else None
             ),
@@ -73,13 +75,15 @@ def _build_trace_record(
                 else {}
             ),
         },
-        "feature_flags": _feature_flags(),
+        "feature_flags": _feature_flags(policy),
+        "profile": policy.name,
+        "policy": policy.as_trace_dict(),
         "abstained": response.get("abstained", False),
         "error": response.get("error", False),
         "stages": list(collector.stages) if collector else [],
         "latency_ms": round(elapsed_ms, 2),
         "prompt_length": len(state.prompt) if state.prompt else 0,
-        "generator_model": settings.llm_model,
+        "generator_model": policy.generator_model,
     }
 
 
@@ -167,7 +171,13 @@ def run_answer(
     started = time.perf_counter()
     debug_enabled = settings.debug if debug is None else debug
     collector = TraceCollector() if (trace and settings.trace_logging_enabled) or debug_enabled else None
-    state = AnswerState(question=question, debug_enabled=debug_enabled, session_id=session_id)
+    policy = resolve_policy().policy
+    state = AnswerState(
+        question=question,
+        debug_enabled=debug_enabled,
+        session_id=session_id,
+        policy=policy,
+    )
 
     with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):
         logger.info("answer_started", trace_label=trace_label)

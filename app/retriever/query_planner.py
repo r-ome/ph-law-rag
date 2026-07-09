@@ -24,12 +24,19 @@ _SYSTEM = (
 
 _USER = "Question:\n{question}\n\nQueries:"
 
-def _plan(question: str) -> list[str]:
+def _plan(
+    question: str,
+    *,
+    model: str | None = None,
+    max_subqueries: int | None = None,
+) -> list[str]:
+    model = model or settings.query_planner_model
+    max_subqueries = max_subqueries or settings.query_planner_max_subqueries
     try:
         raw = generate(
             _SYSTEM,
             _USER.format(question=question),
-            model=settings.query_planner_model
+            model=model,
         )
     except LLMError:
         return [question]
@@ -42,7 +49,7 @@ def _plan(question: str) -> list[str]:
             continue
         seen.add(q.lower())
         subs.append(q)
-        if len(subs) >= settings.query_planner_max_subqueries:
+        if len(subs) >= max_subqueries:
             break
 
     return subs or [question]

@@ -33,7 +33,7 @@ def expand_with_edges(
         for r in dense_retriever(
             question,
             source_id=nbr,
-            top_k=settings.edge_hop_top_k,
+            top_k=knobs.edge_hop_top_k if knobs else settings.edge_hop_top_k,
             knobs=knobs,
         ):
             r.metadata["_edge_relation"] = label

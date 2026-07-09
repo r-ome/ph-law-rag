@@ -4,7 +4,6 @@
     "question": "hi",
     "response": {
       "abstained": false,
-      "answer": "Hello! I'm a Philippine law research assistant. Ask me about Philippine statutes, the Constitution, or case law — for example: \"What are the grounds for annulment of marriage?\"",
       "context_sources": [],
       "contexts": [],
       "debug": {
@@ -17,8 +16,7 @@
         "prompt_length": 0,
         "stages": []
       },
-      "error": false,
-      "sources": []
+      "error": false
     },
     "trace_record": {
       "abstained": false,
@@ -42,7 +40,44 @@
         "enabled": false,
         "model": null
       },
+      "policy": {
+        "corrective_retrieval_enabled": false,
+        "escalate_intents": [],
+        "escalate_on_partial_evidence": false,
+        "evidence_gate": "min_chunks",
+        "generator_model": "mistral",
+        "later_enacted_preference_enabled": false,
+        "min_chunks_for_answer": 1,
+        "name": "local",
+        "query_decomposition_enabled": false,
+        "query_rewriting_enabled": true,
+        "retrieval_defaults": {
+          "consolidated_dedup_enabled": true,
+          "dense_top_k": 30,
+          "edge_expansion_enabled": true,
+          "edge_hop_top_k": 3,
+          "max_distance": 0.5,
+          "parent_expansion_enabled": true,
+          "parent_expansion_max_chars": 8000,
+          "parent_expansion_min_children": 2,
+          "prefer_operative_enabled": false,
+          "query_planner_max_subqueries": 3,
+          "query_planner_model": "mistral",
+          "rerank_score_margin": 6.0,
+          "rerank_top_n": 8,
+          "retrieval_operative_only": true,
+          "sparse_overfetch_k": 100,
+          "sparse_top_k": 10,
+          "subquery_packaging_enabled": false,
+          "subquery_reserve_n": 2
+        },
+        "router_enabled": false,
+        "router_model": "claude-haiku-4-5",
+        "selfcheck_enabled": false,
+        "strong_model": null
+      },
       "pre_expansion_chunks": [],
+      "profile": "local",
       "prompt_length": 0,
       "question": "hi",
       "retrieval_strategy": {
@@ -75,7 +110,6 @@
     "question": "What is theft under Article 308 of the Revised Penal Code?",
     "response": {
       "abstained": false,
-      "answer": "Theft, as defined in Article 308 of the Revised Penal Code, is committed by any person who, with intent to gain but without violence against or intimidation of persons nor force upon things, shall take personal property of another without the latter's consent. This includes:\n1. A person who finds lost property and fails to deliver it to local authorities or its owner [1].\n2. A person who maliciously damages another's property and removes or uses the fruits or object of the damage caused by them [1].\n3. A person who enters an enclosed estate, field, or property where trespass is forbidden or which belongs to another without consent, and hunts, fishes, or gathers fruits, cereals, or other forest or farm products [1].",
       "context_sources": [
         "revised_penal_code",
         "revised_penal_code",
@@ -333,17 +367,7 @@
           }
         ]
       },
-      "error": false,
-      "sources": [
-        {
-          "locator": "Article 308",
-          "ref": 1,
-          "source_id": "revised_penal_code",
-          "title": "The Revised Penal Code",
-          "url": "https://lawphil.net/statutes/acts/act1930/act_3815_1930.html",
-          "via": null
-        }
-      ]
+      "error": false
     },
     "trace_record": {
       "abstained": false,
@@ -366,6 +390,42 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "policy": {
+        "corrective_retrieval_enabled": false,
+        "escalate_intents": [],
+        "escalate_on_partial_evidence": false,
+        "evidence_gate": "min_chunks",
+        "generator_model": "mistral",
+        "later_enacted_preference_enabled": false,
+        "min_chunks_for_answer": 1,
+        "name": "local",
+        "query_decomposition_enabled": false,
+        "query_rewriting_enabled": true,
+        "retrieval_defaults": {
+          "consolidated_dedup_enabled": true,
+          "dense_top_k": 30,
+          "edge_expansion_enabled": true,
+          "edge_hop_top_k": 3,
+          "max_distance": 0.5,
+          "parent_expansion_enabled": true,
+          "parent_expansion_max_chars": 8000,
+          "parent_expansion_min_children": 2,
+          "prefer_operative_enabled": false,
+          "query_planner_max_subqueries": 3,
+          "query_planner_model": "mistral",
+          "rerank_score_margin": 6.0,
+          "rerank_top_n": 8,
+          "retrieval_operative_only": true,
+          "sparse_overfetch_k": 100,
+          "sparse_top_k": 10,
+          "subquery_packaging_enabled": false,
+          "subquery_reserve_n": 2
+        },
+        "router_enabled": false,
+        "router_model": "claude-haiku-4-5",
+        "selfcheck_enabled": false,
+        "strong_model": null
       },
       "pre_expansion_chunks": [
         {
@@ -465,6 +525,7 @@
           "unit_label": "Article 305"
         }
       ],
+      "profile": "local",
       "prompt_length": 5482,
       "question": "What is theft under Article 308 of the Revised Penal Code?",
       "retrieval_strategy": {
@@ -1060,7 +1121,6 @@
     "question": "Which law controls if a later statute amended an older penalty provision?",
     "response": {
       "abstained": false,
-      "answer": "The provided context consists of various sections from Republic Act No. 10951, which is an act adjusting penalties based on property and damage values under the Revised Penal Code. This law amends several articles of the Revised Penal Code, indicating that when a later statute amends an older penalty provision, the later statute (in this case, Republic Act No. 10951) controls [1][2][3][4][5][6][7][8].",
       "context_sources": [
         "rpc_penalty_amendments_2017",
         "rpc_penalty_amendments_2017",
@@ -1318,73 +1378,7 @@
           }
         ]
       },
-      "error": false,
-      "sources": [
-        {
-          "locator": "Section 98",
-          "ref": 1,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 99",
-          "ref": 2,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 62",
-          "ref": 3,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 72",
-          "ref": 4,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 83",
-          "ref": 5,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 74",
-          "ref": 6,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 68",
-          "ref": 7,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        },
-        {
-          "locator": "Section 87",
-          "ref": 8,
-          "source_id": "rpc_penalty_amendments_2017",
-          "title": "An Act Adjusting the Amount or the Value of Property and Damage on Which a Penalty is Based and the Fines Imposed Under the Revised Penal Code",
-          "url": "https://lawphil.net/statutes/repacts/ra2017/ra_10951_2017.html",
-          "via": null
-        }
-      ]
+      "error": false
     },
     "trace_record": {
       "abstained": false,
@@ -1407,6 +1401,42 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "policy": {
+        "corrective_retrieval_enabled": false,
+        "escalate_intents": [],
+        "escalate_on_partial_evidence": false,
+        "evidence_gate": "min_chunks",
+        "generator_model": "mistral",
+        "later_enacted_preference_enabled": false,
+        "min_chunks_for_answer": 1,
+        "name": "local",
+        "query_decomposition_enabled": false,
+        "query_rewriting_enabled": true,
+        "retrieval_defaults": {
+          "consolidated_dedup_enabled": true,
+          "dense_top_k": 30,
+          "edge_expansion_enabled": true,
+          "edge_hop_top_k": 3,
+          "max_distance": 0.5,
+          "parent_expansion_enabled": true,
+          "parent_expansion_max_chars": 8000,
+          "parent_expansion_min_children": 2,
+          "prefer_operative_enabled": false,
+          "query_planner_max_subqueries": 3,
+          "query_planner_model": "mistral",
+          "rerank_score_margin": 6.0,
+          "rerank_top_n": 8,
+          "retrieval_operative_only": true,
+          "sparse_overfetch_k": 100,
+          "sparse_top_k": 10,
+          "subquery_packaging_enabled": false,
+          "subquery_reserve_n": 2
+        },
+        "router_enabled": false,
+        "router_model": "claude-haiku-4-5",
+        "selfcheck_enabled": false,
+        "strong_model": null
       },
       "pre_expansion_chunks": [
         {
@@ -1506,6 +1536,7 @@
           "unit_label": "Section 87"
         }
       ],
+      "profile": "local",
       "prompt_length": 4304,
       "question": "Which law controls if a later statute amended an older penalty provision?",
       "retrieval_strategy": {
@@ -2125,7 +2156,6 @@
     "question": "What does Philippine law say about the mineral rights of a fictional asteroid colony?",
     "response": {
       "abstained": true,
-      "answer": "I don't have enough information in the indexed Philippine law corpus to answer that question. The provided context only discusses minerals and mineral lands on Earth, not asteroids or other celestial bodies.",
       "context_sources": [
         "civil_code",
         "civil_code",
@@ -2383,8 +2413,7 @@
           }
         ]
       },
-      "error": false,
-      "sources": []
+      "error": false
     },
     "trace_record": {
       "abstained": true,
@@ -2407,6 +2436,42 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "policy": {
+        "corrective_retrieval_enabled": false,
+        "escalate_intents": [],
+        "escalate_on_partial_evidence": false,
+        "evidence_gate": "min_chunks",
+        "generator_model": "mistral",
+        "later_enacted_preference_enabled": false,
+        "min_chunks_for_answer": 1,
+        "name": "local",
+        "query_decomposition_enabled": false,
+        "query_rewriting_enabled": true,
+        "retrieval_defaults": {
+          "consolidated_dedup_enabled": true,
+          "dense_top_k": 30,
+          "edge_expansion_enabled": true,
+          "edge_hop_top_k": 3,
+          "max_distance": 0.5,
+          "parent_expansion_enabled": true,
+          "parent_expansion_max_chars": 8000,
+          "parent_expansion_min_children": 2,
+          "prefer_operative_enabled": false,
+          "query_planner_max_subqueries": 3,
+          "query_planner_model": "mistral",
+          "rerank_score_margin": 6.0,
+          "rerank_top_n": 8,
+          "retrieval_operative_only": true,
+          "sparse_overfetch_k": 100,
+          "sparse_top_k": 10,
+          "subquery_packaging_enabled": false,
+          "subquery_reserve_n": 2
+        },
+        "router_enabled": false,
+        "router_model": "claude-haiku-4-5",
+        "selfcheck_enabled": false,
+        "strong_model": null
       },
       "pre_expansion_chunks": [
         {
@@ -2506,6 +2571,7 @@
           "unit_label": "Article 566"
         }
       ],
+      "profile": "local",
       "prompt_length": 4618,
       "question": "What does Philippine law say about the mineral rights of a fictional asteroid colony?",
       "retrieval_strategy": {
@@ -3137,7 +3203,6 @@
     "question": "Answer only if the retrieved context states the exact filing deadline for this unknown local ordinance.",
     "response": {
       "abstained": true,
-      "answer": "I don't have enough information in the indexed Philippine law corpus to answer that question specifically as none of the provided passages state the exact filing deadline for an unspecified local ordinance. However, from the Safe Spaces Act [2], LGUs are required to pass an ordinance within 60 days of the act's effectivity. From The Public Land Act [1], there is a requirement for publication of proclamations related to land matters in the Official Gazette and local newspapers, but no specific deadline for filing applications based on these proclamations is provided. From the Expanded Anti-Trafficking in Persons Act of 2022 [7], LGUs are encouraged to enact ordinances to strengthen the implementation of the law, but no specific deadline for their enactment is given.",
       "context_sources": [
         "public_land_act",
         "safe_spaces_act",
@@ -3395,8 +3460,7 @@
           }
         ]
       },
-      "error": false,
-      "sources": []
+      "error": false
     },
     "trace_record": {
       "abstained": true,
@@ -3419,6 +3483,42 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "policy": {
+        "corrective_retrieval_enabled": false,
+        "escalate_intents": [],
+        "escalate_on_partial_evidence": false,
+        "evidence_gate": "min_chunks",
+        "generator_model": "mistral",
+        "later_enacted_preference_enabled": false,
+        "min_chunks_for_answer": 1,
+        "name": "local",
+        "query_decomposition_enabled": false,
+        "query_rewriting_enabled": true,
+        "retrieval_defaults": {
+          "consolidated_dedup_enabled": true,
+          "dense_top_k": 30,
+          "edge_expansion_enabled": true,
+          "edge_hop_top_k": 3,
+          "max_distance": 0.5,
+          "parent_expansion_enabled": true,
+          "parent_expansion_max_chars": 8000,
+          "parent_expansion_min_children": 2,
+          "prefer_operative_enabled": false,
+          "query_planner_max_subqueries": 3,
+          "query_planner_model": "mistral",
+          "rerank_score_margin": 6.0,
+          "rerank_top_n": 8,
+          "retrieval_operative_only": true,
+          "sparse_overfetch_k": 100,
+          "sparse_top_k": 10,
+          "subquery_packaging_enabled": false,
+          "subquery_reserve_n": 2
+        },
+        "router_enabled": false,
+        "router_model": "claude-haiku-4-5",
+        "selfcheck_enabled": false,
+        "strong_model": null
       },
       "pre_expansion_chunks": [
         {
@@ -3518,6 +3618,7 @@
           "unit_label": "Section 7"
         }
       ],
+      "profile": "local",
       "prompt_length": 6486,
       "question": "Answer only if the retrieved context states the exact filing deadline for this unknown local ordinance.",
       "retrieval_strategy": {
@@ -4161,7 +4262,6 @@
     "question": "What is its penalty?",
     "response": {
       "abstained": false,
-      "answer": "The penalty for theft under Philippine law, as stated in the Revised Penal Code [1], depends on the value of the stolen property. If the value of the thing stolen is more than One million two hundred thousand pesos (₱1,200,000) but does not exceed Two million two hundred thousand pesos (₱2,200,000), the penalty is prisión mayor in its minimum and medium periods. If the value exceeds ₱2,200,000, the penalty increases to the maximum period of the one prescribed and an additional year for each additional One million pesos (₱1,000,000), but the total of the penalty which may be imposed shall not exceed twenty (20) years [1].\n\nFor specific types of stolen property such as those from the National Museum, a different penalty is prescribed in the Revised Penal Code [2]. For infringement of rights secured by provisions of the Intellectual Property Code of the Philippines, penalties are also specified in that code [4]. Theft committed with grave abuse of confidence or involving large cattle or fish may be punished by penalties next higher in degree than those specified in the Revised Penal Code [5]. Lastly, violations related to labor laws have their own set of penalties as stated in the Labor Code of the Philippines [6].",
       "context_sources": [
         "revised_penal_code",
         "revised_penal_code",
@@ -4396,49 +4496,7 @@
           }
         ]
       },
-      "error": false,
-      "sources": [
-        {
-          "locator": "Article 309",
-          "ref": 1,
-          "source_id": "revised_penal_code",
-          "title": "The Revised Penal Code",
-          "url": "https://lawphil.net/statutes/acts/act1930/act_3815_1930.html",
-          "via": null
-        },
-        {
-          "locator": "Article 311",
-          "ref": 2,
-          "source_id": "revised_penal_code",
-          "title": "The Revised Penal Code",
-          "url": "https://lawphil.net/statutes/acts/act1930/act_3815_1930.html",
-          "via": null
-        },
-        {
-          "locator": "Chapter XVII, Section 217",
-          "ref": 4,
-          "source_id": "ip_code",
-          "title": "Intellectual Property Code of the Philippines",
-          "url": "https://lawphil.net/statutes/repacts/ra1997/ra_8293_1997.html",
-          "via": null
-        },
-        {
-          "locator": "Article 310",
-          "ref": 5,
-          "source_id": "revised_penal_code",
-          "title": "The Revised Penal Code",
-          "url": "https://lawphil.net/statutes/acts/act1930/act_3815_1930.html",
-          "via": null
-        },
-        {
-          "locator": "Article 272",
-          "ref": 6,
-          "source_id": "labor_code",
-          "title": "Labor Code of the Philippines",
-          "url": "https://lawphil.net/statutes/presdecs/pd1974/pd_442_1974.html",
-          "via": null
-        }
-      ]
+      "error": false
     },
     "trace_record": {
       "abstained": false,
@@ -4461,6 +4519,42 @@
         "decision": null,
         "enabled": false,
         "model": null
+      },
+      "policy": {
+        "corrective_retrieval_enabled": false,
+        "escalate_intents": [],
+        "escalate_on_partial_evidence": false,
+        "evidence_gate": "min_chunks",
+        "generator_model": "mistral",
+        "later_enacted_preference_enabled": false,
+        "min_chunks_for_answer": 1,
+        "name": "local",
+        "query_decomposition_enabled": false,
+        "query_rewriting_enabled": true,
+        "retrieval_defaults": {
+          "consolidated_dedup_enabled": true,
+          "dense_top_k": 30,
+          "edge_expansion_enabled": true,
+          "edge_hop_top_k": 3,
+          "max_distance": 0.5,
+          "parent_expansion_enabled": true,
+          "parent_expansion_max_chars": 8000,
+          "parent_expansion_min_children": 2,
+          "prefer_operative_enabled": false,
+          "query_planner_max_subqueries": 3,
+          "query_planner_model": "mistral",
+          "rerank_score_margin": 6.0,
+          "rerank_top_n": 8,
+          "retrieval_operative_only": true,
+          "sparse_overfetch_k": 100,
+          "sparse_top_k": 10,
+          "subquery_packaging_enabled": false,
+          "subquery_reserve_n": 2
+        },
+        "router_enabled": false,
+        "router_model": "claude-haiku-4-5",
+        "selfcheck_enabled": false,
+        "strong_model": null
       },
       "pre_expansion_chunks": [
         {
@@ -4560,6 +4654,7 @@
           "unit_label": "Section 217(b)"
         }
       ],
+      "profile": "local",
       "prompt_length": 6332,
       "question": "What is its penalty?",
       "retrieval_strategy": {

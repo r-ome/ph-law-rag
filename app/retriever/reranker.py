@@ -201,7 +201,10 @@ def rerank(
         return kept
 
     top = results[0].score
-    kept = [r for r in results if r.score >= top - settings.rerank_score_margin]
+    rerank_score_margin = (
+        knobs.rerank_score_margin if knobs else settings.rerank_score_margin
+    )
+    kept = [r for r in results if r.score >= top - rerank_score_margin]
     kept = kept[:top_n]
     logger.debug(
         "rerank_completed",

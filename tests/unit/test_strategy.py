@@ -72,6 +72,34 @@ def test_current_law_registered_from_r3_trace():
     )
 
 
+def test_current_law_preset_does_not_read_behavior_settings(monkeypatch):
+    monkeypatch.setattr(settings, "sparse_overfetch_k", 999)
+    monkeypatch.setattr(settings, "rerank_score_margin", 99.0)
+    monkeypatch.setattr(settings, "max_distance", 0.99)
+    monkeypatch.setattr(settings, "edge_expansion_enabled", False)
+    monkeypatch.setattr(settings, "edge_hop_top_k", 99)
+    monkeypatch.setattr(settings, "parent_expansion_min_children", 99)
+    monkeypatch.setattr(settings, "parent_expansion_max_chars", 99)
+    monkeypatch.setattr(settings, "query_planner_model", "other-model")
+    monkeypatch.setattr(settings, "query_planner_max_subqueries", 99)
+    monkeypatch.setattr(settings, "subquery_packaging_enabled", True)
+    monkeypatch.setattr(settings, "subquery_reserve_n", 99)
+
+    knobs = resolve_knobs("current_law")
+
+    assert knobs.sparse_overfetch_k == 100
+    assert knobs.rerank_score_margin == 6.0
+    assert knobs.max_distance == 0.5
+    assert knobs.edge_expansion_enabled is True
+    assert knobs.edge_hop_top_k == 3
+    assert knobs.parent_expansion_min_children == 2
+    assert knobs.parent_expansion_max_chars == 8000
+    assert knobs.query_planner_model == "mistral"
+    assert knobs.query_planner_max_subqueries == 3
+    assert knobs.subquery_packaging_enabled is False
+    assert knobs.subquery_reserve_n == 2
+
+
 def test_r3_candidate_stubs_cleared_after_decisions():
     assert strategy.CANDIDATE_PRESET_STUBS == ()
     assert "citation_precision" not in strategy._PRESET_KNOBS
@@ -180,7 +208,11 @@ def test_edge_expansion_uses_resolved_rerank_top_n(monkeypatch):
 def test_packaged_retrieve_caps_with_resolved_rerank_top_n(monkeypatch):
     knobs = _knobs(rerank_top_n=1)
     monkeypatch.setattr(settings, "subquery_reserve_n", 2)
-    monkeypatch.setattr(subquery_retrieval, "_plan", lambda question: ["first", "second"])
+    monkeypatch.setattr(
+        subquery_retrieval,
+        "_plan",
+        lambda question, model=None, max_subqueries=None: ["first", "second"],
+    )
     monkeypatch.setattr(
         subquery_retrieval,
         "dense_retriever",

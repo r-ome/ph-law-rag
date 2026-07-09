@@ -84,9 +84,13 @@ def expand_parents(
         for r in results
         if r.metadata.get("parent_key") and not r.metadata.get("parent_has_hidden_leaves")
     )
+    min_children = (
+        knobs.parent_expansion_min_children if knobs else settings.parent_expansion_min_children
+    )
+    max_chars = knobs.parent_expansion_max_chars if knobs else settings.parent_expansion_max_chars
     eligible = {
         pk for pk, n in counts.items()
-        if pk and n >= settings.parent_expansion_min_children
+        if pk and n >= min_children
     }
     if not eligible:
         return results
@@ -108,7 +112,7 @@ def expand_parents(
             out.append(r)
             continue
         row = parents.get(pk)
-        if row and budget + row["char_count"] <= settings.parent_expansion_max_chars:
+        if row and budget + row["char_count"] <= max_chars:
             out.append(_parent_result(row, counts[pk], r.score, r.metadata))
             budget += row["char_count"]
             covered.add(pk)

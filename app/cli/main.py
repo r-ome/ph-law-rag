@@ -197,7 +197,15 @@ def consolidate_report():
 
 @app.command("show-config")
 def show_config():
-	typer.echo(json.dumps(settings.model_dump(mode="json"), indent=2))
+	from app.pipeline.policy import resolve_policy
+
+	resolution = resolve_policy()
+	typer.echo(json.dumps({
+		**settings.model_dump(mode="json"),
+		"profile": resolution.policy.name,
+		"policy_overrides": resolution.policy_overrides,
+		"env_ignored": resolution.env_ignored,
+	}, indent=2))
 
 @app.command("init")
 def init():

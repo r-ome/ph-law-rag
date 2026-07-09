@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from app.pipeline.policy import AnswerPolicy
 from app.retriever.context_selection import SelectionResult
 from app.retriever.strategy import RetrievalKnobs, resolve_knobs
 
@@ -19,6 +20,7 @@ class AnswerState:
     router_skipped_reason: str | None = None
     prompt: str | None = None
     response: dict | None = None
+    policy: AnswerPolicy | None = None
 
     def __post_init__(self) -> None:
         if self.effective_question is None:

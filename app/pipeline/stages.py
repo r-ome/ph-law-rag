@@ -103,8 +103,17 @@ def package_greeting(state: AnswerState) -> None:
     )
 
 
+def _policy(state: AnswerState):
+    if state.policy is None:
+        from app.pipeline.policy import resolve_policy
+
+        state.policy = resolve_policy().policy
+    return state.policy
+
+
 def rewrite_query(state: AnswerState) -> None:
-    if not state.session_id:
+    policy = _policy(state)
+    if not state.session_id or not policy.query_rewriting_enabled:
         return
     from app.conversation.query_rewriter import rewrite_query as rewrite_query_with_history
     from app.conversation.session import get_history
@@ -114,23 +123,37 @@ def rewrite_query(state: AnswerState) -> None:
 
 
 def classify_intent(state: AnswerState, strategy_override: str | None = None) -> None:
+    policy = _policy(state)
     if strategy_override is not None:
         state.strategy_name = strategy_override
-        state.strategy_knobs = resolve_knobs(state.strategy_name)
+        state.strategy_knobs = (
+            policy.retrieval_defaults
+            if state.strategy_name == "default"
+            else resolve_knobs(state.strategy_name)
+        )
         state.router_skipped_reason = "strategy_override"
         return
-    if not settings.router_enabled:
+    if not policy.router_enabled:
         return
 
     from app.retriever.intent_router import classify
 
-    state.router_decision = classify(state.effective_question or state.question)
+    state.router_decision = classify(state.effective_question or state.question, model=policy.router_model)
     state.strategy_name = state.router_decision.strategy
-    state.strategy_knobs = resolve_knobs(state.strategy_name)
+    state.strategy_knobs = (
+        policy.retrieval_defaults
+        if state.strategy_name == "default"
+        else resolve_knobs(state.strategy_name)
+    )
 
 
 def plan_retrieval(state: AnswerState) -> None:
-    state.strategy_knobs = resolve_knobs(state.strategy_name)
+    policy = _policy(state)
+    state.strategy_knobs = (
+        policy.retrieval_defaults
+        if state.strategy_name == "default"
+        else resolve_knobs(state.strategy_name)
+    )
 
 
 def retrieve_context(state: AnswerState) -> None:
@@ -141,8 +164,14 @@ def retrieve_context(state: AnswerState) -> None:
 
 
 def gate_evidence(state: AnswerState) -> None:
+    policy = _policy(state)
     question = state.effective_question or state.question
-    if len(state.selection.pre_expansion) < settings.min_chunks_for_answer:
+    if policy.evidence_gate == "crag":
+        raise NotImplementedError(
+            "RAGLAB_PROFILE=crag-experimental is registered, but the CRAG evidence gate "
+            "is not implemented until PR5."
+        )
+    if len(state.selection.pre_expansion) < policy.min_chunks_for_answer:
         state.response = _package(
             ABSTAIN_MESSAGE,
             sources=[],
@@ -153,7 +182,7 @@ def gate_evidence(state: AnswerState) -> None:
         )
         return
 
-    if settings.answerability_gate_enabled and not is_answerable(question, state.selection.pre_expansion):
+    if policy.evidence_gate == "answerability" and not is_answerable(question, state.selection.pre_expansion):
         state.response = _package(
             ABSTAIN_MESSAGE,
             sources=[],
@@ -165,18 +194,19 @@ def gate_evidence(state: AnswerState) -> None:
 
 
 def generate_answer(state: AnswerState) -> None:
+    policy = _policy(state)
     question = state.effective_question or state.question
     context_block, sources = build_context(state.selection.selected)
 
     user_prompt = build_user_prompt(question, context_block)
     state.prompt = user_prompt
     system_prompt = SYSTEM_PROMPT
-    if settings.later_enacted_preference_enabled:
+    if policy.later_enacted_preference_enabled:
         system_prompt = SYSTEM_PROMPT + LATER_ENACTED_RULE
     try:
-        answer_text = generate(system_prompt, user_prompt)
+        answer_text = generate(system_prompt, user_prompt, model=policy.generator_model)
     except LLMError as e:
-        logger.warning("generation_failed", error=str(e), model=settings.llm_model)
+        logger.warning("generation_failed", error=str(e), model=policy.generator_model)
         state.response = _package(
             f"The language model could not be reached: {e}",
             sources=[],
@@ -188,13 +218,14 @@ def generate_answer(state: AnswerState) -> None:
         )
         return
 
-    if settings.faithfulness_selfcheck_enabled and not is_abstention(answer_text):
+    if policy.selfcheck_enabled and not is_abstention(answer_text):
         from app.retriever.prompts import SELFCHECK_SYSTEM, build_selfcheck_prompt
 
         try:
             revised = generate(
                 SELFCHECK_SYSTEM,
                 build_selfcheck_prompt(question, context_block, answer_text),
+                model=policy.generator_model,
             )
             if revised.strip():
                 answer_text = revised
@@ -210,4 +241,3 @@ def generate_answer(state: AnswerState) -> None:
         prompt=user_prompt,
         debug=state.debug_enabled,
     )
-
