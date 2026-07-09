@@ -24,7 +24,12 @@ def _strip_reasoning(text: str) -> str:
     return text.strip()
 
 
-def generate(system_prompt: str, user_prompt: str, model: str | None = None) -> str:
+def generate(
+    system_prompt: str,
+    user_prompt: str,
+    model: str | None = None,
+    max_tokens: int | None = None,
+) -> str:
     """Generate a completion. Routes by model name: claude* → Anthropic, else Ollama.
 
     This is the single generator seam. Swapping the generator for an A/B is a
@@ -40,7 +45,7 @@ def generate(system_prompt: str, user_prompt: str, model: str | None = None) -> 
         if model.startswith("claude"):
             result = _generate_anthropic(system_prompt, user_prompt, model)
         else:
-            result = _generate_ollama(system_prompt, user_prompt, model)
+            result = _generate_ollama(system_prompt, user_prompt, model, max_tokens=max_tokens)
         succeeded = True
         return result
     except LLMError as exc:
@@ -63,8 +68,13 @@ def generate(system_prompt: str, user_prompt: str, model: str | None = None) -> 
             )
 
 
-def _generate_ollama(system_prompt: str, user_prompt: str, model: str) -> str:
+def _generate_ollama(
+    system_prompt: str, user_prompt: str, model: str, max_tokens: int | None = None
+) -> str:
     url = f"{settings.ollama_base_url}/api/chat"
+    options = {"temperature": 0, "seed": 42}
+    if max_tokens is not None:
+        options["num_predict"] = max_tokens  # cap local output so the gate verdict isn't truncated
     payload = {
         "model": model,
         "messages": [
@@ -73,10 +83,7 @@ def _generate_ollama(system_prompt: str, user_prompt: str, model: str) -> str:
         ],
         "stream": False,
         "think": False,
-        "options": {
-            "temperature": 0,
-            "seed": 42,
-        },
+        "options": options,
     }
 
     try:

@@ -45,6 +45,9 @@ class AnswerState:
     evidence: EvidenceReport | None = None
     corrective_ran: bool = False
     corrective_added_chunks: int = 0
+    corrective_baseline_selected_count: int | None = None
+    corrective_post_selected_count: int | None = None
+    corrective_max_added: int | None = None
     router_decision: object | None = None
     router_skipped_reason: str | None = None
     model_choice: ModelChoice | None = None

@@ -20,6 +20,14 @@ def test_run_rows_persists_selected_chunk_ids_and_strategy_override(tmp_path, mo
             "sources": [{"source_id": "source_a"}],
             "context_sources": ["source_a"],
             "abstained": False,
+            "corrective_retrieval": {
+                "enabled": True,
+                "fired": True,
+                "added_chunks": 1,
+                "baseline_selected_count": 2,
+                "post_selected_count": 3,
+                "max_added": 2,
+            },
             "debug": {
                 "chunks": [
                     {"chunk_id": "chunk-1"},
@@ -53,6 +61,14 @@ def test_run_rows_persists_selected_chunk_ids_and_strategy_override(tmp_path, mo
         "strategy_override": "current_law",
     }
     assert rows[0]["selected_chunk_ids"] == ["chunk-1", "chunk-2"]
+    assert rows[0]["corrective_retrieval"] == {
+        "enabled": True,
+        "fired": True,
+        "added_chunks": 1,
+        "baseline_selected_count": 2,
+        "post_selected_count": 3,
+        "max_added": 2,
+    }
     assert rows[0]["debug_stages"] == [{"name": "prefer_operative", "fired": True}]
     written = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
     assert written == rows

@@ -109,6 +109,8 @@ def run_rows(
             "generator_model": model_choice["model"],
             "model_choice": model_choice,
             "model_choice_reason": model_choice["reason"],
+            "evidence": resp.get("evidence"),
+            "corrective_retrieval": resp.get("corrective_retrieval", {}),
             "query_decomposition": policy.query_decomposition_enabled,
             "elapsed_s": round(elapsed, 2),
             "cited_sources": [s.get("source_id", "") for s in resp.get("sources", [])],

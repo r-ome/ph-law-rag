@@ -26,6 +26,7 @@ class ConfigView(BaseModel):
     chunk_overlap: int
     min_chunks_for_answer: int
     evidence_gate: str
+    evidence_judge_model: str
     corrective_retrieval_enabled: bool
     max_conversation_turns: int
     router_enabled: bool

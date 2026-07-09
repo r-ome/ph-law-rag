@@ -232,3 +232,17 @@ def test_packaged_retrieve_caps_with_resolved_rerank_top_n(monkeypatch):
     out = subquery_retrieval.packaged_retrieve("question", knobs=knobs)
 
     assert len(out) == 1
+
+
+def test_round_robin_merge_skips_seen_ids_and_preserves_rank_order():
+    out = subquery_retrieval.round_robin_merge(
+        [
+            [_r("a1"), _r("a2")],
+            [_r("seen"), _r("b2")],
+            [_r("c1")],
+        ],
+        seen_ids={"seen"},
+        cap=3,
+    )
+
+    assert [result.chunk_id for result in out] == ["a1", "c1", "a2"]

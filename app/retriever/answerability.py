@@ -55,18 +55,18 @@ NEEDS: the SSS pension computation formula
 ANSWERABLE: NO"""
 
 
-def _gate_complete(system: str, user: str, model: str) -> str:
+def _gate_complete(system: str, user: str, model: str, *, max_tokens: int = 100) -> str:
     """Run the gate prompt on the configured judge. Anthropic (claude-*) or local
     Ollama; lazy imports so neither dep is required unless its model is selected."""
     if model.startswith("claude"):
         import anthropic
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key.get_secret_value())
         msg = client.messages.create(
-            model=model, max_tokens=100, temperature=0,
+            model=model, max_tokens=max_tokens, temperature=0,
             system=system, messages=[{"role": "user", "content": user}],
         )
         return msg.content[0].text
-    return generate(system, user, model=model)
+    return generate(system, user, model=model, max_tokens=max_tokens)
 
 
 def is_answerable(question: str, reranked: list[RetrievalResult]) -> bool:

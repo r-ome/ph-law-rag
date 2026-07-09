@@ -119,6 +119,7 @@ class Settings(BaseSettings):
 	edge_hop_top_k: int = 3
 	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
 	answerability_gate_model: str = "mistral"  # gate pinned to mistral even when A/B-ing another generator
+	crag_judge_model: str = "claude-haiku-4-5"  # CRAG facet-judge; override (e.g. gemma4:e4b) to run the gatekeeper locally
 	query_decomposition_enabled: bool = False
 	query_planner_model: str = "mistral"
 	query_planner_max_subqueries: int = 3
@@ -287,6 +288,7 @@ def config_view() -> dict:
 		"chunk_overlap": settings.chunk_overlap,
 		"min_chunks_for_answer": policy.min_chunks_for_answer,
 		"evidence_gate": policy.evidence_gate,
+		"evidence_judge_model": policy.evidence_judge_model,
 		"corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
 		"max_conversation_turns": settings.max_conversation_turns,
 		"router_enabled": policy.router_enabled,

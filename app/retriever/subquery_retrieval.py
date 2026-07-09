@@ -8,6 +8,27 @@ from app.config import settings
 from app.retriever.strategy import RetrievalKnobs
 
 
+def round_robin_merge(
+    per_query_lists: list[list[RetrievalResult]],
+    *,
+    seen_ids: set[str] | None = None,
+    cap: int,
+) -> list[RetrievalResult]:
+    seen = set(seen_ids or set())
+    ordered: list[RetrievalResult] = []
+    max_len = max((len(results) for results in per_query_lists), default=0)
+
+    for rank in range(max_len):
+        for results in per_query_lists:
+            if len(ordered) >= cap:
+                return ordered
+            if rank < len(results) and results[rank].chunk_id not in seen:
+                seen.add(results[rank].chunk_id)
+                ordered.append(results[rank])
+
+    return ordered
+
+
 def packaged_retrieve(
     question: str,
     knobs: RetrievalKnobs | None = None,
@@ -41,12 +62,8 @@ def packaged_retrieve(
         ])
         per_sub.append(rerank(sub, fused, knobs=knobs)[:reserve_n])
 
-    seen: set[str] = set()
-    ordered: list[RetrievalResult] = []
-    for rank in range(reserve_n):     # round-robin, no cross-query score sort
-        for lst in per_sub:
-            if rank < len(lst) and lst[rank].chunk_id not in seen:
-                seen.add(lst[rank].chunk_id)
-                ordered.append(lst[rank])
-
-    return ordered[:top_n]             # context-budget parity with baseline
+    return round_robin_merge(
+        per_sub,
+        seen_ids=set(),
+        cap=top_n,
+    )                                  # context-budget parity with baseline

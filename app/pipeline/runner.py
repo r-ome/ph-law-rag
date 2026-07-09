@@ -22,6 +22,7 @@ def _feature_flags(policy: AnswerPolicy) -> dict:
         "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
         "answerability_gate_enabled": policy.evidence_gate == "answerability",
         "evidence_gate": policy.evidence_gate,
+        "evidence_judge_model": policy.evidence_judge_model,
         "corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
         "query_decomposition_enabled": policy.query_decomposition_enabled,
         "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
@@ -96,6 +97,21 @@ def _build_trace_record(
             "enabled": policy.corrective_retrieval_enabled,
             "fired": state.corrective_ran,
             "added_chunks": state.corrective_added_chunks,
+            "baseline_selected_count": (
+                state.corrective_baseline_selected_count
+                if state.corrective_baseline_selected_count is not None
+                else len(state.selection.selected)
+            ),
+            "post_selected_count": (
+                state.corrective_post_selected_count
+                if state.corrective_post_selected_count is not None
+                else len(state.selection.selected)
+            ),
+            "max_added": (
+                state.corrective_max_added
+                if state.corrective_max_added is not None
+                else policy.retrieval_defaults.subquery_reserve_n
+            ),
         },
     }
 
@@ -138,6 +154,38 @@ def _attach_model_metadata(state: AnswerState) -> None:
     state.response["generator_model"] = state.model_choice.model
 
 
+def _attach_corrective_metadata(state: AnswerState) -> None:
+    if state.response is None:
+        return
+    policy = state.policy or resolve_policy().policy
+    state.response["corrective_retrieval"] = {
+        "enabled": policy.corrective_retrieval_enabled,
+        "fired": state.corrective_ran,
+        "added_chunks": state.corrective_added_chunks,
+        "baseline_selected_count": (
+            state.corrective_baseline_selected_count
+            if state.corrective_baseline_selected_count is not None
+            else len(state.selection.selected)
+        ),
+        "post_selected_count": (
+            state.corrective_post_selected_count
+            if state.corrective_post_selected_count is not None
+            else len(state.selection.selected)
+        ),
+        "max_added": (
+            state.corrective_max_added
+            if state.corrective_max_added is not None
+            else policy.retrieval_defaults.subquery_reserve_n
+        ),
+    }
+
+
+def _attach_evidence_metadata(state: AnswerState) -> None:
+    if state.response is None:
+        return
+    state.response["evidence"] = state.evidence.as_trace_dict() if state.evidence else None
+
+
 def _finalize(
     *,
     state: AnswerState,
@@ -151,6 +199,8 @@ def _finalize(
         return None
 
     _attach_model_metadata(state)
+    _attach_corrective_metadata(state)
+    _attach_evidence_metadata(state)
     _attach_debug_stages(state, collector)
     _append_session_turn(state)
 

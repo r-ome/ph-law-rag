@@ -198,6 +198,9 @@ def test_cascade_profile_routes_generation_to_strong_model(monkeypatch):
         "enabled": False,
         "fired": False,
         "added_chunks": 0,
+        "baseline_selected_count": 1,
+        "post_selected_count": 1,
+        "max_added": 2,
     }
 
 
@@ -327,4 +330,7 @@ def test_hard_abstain_when_min_chunks_not_met(monkeypatch):
         "enabled": False,
         "fired": False,
         "added_chunks": 0,
+        "baseline_selected_count": 1,
+        "post_selected_count": 1,
+        "max_added": 2,
     }

@@ -98,8 +98,8 @@ def test_cascade_profiles_define_expected_escalation(monkeypatch):
     local_cascade = resolve_policy().policy
 
     assert local_cascade.router_enabled is True
-    assert local_cascade.router_model == "qwen3:4b"
-    assert local_cascade.strong_model == "qwen3:4b"
+    assert local_cascade.router_model == "gemma3:4b"
+    assert local_cascade.strong_model == "gemma3:4b"
     assert local_cascade.escalate_intents == cascade.escalate_intents
 
 
@@ -122,8 +122,15 @@ def test_policy_trace_dict_serializes_frozenset_and_knobs():
     assert policy.as_trace_dict()["retrieval_defaults"]["dense_top_k"] == 1
 
 
-def test_crag_profile_is_registered_but_not_implemented(monkeypatch):
+def test_crag_profile_is_registered_with_pinned_judge_and_corrective(monkeypatch):
     monkeypatch.setattr(settings, "raglab_profile", "crag-experimental")
+    monkeypatch.setattr(settings, "answerability_gate_model", "mistral")
 
-    with pytest.raises(NotImplementedError, match="CRAG evidence gate"):
-        resolve_policy()
+    resolution = resolve_policy()
+
+    assert resolution.policy.name == "crag-experimental"
+    assert resolution.policy.evidence_gate == "crag"
+    assert resolution.policy.evidence_judge_model == "claude-haiku-4-5"
+    assert resolution.policy.corrective_retrieval_enabled is True
+    assert resolution.policy_overrides["evidence_judge_model"] == "claude-haiku-4-5"
+    assert resolution.env_ignored["evidence_judge_model"] == "mistral"

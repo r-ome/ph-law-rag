@@ -29,6 +29,7 @@ BEHAVIOR_FIELDS: frozenset[str] = frozenset(
         "consolidated_dedup_enabled",
         "min_chunks_for_answer",
         "answerability_gate_enabled",
+        "evidence_judge_model",
         "faithfulness_selfcheck_enabled",
         "later_enacted_preference_enabled",
         "query_decomposition_enabled",
@@ -82,6 +83,7 @@ INFRA_FIELDS: frozenset[str] = frozenset(
         "anthropic_api_key",
         "max_conversation_turns",
         "answerability_gate_model",
+        "crag_judge_model",
         "aws_region",
     }
 )
@@ -98,6 +100,7 @@ class AnswerPolicy:
     escalate_on_partial_evidence: bool
     retrieval_defaults: RetrievalKnobs
     evidence_gate: EvidenceGate
+    evidence_judge_model: str
     min_chunks_for_answer: int
     corrective_retrieval_enabled: bool
     selfcheck_enabled: bool
@@ -119,6 +122,7 @@ class AnswerPolicy:
             evidence_gate=(
                 "answerability" if settings_obj.answerability_gate_enabled else "min_chunks"
             ),
+            evidence_judge_model=settings_obj.answerability_gate_model,
             min_chunks_for_answer=settings_obj.min_chunks_for_answer,
             corrective_retrieval_enabled=False,
             selfcheck_enabled=settings_obj.faithfulness_selfcheck_enabled,
@@ -148,7 +152,7 @@ class PolicyResolution:
         }
 
 
-def _base_profile(name: str) -> AnswerPolicy:
+def _base_profile(name: str, settings_obj=settings) -> AnswerPolicy:
     base = AnswerPolicy(
         name=name,
         generator_model="mistral",
@@ -178,6 +182,7 @@ def _base_profile(name: str) -> AnswerPolicy:
             subquery_reserve_n=2,
         ),
         evidence_gate="min_chunks",
+        evidence_judge_model=settings_obj.answerability_gate_model,
         min_chunks_for_answer=1,
         corrective_retrieval_enabled=False,
         selfcheck_enabled=False,
@@ -211,8 +216,11 @@ def _base_profile(name: str) -> AnswerPolicy:
     if name == "crag-experimental":
         return replace(
             base,
-            router_enabled=True,
+            generator_model=settings_obj.llm_model,
+            router_enabled=settings_obj.router_enabled,
+            router_model=settings_obj.router_model,
             evidence_gate="crag",
+            evidence_judge_model=settings_obj.crag_judge_model,
             corrective_retrieval_enabled=True,
         )
     raise ValueError(f"Unknown RAGLAB_PROFILE: {name}")
@@ -223,6 +231,8 @@ def _policy_value(policy: AnswerPolicy, field: str) -> object:
         return policy.generator_model
     if field == "answerability_gate_enabled":
         return policy.evidence_gate == "answerability"
+    if field == "evidence_judge_model":
+        return policy.evidence_judge_model
     if field == "faithfulness_selfcheck_enabled":
         return policy.selfcheck_enabled
     if field == "enable_query_rewriting":
@@ -243,12 +253,7 @@ def resolve_policy(settings_obj=settings) -> PolicyResolution:
             env_ignored={},
         )
 
-    policy = _base_profile(profile_name)
-    if policy.evidence_gate == "crag":
-        raise NotImplementedError(
-            "RAGLAB_PROFILE=crag-experimental is registered, but the CRAG evidence gate "
-            "is not implemented until PR5."
-        )
+    policy = _base_profile(profile_name, settings_obj=settings_obj)
     overrides: dict[str, object] = {}
     ignored: dict[str, object] = {}
     local_policy = AnswerPolicy.from_settings(settings_obj, name=profile_name)
