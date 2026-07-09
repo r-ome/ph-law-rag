@@ -85,3 +85,20 @@ def test_retriever_strategy_does_not_import_downstream_layers():
 			_matches(module, prefix)
 			for prefix in ("app.api", "app.evals", "app.ingestion", "app.indexing")
 		), f"{path.relative_to(ROOT)} imports forbidden module {module}"
+
+
+def test_pipeline_may_import_retriever_but_retriever_library_does_not_import_pipeline():
+	for path in _python_files("app", "pipeline"):
+		for module in _imports(path):
+			assert not any(
+				_matches(module, prefix)
+				for prefix in ("app.api", "app.evals", "app.ingestion", "app.indexing")
+			), f"{path.relative_to(ROOT)} imports forbidden module {module}"
+
+	for path in _python_files("app", "retriever"):
+		if path.name == "answer_service.py":
+			continue
+		for module in _imports(path):
+			assert not _matches(module, "app.pipeline"), (
+				f"{path.relative_to(ROOT)} imports forbidden module {module}"
+			)

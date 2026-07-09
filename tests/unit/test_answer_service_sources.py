@@ -1,4 +1,4 @@
-from app.retriever.answer_service import _chunk_trace, _cited_sources
+from app.pipeline.stages import _chunk_trace, _cited_sources
 from app.retriever.types import RetrievalResult
 
 

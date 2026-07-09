@@ -1,9 +1,12 @@
 import pytest
 
 from app.config import settings
+from app.pipeline import runner, stages
 from app.retriever import answer_service, intent_router
 from app.retriever.context_selection import SelectionResult
+from app.retriever.llm_client import LLMError
 from app.retriever.strategy import resolve_knobs
+from app.retriever.types import RetrievalResult
 
 pytestmark = pytest.mark.unit
 
@@ -15,7 +18,7 @@ def _capture_traces(monkeypatch):
         def write(self, record):
             records.append(record)
 
-    monkeypatch.setattr(answer_service, "TraceWriter", lambda: FakeTraceWriter())
+    monkeypatch.setattr(runner, "TraceWriter", lambda: FakeTraceWriter())
     monkeypatch.setattr(settings, "trace_logging_enabled", True)
     return records
 
@@ -38,11 +41,20 @@ def test_answer_router_off_does_not_classify_and_traces_disabled_decision(monkey
     def fail_classify(question):
         raise AssertionError("router should not classify when disabled")
 
-    def fake_run_pipeline(question, debug_enabled, strategy_name, strategy_knobs):
-        return _response(), SelectionResult(retrieved=[], pre_expansion=[], selected=[]), "prompt"
+    def fake_retrieve_context(state):
+        state.selection = SelectionResult(retrieved=[], pre_expansion=[], selected=[])
+
+    def fake_gate_evidence(state):
+        return None
+
+    def fake_generate_answer(state):
+        state.response = _response()
+        state.prompt = "prompt"
 
     monkeypatch.setattr(intent_router, "classify", fail_classify)
-    monkeypatch.setattr(answer_service, "_run_pipeline", fake_run_pipeline)
+    monkeypatch.setattr(stages, "retrieve_context", fake_retrieve_context)
+    monkeypatch.setattr(stages, "gate_evidence", fake_gate_evidence)
+    monkeypatch.setattr(stages, "generate_answer", fake_generate_answer)
 
     answer_service.answer("What is theft under Philippine law?", trace=True)
 
@@ -80,7 +92,7 @@ def test_answer_router_on_uses_current_law_strategy_knobs(monkeypatch):
             captured["knobs"] = knobs
             return SelectionResult(retrieved=[], pre_expansion=[], selected=[])
 
-    monkeypatch.setitem(answer_service.STRATEGIES, "current_law", FakeStrategy())
+    monkeypatch.setitem(stages.STRATEGIES, "current_law", FakeStrategy())
 
     answer_service.answer("Which law controls after the amendment?", trace=False)
 
@@ -96,13 +108,22 @@ def test_answer_strategy_override_skips_router_and_traces_reason(monkeypatch):
     def fail_classify(question):
         raise AssertionError("router should not classify when strategy is overridden")
 
-    def fake_run_pipeline(question, debug_enabled, strategy_name, strategy_knobs):
-        captured["strategy_name"] = strategy_name
-        captured["knobs"] = strategy_knobs
-        return _response(), SelectionResult(retrieved=[], pre_expansion=[], selected=[]), "prompt"
+    def fake_retrieve_context(state):
+        captured["strategy_name"] = state.strategy_name
+        captured["knobs"] = state.strategy_knobs
+        state.selection = SelectionResult(retrieved=[], pre_expansion=[], selected=[])
+
+    def fake_gate_evidence(state):
+        return None
+
+    def fake_generate_answer(state):
+        state.response = _response()
+        state.prompt = "prompt"
 
     monkeypatch.setattr(intent_router, "classify", fail_classify)
-    monkeypatch.setattr(answer_service, "_run_pipeline", fake_run_pipeline)
+    monkeypatch.setattr(stages, "retrieve_context", fake_retrieve_context)
+    monkeypatch.setattr(stages, "gate_evidence", fake_gate_evidence)
+    monkeypatch.setattr(stages, "generate_answer", fake_generate_answer)
 
     answer_service.answer("Which law controls after the amendment?", trace=True, strategy_override="current_law")
 
@@ -132,3 +153,92 @@ def test_answer_greeting_router_on_does_not_classify(monkeypatch):
         "decision": None,
     }
     assert records[0]["retrieval_strategy"]["strategy"] == "default"
+
+
+def test_answer_greeting_with_session_still_finalizes(monkeypatch):
+    records = _capture_traces(monkeypatch)
+    appended = []
+    monkeypatch.setattr(runner, "_ensure_session", lambda session_id: None)
+    monkeypatch.setattr(runner, "_append_session_turn", lambda state: appended.append(state))
+
+    response, trace_record = answer_service.run_answer(
+        "hi",
+        debug=True,
+        session_id="s1",
+        trace=True,
+    )
+
+    assert response["answer"]
+    assert response["debug"]["stages"] == []
+    assert len(appended) == 1
+    assert appended[0].session_id == "s1"
+    assert len(records) == 1
+    assert trace_record == records[0]
+    assert trace_record["session_id"] == "s1"
+
+
+def test_llm_error_path_returns_error_response(monkeypatch):
+    monkeypatch.setattr(settings, "trace_logging_enabled", False)
+    monkeypatch.setattr(settings, "min_chunks_for_answer", 1)
+
+    class FakeStrategy:
+        def execute(self, question, knobs=None):
+            return SelectionResult(
+                retrieved=[],
+                pre_expansion=[RetrievalResult("c1", "context", 1.0, {})],
+                selected=[RetrievalResult("c1", "context", 1.0, {})],
+            )
+
+    monkeypatch.setitem(stages.STRATEGIES, "default", FakeStrategy())
+    monkeypatch.setattr(stages, "build_context", lambda selected: ("context", []))
+
+    def fail_generate(system_prompt, user_prompt):
+        raise LLMError("offline")
+
+    monkeypatch.setattr(stages, "generate", fail_generate)
+
+    response = answer_service.answer("What is theft?", trace=False)
+
+    assert response["error"] is True
+    assert response["abstained"] is False
+    assert "offline" in response["answer"]
+
+
+def test_unexpected_pipeline_exception_propagates_without_finalize(monkeypatch):
+    records = _capture_traces(monkeypatch)
+    appended = []
+    monkeypatch.setattr(settings, "router_enabled", False)
+    monkeypatch.setattr(runner, "_ensure_session", lambda session_id: None)
+    monkeypatch.setattr(runner, "_append_session_turn", lambda state: appended.append(state))
+
+    def fail_retrieve_context(state):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(stages, "retrieve_context", fail_retrieve_context)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        answer_service.answer("What is theft?", session_id="s1", trace=True)
+
+    assert records == []
+    assert appended == []
+
+
+def test_hard_abstain_when_min_chunks_not_met(monkeypatch):
+    monkeypatch.setattr(settings, "trace_logging_enabled", False)
+    monkeypatch.setattr(settings, "min_chunks_for_answer", 2)
+
+    class FakeStrategy:
+        def execute(self, question, knobs=None):
+            return SelectionResult(
+                retrieved=[],
+                pre_expansion=[RetrievalResult("c1", "context", 1.0, {})],
+                selected=[RetrievalResult("c1", "context", 1.0, {})],
+            )
+
+    monkeypatch.setitem(stages.STRATEGIES, "default", FakeStrategy())
+
+    response = answer_service.answer("What is a deliberately obscure corpus miss?", trace=False)
+
+    assert response["abstained"] is True
+    assert response["error"] is False
+    assert response["sources"] == []

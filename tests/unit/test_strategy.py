@@ -134,6 +134,7 @@ def test_pinned_preset_flows_through_real_select_context(monkeypatch):
 
 def test_trace_carries_resolved_strategy_block(monkeypatch):
     from app.retriever import answer_service
+    from app.pipeline import runner
 
     records = []
 
@@ -143,7 +144,7 @@ def test_trace_carries_resolved_strategy_block(monkeypatch):
 
     monkeypatch.setattr(settings, "trace_logging_enabled", True)
     monkeypatch.setattr(settings, "dense_top_k", 33)
-    monkeypatch.setattr(answer_service, "TraceWriter", lambda: FakeTraceWriter())
+    monkeypatch.setattr(runner, "TraceWriter", lambda: FakeTraceWriter())
 
     answer_service.answer("hi", trace=True)
 
