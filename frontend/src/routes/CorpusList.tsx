@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 
 const ALL = "__all__";
+const EMPTY_DOCUMENTS: DocumentSummary[] = [];
 
 function statusVariant(status: string): "default" | "secondary" | "outline" {
   if (status === "operative") return "default";
@@ -79,7 +80,7 @@ export default function CorpusList() {
   const [status, setStatus] = useState(ALL);
   const [sourceIndex, setSourceIndex] = useState(ALL);
 
-  const docs = data?.documents ?? [];
+  const docs = data?.documents ?? EMPTY_DOCUMENTS;
 
   const categories = useMemo(
     () => Array.from(new Set(docs.map((d) => d.category))).sort(),

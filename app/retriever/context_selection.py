@@ -16,6 +16,18 @@ class SelectionResult:
     selected: list[RetrievalResult]
 
 
+def _snapshot_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
+    return [
+        RetrievalResult(
+            chunk_id=r.chunk_id,
+            text=r.text,
+            score=r.score,
+            metadata=dict(r.metadata),
+        )
+        for r in results
+    ]
+
+
 def select_context(
     question: str,
     knobs: RetrievalKnobs | None = None,
@@ -27,10 +39,12 @@ def select_context(
             pre_expansion = packaged_retrieve(question, knobs=knobs)
             stage["out_n"] = len(pre_expansion)
         retrieved = pre_expansion
+        retrieved_trace = _snapshot_results(retrieved)
     else:
         with stage_timer("hybrid_retriever") as stage:
             retrieved = hybrid_retriever(question, knobs=knobs)
             stage["out_n"] = len(retrieved)
+        retrieved_trace = _snapshot_results(retrieved)
         with stage_timer("rerank", in_n=len(retrieved)) as stage:
             pre_expansion = rerank(question, retrieved, knobs=knobs)
             stage["out_n"] = len(pre_expansion)
@@ -80,7 +94,7 @@ def select_context(
             stage["fields"] = {"fired": len(selected) != before}
 
     return SelectionResult(
-        retrieved=retrieved,
+        retrieved=retrieved_trace,
         pre_expansion=pre_expansion,
         selected=selected,
     )

@@ -1,7 +1,10 @@
 import type { ChunkTrace, TraceRecord } from "@/api/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { useState } from "react";
 
 function textValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "none";
@@ -13,6 +16,47 @@ function score(value: number | null | undefined): string {
   return typeof value === "number" ? value.toFixed(4) : "n/a";
 }
 
+function ChunkCard({ chunk }: { chunk: ChunkTrace }) {
+  const [expanded, setExpanded] = useState(false);
+  const fullText = chunk.text || chunk.preview;
+  const canExpand = fullText.length > chunk.preview.length;
+  const visibleText = expanded ? fullText : chunk.preview;
+
+  return (
+    <div className="rounded-md border bg-background p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">{score(chunk.score)}</Badge>
+        <span className="font-medium">{chunk.source_id || "unknown"}</span>
+        {chunk.unit_label && <span className="text-muted-foreground">{chunk.unit_label}</span>}
+        {chunk.expanded_from_parent && <Badge>expanded_from_parent</Badge>}
+        {chunk.dedup_merged_chunk_ids.length > 0 && (
+          <Badge variant="outline">dedup {chunk.dedup_merged_chunk_ids.length}</Badge>
+        )}
+      </div>
+      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 font-mono text-xs leading-5">
+        {visibleText}
+      </pre>
+      {canExpand && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="mt-2"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? (
+            <ChevronUpIcon data-icon="inline-start" />
+          ) : (
+            <ChevronDownIcon data-icon="inline-start" />
+          )}
+          {expanded ? "Show less" : "Read more"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ChunkList({ title, chunks }: { title: string; chunks: ChunkTrace[] }) {
   return (
     <div className="min-w-0 space-y-2">
@@ -21,20 +65,7 @@ function ChunkList({ title, chunks }: { title: string; chunks: ChunkTrace[] }) {
         <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">none</p>
       ) : (
         chunks.map((chunk) => (
-          <div key={chunk.chunk_id} className="rounded-md border bg-background p-3 text-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">{score(chunk.score)}</Badge>
-              <span className="font-medium">{chunk.source_id || "unknown"}</span>
-              {chunk.unit_label && <span className="text-muted-foreground">{chunk.unit_label}</span>}
-              {chunk.expanded_from_parent && <Badge>expanded_from_parent</Badge>}
-              {chunk.dedup_merged_chunk_ids.length > 0 && (
-                <Badge variant="outline">dedup {chunk.dedup_merged_chunk_ids.length}</Badge>
-              )}
-            </div>
-            <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 font-mono text-xs leading-5">
-              {chunk.preview}
-            </pre>
-          </div>
+          <ChunkCard key={chunk.chunk_id} chunk={chunk} />
         ))
       )}
     </div>

@@ -19,14 +19,17 @@ def test_cited_sources_returns_empty_without_citations() -> None:
 
 
 def test_chunk_trace_serializes_consolidated_as_string() -> None:
-    trace = _chunk_trace(
-        RetrievalResult(
-            chunk_id="c1",
-            text="Example text",
-            score=1.0,
-            metadata={"consolidated": 1},
-        ),
-        preview_chars=20,
-    )
+	text = "Example text with more detail"
+	trace = _chunk_trace(
+		RetrievalResult(
+			chunk_id="c1",
+			text=text,
+			score=1.0,
+			metadata={"consolidated": 1},
+		),
+		preview_chars=12,
+	)
 
-    assert trace["consolidated"] == "1"
+	assert trace["consolidated"] == "1"
+	assert trace["preview"] == text[:12]
+	assert trace["text"] == text

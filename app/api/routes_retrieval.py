@@ -19,6 +19,7 @@ class ChunkTrace(BaseModel):
     consolidated: str = ""
     dedup_merged_chunk_ids: list[str] = []
     preview: str = ""
+    text: str = ""
 
 
 class TraceRecord(BaseModel):

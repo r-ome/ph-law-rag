@@ -20,6 +20,7 @@ const trace: TraceRecord = {
       consolidated: "",
       dedup_merged_chunk_ids: [],
       preview: "The penalty for theft depends on value...",
+      text: "The penalty for theft depends on value and the circumstances described in Article 309.",
     },
   ],
   pre_expansion_chunks: [
@@ -33,6 +34,7 @@ const trace: TraceRecord = {
       consolidated: "",
       dedup_merged_chunk_ids: [],
       preview: "The penalty for theft depends on value...",
+      text: "The penalty for theft depends on value and the circumstances described in Article 309.",
     },
   ],
   selected_chunks: [
@@ -46,6 +48,7 @@ const trace: TraceRecord = {
       consolidated: "",
       dedup_merged_chunk_ids: [],
       preview: "The penalty for theft depends on value...",
+      text: "The penalty for theft depends on value and the circumstances described in Article 309.",
     },
   ],
   retrieval_strategy: { strategy: "current_law", knobs: {} },

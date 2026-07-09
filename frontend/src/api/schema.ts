@@ -479,6 +479,11 @@ export interface components {
              * @default
              */
             preview: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
         };
         /** ConfigView */
         ConfigView: {

@@ -41,6 +41,7 @@ def _chunk_trace(r: RetrievalResult, preview_chars: int) -> dict:
         "consolidated": "" if consolidated is None else str(consolidated),
         "dedup_merged_chunk_ids": r.metadata.get("dedup_merged_chunk_ids", []),
         "preview": r.text[:preview_chars],
+        "text": r.text,
     }
 
 def _debug_trace(
