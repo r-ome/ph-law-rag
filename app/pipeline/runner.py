@@ -21,6 +21,8 @@ def _feature_flags(policy: AnswerPolicy) -> dict:
         "trace_logging_enabled": settings.trace_logging_enabled,
         "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
         "answerability_gate_enabled": policy.evidence_gate == "answerability",
+        "evidence_gate": policy.evidence_gate,
+        "corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
         "query_decomposition_enabled": policy.query_decomposition_enabled,
         "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
         "enable_query_rewriting": policy.query_rewriting_enabled,
@@ -89,6 +91,12 @@ def _build_trace_record(
         "model_choice": (
             state.model_choice.as_trace_dict() if state.model_choice else None
         ),
+        "evidence": state.evidence.as_trace_dict() if state.evidence else None,
+        "corrective_retrieval": {
+            "enabled": policy.corrective_retrieval_enabled,
+            "fired": state.corrective_ran,
+            "added_chunks": state.corrective_added_chunks,
+        },
     }
 
 
@@ -205,6 +213,12 @@ def run_answer(
             stages.retrieve_context(state)
             stages.gate_evidence(state)
             if state.response is None:
+                if (
+                    state.evidence is not None
+                    and state.evidence.verdict == "partial"
+                    and policy.corrective_retrieval_enabled
+                ):
+                    stages.corrective_retrieve(state)
                 stages.route_model(state)
                 stages.generate_answer(state)
 

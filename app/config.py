@@ -286,6 +286,8 @@ def config_view() -> dict:
 		"chunk_size": settings.chunk_size,
 		"chunk_overlap": settings.chunk_overlap,
 		"min_chunks_for_answer": policy.min_chunks_for_answer,
+		"evidence_gate": policy.evidence_gate,
+		"corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
 		"max_conversation_turns": settings.max_conversation_turns,
 		"router_enabled": policy.router_enabled,
 		"edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,

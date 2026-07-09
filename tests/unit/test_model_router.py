@@ -5,7 +5,7 @@ import pytest
 
 from app.pipeline.model_router import select_model
 from app.pipeline.policy import AnswerPolicy
-from app.pipeline.state import AnswerState
+from app.pipeline.state import AnswerState, EvidenceReport
 
 pytestmark = pytest.mark.unit
 
@@ -53,3 +53,23 @@ def test_select_model_does_not_escalate_non_matching_intent():
 
     assert choice.model == "mistral"
     assert choice.reason == "policy_default"
+
+
+def test_select_model_escalates_partial_evidence_when_policy_allows():
+    policy = _policy(
+        generator_model="mistral",
+        strong_model="claude-haiku-4-5",
+        escalate_on_partial_evidence=True,
+    )
+    state = AnswerState(question="What penalties apply?", debug_enabled=False)
+    state.evidence = EvidenceReport(
+        verdict="partial",
+        method="crag_facets",
+        missing_facets=["penalty clause"],
+        detail={},
+    )
+
+    choice = select_model(policy, state)
+
+    assert choice.model == "claude-haiku-4-5"
+    assert choice.reason == "evidence:partial"

@@ -33,7 +33,7 @@ CASES = [
         "debug": True,
     },
     {
-        "label": "hard_abstain_min_chunks",
+        "label": "soft_abstain_out_of_scope",
         "question": "What does Philippine law say about the mineral rights of a fictional asteroid colony?",
         "debug": True,
     },

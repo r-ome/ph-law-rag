@@ -184,6 +184,21 @@ def test_cascade_profile_routes_generation_to_strong_model(monkeypatch):
     assert trace_record == records[0]
     assert trace_record["generator_model"] == "claude-haiku-4-5"
     assert trace_record["model_choice"] == response["model_choice"]
+    assert trace_record["evidence"] == {
+        "verdict": "sufficient",
+        "method": "min_chunks",
+        "missing_facets": [],
+        "detail": {
+            "pre_expansion_count": 1,
+            "selected_count": 1,
+            "min_chunks_for_answer": 1,
+        },
+    }
+    assert trace_record["corrective_retrieval"] == {
+        "enabled": False,
+        "fired": False,
+        "added_chunks": 0,
+    }
 
 
 def test_answer_greeting_router_on_does_not_classify(monkeypatch):
@@ -276,7 +291,7 @@ def test_unexpected_pipeline_exception_propagates_without_finalize(monkeypatch):
 
 
 def test_hard_abstain_when_min_chunks_not_met(monkeypatch):
-    monkeypatch.setattr(settings, "trace_logging_enabled", False)
+    records = _capture_traces(monkeypatch)
     monkeypatch.setattr(settings, "min_chunks_for_answer", 2)
 
     class FakeStrategy:
@@ -289,8 +304,27 @@ def test_hard_abstain_when_min_chunks_not_met(monkeypatch):
 
     monkeypatch.setitem(stages.STRATEGIES, "default", FakeStrategy())
 
-    response = answer_service.answer("What is a deliberately obscure corpus miss?", trace=False)
+    response, trace_record = answer_service.run_answer(
+        "What is a deliberately obscure corpus miss?",
+        trace=True,
+    )
 
     assert response["abstained"] is True
     assert response["error"] is False
     assert response["sources"] == []
+    assert trace_record == records[0]
+    assert trace_record["evidence"] == {
+        "verdict": "insufficient",
+        "method": "min_chunks",
+        "missing_facets": [],
+        "detail": {
+            "pre_expansion_count": 1,
+            "selected_count": 1,
+            "min_chunks_for_answer": 2,
+        },
+    }
+    assert trace_record["corrective_retrieval"] == {
+        "enabled": False,
+        "fired": False,
+        "added_chunks": 0,
+    }

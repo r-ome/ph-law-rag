@@ -1,7 +1,8 @@
 # Pipeline refactor plan — decouple before CRAG
 
 Status: PR1 FROZEN (2026-07-09); PR3 machinery implemented (2026-07-09);
-cascade experiments pending; PR4+ draft
+cascade experiments pending; PR4 evidence/corrective slot implemented (2026-07-09);
+PR5+ draft
 Owner: Jerome. Claude drafted; Jerome codes.
 
 Goal: make each answer-pipeline stage replaceable and traceable so model cascading,
@@ -358,8 +359,10 @@ Verification — two layers:
    Compares normalized `(response, trace_record)` pairs; ignored/normalized
    fields: `trace_id`, `timestamp`, `latency_ms`, `stages[*].ms`. Question set:
    a hand-picked manifest with branch labels — `greeting`, `normal_answer`,
-   `current_law_router`, `hard_abstain_min_chunks` (a question known to return
-   zero/low corpus hits), `soft_abstain`, `session_rewrite` — path coverage over
+   `current_law_router`, `soft_abstain_out_of_scope` (out-of-scope question; the
+   evidence gate passes and abstention happens post-generation — at this corpus
+   size no natural question trips the min-chunks hard gate, which is covered by
+   unit tests instead), `soft_abstain`, `session_rewrite` — path coverage over
    row count. Catches broad behavior drift.
 2. **Unit regressions lock branch semantics** (deterministic, no live deps):
    - LLM error path: `generate` patched to raise `LLMError` → error response,
@@ -398,7 +401,7 @@ Graduation per profile on its own evidence; negative results logged. Eval
 rows/meta and trace records carry actual `model_choice` so mixed-model cascade
 runs are auditable.
 
-**PR4 — evidence stage + corrective slot.** `EvidenceReport`, `gate_evidence`
+**PR4 — evidence stage + corrective slot. IMPLEMENTED 2026-07-09.** `EvidenceReport`, `gate_evidence`
 subsuming min-chunks + answerability, `corrective_retrieve` no-op, trace fields.
 `routes_retrieval.TraceRecord` is updated in the same PR. No behavior change
 under any current profile.

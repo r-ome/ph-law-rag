@@ -56,6 +56,8 @@ def _active_config() -> dict:
         "prefer_operative_enabled": policy.retrieval_defaults.prefer_operative_enabled,
         "consolidated_dedup_enabled": policy.retrieval_defaults.consolidated_dedup_enabled,
         "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
+        "evidence_gate": policy.evidence_gate,
+        "corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
         "answerability_gate_enabled": policy.evidence_gate == "answerability",
         "faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
         "later_enacted_preference_enabled": policy.later_enacted_preference_enabled,

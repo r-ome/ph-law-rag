@@ -2,7 +2,6 @@ import re
 
 from app.config import settings
 from app.observability.logger import get_logger
-from app.retriever.answerability import is_answerable
 from app.retriever.context_builder import build_context
 from app.retriever.context_selection import SelectionResult
 from app.retriever.llm_client import LLMError, generate
@@ -165,24 +164,10 @@ def retrieve_context(state: AnswerState) -> None:
 
 def gate_evidence(state: AnswerState) -> None:
     policy = _policy(state)
-    question = state.effective_question or state.question
-    if policy.evidence_gate == "crag":
-        raise NotImplementedError(
-            "RAGLAB_PROFILE=crag-experimental is registered, but the CRAG evidence gate "
-            "is not implemented until PR5."
-        )
-    if len(state.selection.pre_expansion) < policy.min_chunks_for_answer:
-        state.response = _package(
-            ABSTAIN_MESSAGE,
-            sources=[],
-            abstained=True,
-            selection=state.selection,
-            prompt=None,
-            debug=state.debug_enabled,
-        )
-        return
+    from app.pipeline.evidence import evaluate_evidence
 
-    if policy.evidence_gate == "answerability" and not is_answerable(question, state.selection.pre_expansion):
+    state.evidence = evaluate_evidence(state, policy)
+    if state.evidence.verdict == "insufficient":
         state.response = _package(
             ABSTAIN_MESSAGE,
             sources=[],
@@ -191,6 +176,12 @@ def gate_evidence(state: AnswerState) -> None:
             prompt=None,
             debug=state.debug_enabled,
         )
+
+
+def corrective_retrieve(state: AnswerState) -> None:
+    from app.pipeline.corrective import corrective_retrieve as run_corrective
+
+    run_corrective(state, _policy(state))
 
 
 def route_model(state: AnswerState) -> None:

@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass, field
+from typing import Literal
 
 from app.pipeline.policy import AnswerPolicy
 from app.retriever.context_selection import SelectionResult
@@ -14,6 +15,22 @@ class ModelChoice:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class EvidenceReport:
+    verdict: Literal["sufficient", "partial", "insufficient"]
+    method: Literal["min_chunks", "answerability_gate", "crag_facets"]
+    missing_facets: list[str]
+    detail: dict
+
+    def as_trace_dict(self) -> dict:
+        return {
+            "verdict": self.verdict,
+            "method": self.method,
+            "missing_facets": self.missing_facets,
+            "detail": self.detail,
+        }
+
+
 @dataclass
 class AnswerState:
     question: str
@@ -25,6 +42,9 @@ class AnswerState:
     selection: SelectionResult = field(
         default_factory=lambda: SelectionResult(retrieved=[], pre_expansion=[], selected=[])
     )
+    evidence: EvidenceReport | None = None
+    corrective_ran: bool = False
+    corrective_added_chunks: int = 0
     router_decision: object | None = None
     router_skipped_reason: str | None = None
     model_choice: ModelChoice | None = None

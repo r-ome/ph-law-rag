@@ -45,6 +45,8 @@ class TraceRecord(BaseModel):
     prompt_length: int | None = None
     generator_model: str | None = None
     model_choice: dict[str, Any] | None = None
+    evidence: dict[str, Any] | None = None
+    corrective_retrieval: dict[str, Any] | None = None
 
 
 class InspectRequest(BaseModel):

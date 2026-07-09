@@ -20,12 +20,20 @@
     },
     "trace_record": {
       "abstained": false,
+      "corrective_retrieval": {
+        "added_chunks": 0,
+        "enabled": false,
+        "fired": false
+      },
       "error": false,
+      "evidence": null,
       "feature_flags": {
         "answerability_gate_enabled": false,
+        "corrective_retrieval_enabled": false,
         "debug": false,
         "edge_expansion_enabled": true,
         "enable_query_rewriting": true,
+        "evidence_gate": "min_chunks",
         "faithfulness_selfcheck_enabled": false,
         "later_enacted_preference_enabled": false,
         "min_chunks_for_answer": 1,
@@ -377,12 +385,29 @@
     },
     "trace_record": {
       "abstained": false,
+      "corrective_retrieval": {
+        "added_chunks": 0,
+        "enabled": false,
+        "fired": false
+      },
       "error": false,
+      "evidence": {
+        "detail": {
+          "min_chunks_for_answer": 1,
+          "pre_expansion_count": 8,
+          "selected_count": 8
+        },
+        "method": "min_chunks",
+        "missing_facets": [],
+        "verdict": "sufficient"
+      },
       "feature_flags": {
         "answerability_gate_enabled": false,
+        "corrective_retrieval_enabled": false,
         "debug": false,
         "edge_expansion_enabled": true,
         "enable_query_rewriting": true,
+        "evidence_gate": "min_chunks",
         "faithfulness_selfcheck_enabled": false,
         "later_enacted_preference_enabled": false,
         "min_chunks_for_answer": 1,
@@ -1397,12 +1422,29 @@
     },
     "trace_record": {
       "abstained": false,
+      "corrective_retrieval": {
+        "added_chunks": 0,
+        "enabled": false,
+        "fired": false
+      },
       "error": false,
+      "evidence": {
+        "detail": {
+          "min_chunks_for_answer": 1,
+          "pre_expansion_count": 8,
+          "selected_count": 8
+        },
+        "method": "min_chunks",
+        "missing_facets": [],
+        "verdict": "sufficient"
+      },
       "feature_flags": {
         "answerability_gate_enabled": false,
+        "corrective_retrieval_enabled": false,
         "debug": false,
         "edge_expansion_enabled": true,
         "enable_query_rewriting": true,
+        "evidence_gate": "min_chunks",
         "faithfulness_selfcheck_enabled": false,
         "later_enacted_preference_enabled": false,
         "min_chunks_for_answer": 1,
@@ -2171,7 +2213,7 @@
     }
   },
   {
-    "label": "hard_abstain_min_chunks",
+    "label": "soft_abstain_out_of_scope",
     "question": "What does Philippine law say about the mineral rights of a fictional asteroid colony?",
     "response": {
       "abstained": true,
@@ -2441,12 +2483,29 @@
     },
     "trace_record": {
       "abstained": true,
+      "corrective_retrieval": {
+        "added_chunks": 0,
+        "enabled": false,
+        "fired": false
+      },
       "error": false,
+      "evidence": {
+        "detail": {
+          "min_chunks_for_answer": 1,
+          "pre_expansion_count": 8,
+          "selected_count": 8
+        },
+        "method": "min_chunks",
+        "missing_facets": [],
+        "verdict": "sufficient"
+      },
       "feature_flags": {
         "answerability_gate_enabled": false,
+        "corrective_retrieval_enabled": false,
         "debug": false,
         "edge_expansion_enabled": true,
         "enable_query_rewriting": true,
+        "evidence_gate": "min_chunks",
         "faithfulness_selfcheck_enabled": false,
         "later_enacted_preference_enabled": false,
         "min_chunks_for_answer": 1,
@@ -3223,7 +3282,7 @@
           "prompt_length": 6460
         }
       ],
-      "trace_label": "golden:hard_abstain_min_chunks"
+      "trace_label": "golden:soft_abstain_out_of_scope"
     }
   },
   {
@@ -3497,12 +3556,29 @@
     },
     "trace_record": {
       "abstained": true,
+      "corrective_retrieval": {
+        "added_chunks": 0,
+        "enabled": false,
+        "fired": false
+      },
       "error": false,
+      "evidence": {
+        "detail": {
+          "min_chunks_for_answer": 1,
+          "pre_expansion_count": 8,
+          "selected_count": 8
+        },
+        "method": "min_chunks",
+        "missing_facets": [],
+        "verdict": "sufficient"
+      },
       "feature_flags": {
         "answerability_gate_enabled": false,
+        "corrective_retrieval_enabled": false,
         "debug": false,
         "edge_expansion_enabled": true,
         "enable_query_rewriting": true,
+        "evidence_gate": "min_chunks",
         "faithfulness_selfcheck_enabled": false,
         "later_enacted_preference_enabled": false,
         "min_chunks_for_answer": 1,
@@ -4542,12 +4618,29 @@
     },
     "trace_record": {
       "abstained": false,
+      "corrective_retrieval": {
+        "added_chunks": 0,
+        "enabled": false,
+        "fired": false
+      },
       "error": false,
+      "evidence": {
+        "detail": {
+          "min_chunks_for_answer": 1,
+          "pre_expansion_count": 8,
+          "selected_count": 6
+        },
+        "method": "min_chunks",
+        "missing_facets": [],
+        "verdict": "sufficient"
+      },
       "feature_flags": {
         "answerability_gate_enabled": false,
+        "corrective_retrieval_enabled": false,
         "debug": false,
         "edge_expansion_enabled": true,
         "enable_query_rewriting": true,
+        "evidence_gate": "min_chunks",
         "faithfulness_selfcheck_enabled": false,
         "later_enacted_preference_enabled": false,
         "min_chunks_for_answer": 1,
