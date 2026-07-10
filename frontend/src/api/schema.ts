@@ -527,6 +527,18 @@ export interface components {
             later_enacted_preference_enabled: boolean;
             /** Aws Region */
             aws_region: string;
+            /** Profile */
+            profile: string;
+            /** Evidence Gate */
+            evidence_gate: string;
+            /** Evidence Judge Model */
+            evidence_judge_model: string;
+            /** Corrective Retrieval Enabled */
+            corrective_retrieval_enabled: boolean;
+            /** Strong Model */
+            strong_model?: string | null;
+            /** Escalate On Partial Evidence */
+            escalate_on_partial_evidence: boolean;
         };
         /** ConversationDetail */
         ConversationDetail: {

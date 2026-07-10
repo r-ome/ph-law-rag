@@ -43,6 +43,57 @@ function MetricCard({ label, value, note }: { label: string; value: number | nul
   );
 }
 
+function ConfigFlag({ label, value }: { label: string; value: boolean | undefined }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {label}
+      <Badge variant={value ? "default" : "outline"}>
+        {value === undefined ? "n/a" : value ? "on" : "off"}
+      </Badge>
+    </span>
+  );
+}
+
+function RunConfig({ run }: { run: EvalRunDetail }) {
+  const cfg = (run.meta?.active_config ?? {}) as Record<string, unknown>;
+  const str = (key: string) => {
+    const v = cfg[key];
+    return typeof v === "string" && v ? v : "—";
+  };
+  const bool = (key: string) => (typeof cfg[key] === "boolean" ? (cfg[key] as boolean) : undefined);
+
+  if (!run.meta?.active_config) return null;
+
+  const rows: [string, string][] = [
+    ["Profile", str("profile")],
+    ["Generator model", str("llm_model")],
+    ["Reranker", str("reranker_backend")],
+    ["Evidence gate", str("evidence_gate")],
+    ["Evidence judge", str("evidence_judge_model")],
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Run Config</CardTitle>
+        <CardDescription>Effective pipeline config at generation time.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid gap-1">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="break-all font-medium">{value}</span>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-4 md:col-span-2 xl:col-span-3">
+          <ConfigFlag label="CRAG" value={cfg.evidence_gate === "crag"} />
+          <ConfigFlag label="Corrective" value={bool("corrective_retrieval_enabled")} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SummaryCards({ run }: { run: EvalRunDetail }) {
   const overall = run.summary?.overall;
   const abstention = run.summary?.abstention;
@@ -247,11 +298,11 @@ function RowsDrilldown({ tag }: { tag: string }) {
         {rowsQuery.isLoading && <p>Loading rows…</p>}
         {rowsQuery.error && <p className="text-sm text-red-600">Failed to load rows.</p>}
         {showRows && rowsQuery.data && (
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background shadow-[inset_0_-1px_0_var(--border)]">
                 <TableRow>
-                  <TableHead>Question</TableHead>
+                  <TableHead className="w-[340px]">Question</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Abstained</TableHead>
                   {metricKeys.map(([, label]) => (
@@ -264,9 +315,11 @@ function RowsDrilldown({ tag }: { tag: string }) {
               <TableBody>
                 {rowsQuery.data.rows.map((row, index) => (
                   <TableRow key={row.eval_id ?? `${row.question}-${index}`}>
-                    <TableCell className="min-w-[320px] align-top">
+                    <TableCell className="w-[340px] max-w-[340px] align-top">
                       <details>
-                        <summary className="cursor-pointer font-medium">{row.question}</summary>
+                        <summary className="cursor-pointer whitespace-normal break-words font-medium">
+                          {row.question}
+                        </summary>
                         <div className="mt-3 space-y-3 text-sm">
                           <div>
                             <div className="text-muted-foreground">Answer</div>
@@ -346,6 +399,7 @@ export default function EvalDetail() {
         </div>
       </div>
       <SummaryCards run={run} />
+      <RunConfig run={run} />
       <ByCategory run={run} />
       <ComparePanel tag={tag} />
       <RowsDrilldown tag={tag} />

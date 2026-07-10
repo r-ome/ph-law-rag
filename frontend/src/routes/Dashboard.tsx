@@ -65,12 +65,15 @@ export default function Dashboard() {
   const lastSync = stats.last_sync;
 
   const modelRows = [
+    ["Profile", config.profile],
     ["Embedding backend", config.embedding_backend],
     ["Embedding model", config.embedding_model ?? "—"],
     ["Embedding dim", config.embedding_dim ?? "—"],
-    ["LLM model", config.llm_model],
-    ["Generator", config.generator_backend],
+    ["Generator model", config.llm_model],
+    ["Generator backend", config.generator_backend],
     ["Reranker", config.reranker_backend],
+    ["Evidence gate", config.evidence_gate],
+    ["Evidence judge", config.evidence_judge_model],
     ["Qdrant collection", config.qdrant_collection],
     ["Qdrant URL", config.qdrant_url],
     ["Ollama URL", config.ollama_base_url],
@@ -179,6 +182,8 @@ export default function Dashboard() {
               <span className="font-medium">{config.max_conversation_turns}</span>
             </div>
             <div className="flex flex-wrap gap-2 md:col-span-2">
+              <span>CRAG <Flag value={config.evidence_gate === "crag"} /></span>
+              <span>Corrective <Flag value={config.corrective_retrieval_enabled} /></span>
               <span>Router <Flag value={config.router_enabled} /></span>
               <span>Edges <Flag value={config.edge_expansion_enabled} /></span>
               <span>Answerability <Flag value={config.answerability_gate_enabled} /></span>
