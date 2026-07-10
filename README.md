@@ -8,7 +8,7 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 
 ## What it does
 
-1. Fetches a curated allowlist of Philippine law sources (23 enabled primary sources; see [Corpus](#corpus))
+1. Fetches a curated allowlist of Philippine law sources (45 enabled primary sources; see [Corpus](#corpus))
 2. Normalizes and hashes content for incremental sync — re-runs skip unchanged documents
 3. Chunks, embeds, and stores vectors locally in Qdrant + a persisted BM25 index
 4. Answers legal questions with a local LLM, grounded in retrieved context
@@ -170,11 +170,11 @@ uvicorn app.api.main:app --reload
 
 ## Corpus
 
-The corpus is a curated allowlist of **23 enabled** Philippine-law primary sources (toggled in `sources/ph_law_sources.yaml`):
+The corpus is a curated allowlist of **45 enabled** Philippine-law primary sources (toggled in `sources/ph_law_sources.yaml`):
 
 - **6 constitutional-law documents** — the 1987 Constitution and historical charters
-- **14 statutes** — incl. the Civil Code (RA 386), Family Code (EO 209), Revised Penal Code (Act 3815) with its RA 10951 amendment, and RA 9262 / 10175 / 10173 / 8293
-- **2 presidential issuances**
+- **35 statutes** — incl. the Civil Code (RA 386), Family Code (EO 209), Revised Penal Code (Act 3815) with its RA 10951 amendment, and RA 9262 / 10175 / 10173 / 8293
+- **3 presidential issuances**
 - **1 Supreme Court material**
 
 The scope is intentional: a tight, coherent corpus keeps evals meaningful and makes abstention behavior testable — genuinely out-of-scope questions (e.g. taxation, corporate, or election law, which the corpus does not cover) *should* be refused, not guessed. The pipeline itself is source-agnostic; sources are defined in `sources/ph_law_sources.yaml` and toggled with `enabled`.
@@ -193,7 +193,7 @@ Hybrid retrieval is used because legal text needs both semantic understanding an
 | "rights of an installment buyer" | handles | partial |
 
 Pipeline:
-1. Embed query via `nomic-embed-text`
+1. Embed query via `qwen3-embedding:0.6b` (1024-dim; local default)
 2. Dense retrieval from Qdrant (top-30)
 3. BM25 sparse retrieval (top-10)
 4. RRF fusion (k=60)
