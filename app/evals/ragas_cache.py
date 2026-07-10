@@ -100,6 +100,7 @@ def put_many(
     *,
     source_tag: str | None = None,
     metric_names: list[str] | None = None,
+    judge_model: str | None = None,
     path: Path | None = None,
 ) -> int:
     if not rows:
@@ -108,6 +109,7 @@ def put_many(
     conn = _connect(path)
     now = datetime.now(timezone.utc).isoformat()
     metric_names = metric_names or METRIC_NAMES
+    judge_model = judge_model or settings.ragas_llm_model
     try:
         for key, sample, scores in rows:
             conn.execute(
@@ -134,7 +136,7 @@ def put_many(
                     json.dumps(scores, ensure_ascii=False),
                     json.dumps(sample, ensure_ascii=False, sort_keys=True),
                     json.dumps(metric_names),
-                    settings.ragas_llm_model,
+                    judge_model,
                     settings.ragas_embedding_model,
                     getattr(ragas, "__version__", "unknown"),
                     SCORER_VERSION,

@@ -112,9 +112,12 @@ class Settings(BaseSettings):
 	eval_results_dir: str = "data/eval_results"
 	eval_run_label: str = ""  # optional A/B tag baked into eval output filenames
 	ragas_score_cache_path: str = "data/eval_results/ragas_score_cache.sqlite"
-	ragas_llm_model: str = "claude-haiku-4-5-20251001"
+	ragas_judge_backend: str = "anthropic"  # anthropic | openai — selects the RAGAS judge LLM
+	ragas_llm_model: str = "claude-haiku-4-5-20251001"  # judge model when ragas_judge_backend=anthropic
+	ragas_openai_model: str = "gpt-5-mini"  # judge model when ragas_judge_backend=openai
 	ragas_embedding_model: str = "nomic-embed-text"
 	anthropic_api_key: SecretStr = SecretStr("")
+	openai_api_key: SecretStr = SecretStr("")
 	edge_expansion_enabled: bool = True
 	edge_hop_top_k: int = 3
 	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
