@@ -13,6 +13,7 @@ class ConfigView(BaseModel):
     embedding_backend: str
     embedding_model: str | None = None
     embedding_dim: int | None = None
+    embedding_query_instruction: str | None = None
     llm_model: str
     strong_model: str | None = None
     escalate_intents: list[str] = []

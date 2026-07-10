@@ -57,6 +57,7 @@ INFRA_FIELDS: frozenset[str] = frozenset(
         "embedding_backend",
         "embedding_model",
         "embedding_dim",
+        "embedding_query_instruction",
         "ollama_base_url",
         "reranker_backend",
         "reranker_model",

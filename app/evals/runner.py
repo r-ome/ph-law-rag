@@ -47,6 +47,7 @@ def _active_config() -> dict:
         "bedrock_rerank_region": settings.bedrock_rerank_region,
         "embedding_backend": settings.embedding_backend,
         "embedding_model": settings.embedding_model,
+        "embedding_query_instruction": settings.embedding_query_instruction,
         "qdrant_collection": settings.qdrant_collection,
         "dense_top_k": policy.retrieval_defaults.dense_top_k,
         "sparse_top_k": policy.retrieval_defaults.sparse_top_k,

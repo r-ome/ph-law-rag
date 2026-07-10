@@ -7,17 +7,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import BaseModel, ConfigDict, SecretStr, model_validator
 
 _EMBEDDING_BACKEND_DEFAULTS = {
-	"ollama": {"model": "nomic-embed-text", "dim": 768},
+	"ollama": {"model": "qwen3-embedding:0.6b", "dim": 1024},
 	"bedrock": {"model": "amazon.titan-embed-text-v2:0", "dim": 1024},
 }
 
 _KNOWN_EMBEDDING_DIMS = {
 	"nomic-embed-text": 768,
+	"qwen3-embedding:0.6b": 1024,
 	"amazon.titan-embed-text-v2:0": 1024,
 	"amazon.titan-embed-text-v2:0:8k": 1024,
 }
 
-_OLLAMA_EMBEDDING_MODELS = {"nomic-embed-text"}
+_OLLAMA_EMBEDDING_MODELS = {"nomic-embed-text", "qwen3-embedding:0.6b"}
 _BEDROCK_EMBEDDING_MODELS = {
 	"amazon.titan-embed-text-v2:0",
 	"amazon.titan-embed-text-v2:0:8k",
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
 	request_timeout: int = 30
 	raglab_profile: str = "local"
 	# Qdrant Config
-	qdrant_collection: str = "ph_law"
+	qdrant_collection: str = "ph_law_qwen06"
 	qdrant_url: str = "http://localhost:6333"
 	qdrant_api_key: SecretStr = SecretStr("")
 
@@ -43,6 +44,10 @@ class Settings(BaseSettings):
 	embedding_backend: Literal["ollama", "bedrock"] = "ollama"
 	embedding_model: str | None = None
 	embedding_dim: int | None = None
+	embedding_query_instruction: str | None = (
+		"Given a Philippine law question, retrieve the statutory "
+		"provisions and jurisprudence that answer it."
+	)
 
 	ollama_base_url: str = "http://localhost:11434"
 	dense_top_k: int = 30
@@ -278,6 +283,7 @@ def config_view() -> dict:
 		"embedding_backend": settings.embedding_backend,
 		"embedding_model": settings.embedding_model,
 		"embedding_dim": settings.embedding_dim,
+		"embedding_query_instruction": settings.embedding_query_instruction,
 		"llm_model": policy.generator_model,
 		"strong_model": policy.strong_model,
 		"escalate_intents": sorted(policy.escalate_intents),
