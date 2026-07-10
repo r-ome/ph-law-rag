@@ -49,16 +49,34 @@ Rule:
     in square brackets, e.g. [1] or [2][3]. Place the citation right after the claim.
 - The square-bracket citation contains ONLY the reference number from the context (e.g. [1], [4]). \
     When you mention an article or section number, write it as plain text (e.g. 'Article 1489'), never in brackets.
+- Attribute each rule to its source by name and pinpoint, taken verbatim from the passage header \
+    (the title and any article/section after it), followed by the [n] reference — e.g. 'Under the Revised \
+    Penal Code, Article 308 [2], ...' or 'According to the 1987 Constitution, Article III, Section 13 [1], ...'. \
+    If a passage header names no article or section, cite the source title only. Never state a source name, \
+    article, or section that does not appear in a passage header.
 - If the context does not contain enough information to answer the question at all, \
     your ENTIRE reply must be exactly this sentence, with NO text before or after it: {abstain_message} \
     Do not explain why, do not describe what the passages discuss — output only that one sentence.
+- When you CAN answer, your FIRST sentence must LEAD with the source name and its article/section pinpoint \
+    (from the passage header) plus the [n] reference, then answer the question directly in its own terms — \
+    e.g. 'Under the 1987 Constitution, Article III, Section 13 [1], those charged with offenses punishable by \
+    reclusion perpetua when evidence of guilt is strong are not entitled to bail before conviction.' Do not \
+    open by quoting the provision verbatim, and do not leave the citation for the end.
 - Do not invent article numbers, section numbers, Republic Act numbers, or \
     case citations. Only cite identifiers that appear in the context.
-- Be concise and precise. Quote the operative legal text when it matters. \
+- Be concise and precise. State the rule in your own words as a direct answer; quote the operative \
+    phrase only when the exact wording is legally load-bearing, not as the whole answer. \
 - Do NOT add steps, procedures, requirements, deadlines, penalties, exceptions, or consequences
     unless they are stated word-for-word in the context. If the context describes a rule but not its
     procedure, state only the rule and stop. Do not "complete" or "explain further" from general legal
     knowledge. \
+- Answer ONLY what the question asks. Do not volunteer related provisions, definitions, lists, or facts \
+    from the passages that the question did not ask for, even when they appear in the context (e.g. if asked \
+    only for the GROUNDS, do not also list who is covered or the procedure). \
+- Make the element the question asks for the SUBJECT of your answer sentence — e.g. for a 'grounds' \
+    question write 'The grounds for impeachment ... are X, Y, Z [1]', NOT 'The President ... may be removed \
+    for X, Y, Z'. Do not reproduce the provision's own subject (who it applies to, its definition) unless the \
+    question asks for it, even when the passage is phrased that way. \
 - If the context answers only part of the question, answer that part and explicitly say the
     remainder is not covered by the indexed corpus. Do not fill the gap from outside knowledge. \
 - Before answering, check each sentence: if it is not directly supported by a cited passage, delete it.
@@ -133,4 +151,4 @@ def build_user_prompt(question: str, context_block: str)-> str:
 
 Question: {question}
 
-Answer (grounded with the context above, with [n] citations):"""
+Answer (lead with the source and article/section pinpoint + [n], then answer directly; answer only what is asked):"""
