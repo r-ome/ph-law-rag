@@ -75,7 +75,6 @@ INFRA_FIELDS: frozenset[str] = frozenset(
         "trace_logging_enabled",
         "trace_max_text_preview",
         "eval_dataset_path",
-        "eval_intent_labels_path",
         "eval_results_dir",
         "eval_run_label",
         "ragas_score_cache_path",

@@ -43,11 +43,14 @@ def test_run_rows_persists_selected_chunk_ids_and_strategy_override(tmp_path, mo
     rows = runner.run_rows(
         [
             {
-                "eval_id": "eval_001",
+                "id": "eval_001",
+                "split": "regression",
                 "question": "Question?",
                 "ground_truth": "Truth",
                 "category": "factual",
                 "expected_sources": ["source_a"],
+                "topic": "topic",
+                "facet": "lookup",
             }
         ],
         out_path,
@@ -70,5 +73,9 @@ def test_run_rows_persists_selected_chunk_ids_and_strategy_override(tmp_path, mo
         "max_added": 2,
     }
     assert rows[0]["debug_stages"] == [{"name": "prefer_operative", "fired": True}]
+    assert rows[0]["eval_id"] == "eval_001"
+    assert rows[0]["split"] == "regression"
+    assert rows[0]["facet"] == "lookup"
+    assert rows[0]["topic"] == "topic"
     written = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
     assert written == rows

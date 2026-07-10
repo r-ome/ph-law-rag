@@ -114,18 +114,38 @@ def classify(rec: dict) -> str:
 
 
 def _load(tag: str) -> dict[str, dict]:
-    """Merge run_{tag}.jsonl with scored_{tag}.json (joined on question), keyed by question."""
+    """Merge a run with scores, preferring stable eval IDs over question text."""
     run_path = artifacts.existing_path(tag, "run", required=True)
     run = [json.loads(line) for line in run_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     scored_path = artifacts.existing_path(tag, "scored")
     scored = json.loads(scored_path.read_text(encoding="utf-8")) if scored_path else []
+    by_id = {s["eval_id"]: s for s in scored if s.get("eval_id")}
     by_q = {s["user_input"]: s for s in scored}
     out = {}
     for r in run:
-        s = by_q.get(r["question"], {})
+        key = r.get("eval_id") or r["question"]
+        s = by_id.get(r.get("eval_id")) or by_q.get(r["question"], {})
         r["context_recall"] = s.get("context_recall")
         r["faithfulness"] = s.get("faithfulness")
-        out[r["question"]] = r
+        r["answer_relevancy"] = s.get("answer_relevancy")
+        r["context_precision"] = s.get("llm_context_precision_with_reference")
+        out[key] = r
+    return out
+
+
+def _is_holdout(tag: str) -> bool:
+    return bool((artifacts.load_meta(tag) or {}).get("holdout"))
+
+
+def _aggregate(rows: dict[str, dict]) -> dict[str, float | int | None]:
+    records = list(rows.values())
+    out: dict[str, float | int | None] = {
+        "n": len(records),
+        "abstain_count": sum(bool(record.get("abstained")) for record in records),
+    }
+    for key in ("faithfulness", "answer_relevancy", "context_precision", "context_recall"):
+        values = [record[key] for record in records if isinstance(record.get(key), (int, float))]
+        out[key] = round(sum(values) / len(values), 4) if values else None
     return out
 
 
@@ -141,6 +161,23 @@ def _md_num(x) -> str:
 def build_diff_report(experiment: str, baseline: str | None = None, out: str | None = None) -> Path:
     exp_runs = _load(experiment)
     base_runs = _load(baseline) if baseline else {}
+    holdout = _is_holdout(experiment) or bool(baseline and _is_holdout(baseline))
+    if holdout:
+        lines = [f"# Eval diff — {experiment}" + (f"  (vs {baseline})" if baseline else ""), "",
+                 "## Holdout release aggregates", "",
+                 "| run | n | abstain count | faithfulness | relevancy | precision | recall |",
+                 "|---|--:|--:|--:|--:|--:|--:|"]
+        for label, records in [(experiment, exp_runs), *(([(baseline, base_runs)] if baseline else []))]:
+            aggregate = _aggregate(records)
+            lines.append(
+                f"| {label} | {aggregate['n']} | {aggregate['abstain_count']} | "
+                f"{_md_num(aggregate['faithfulness'])} | {_md_num(aggregate['answer_relevancy'])} | "
+                f"{_md_num(aggregate['context_precision'])} | {_md_num(aggregate['context_recall'])} |"
+            )
+        out_path = Path(out) if out else Path(settings.eval_results_dir) / "diffs" / f"diff_{experiment}.md"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("\n".join(lines) + "\n")
+        return out_path
     base_class = {q: classify(r) for q, r in base_runs.items()}
 
     rows = []

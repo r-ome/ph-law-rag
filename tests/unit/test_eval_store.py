@@ -1,7 +1,9 @@
 import json
 
 from app.eval_store import diff_runs, get_rows, get_run, list_runs
+from app.api.routes_evals import run_rows as api_run_rows
 from app.evals import artifacts
+from app.evals.diff_report import build_diff_report
 
 
 def _write_json(path, payload):
@@ -147,3 +149,32 @@ def test_category_diff_statuses(tmp_path, monkeypatch):
     assert result is not None
     assert result["by_category"]["civil"]["status"] == "missing_baseline"
     assert result["by_category"]["civil"]["delta"] is None
+
+
+def test_holdout_rows_and_diff_report_are_redacted(tmp_path, monkeypatch):
+    results_dir = tmp_path / "eval_results"
+    monkeypatch.setattr(artifacts.settings, "eval_results_dir", str(results_dir))
+    tag = "holdout_20260710_010000"
+    run_dir = _run_dir(results_dir, "2026-07-10", tag)
+    _manifest(results_dir, [{"tag": tag, "date": "2026-07-10"}])
+    _write_json(run_dir / "meta.json", {"tag": tag, "holdout": True})
+    _write_jsonl(run_dir / "run.jsonl", [{
+        "eval_id": "eval_081", "question": "private", "answer": "private",
+        "ground_truth": "private", "expected_sources": ["constitution_1987"],
+        "retrieved_sources": ["constitution_1987"], "contexts": [], "category": "factual",
+        "abstained": False,
+    }])
+    _write_json(run_dir / "scored.json", [{
+        "eval_id": "eval_081", "user_input": "private", "reference": "private",
+        "faithfulness": 0.9, "answer_relevancy": 0.8,
+        "llm_context_precision_with_reference": 0.7, "context_recall": 0.6,
+    }])
+
+    assert get_rows(tag) == {
+        "tag": tag, "row_count": 0, "scored_count": 0, "rows": [], "holdout_redacted": True,
+    }
+    assert api_run_rows(tag).holdout_redacted is True
+    report = build_diff_report(tag)
+    text = report.read_text(encoding="utf-8")
+    assert "## Per-question" not in text
+    assert "private" not in text

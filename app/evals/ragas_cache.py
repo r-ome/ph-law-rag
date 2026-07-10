@@ -40,6 +40,8 @@ def cache_key(
     embedding_model: str | None = None,
     scorer_version: str = SCORER_VERSION,
 ) -> str:
+    # Deliberately content-addressed: row identity is excluded so edited questions
+    # cannot reuse stale scores and existing cache entries remain useful.
     payload = {
         "sample": sample,
         "metric_names": metric_names or METRIC_NAMES,

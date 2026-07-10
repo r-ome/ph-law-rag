@@ -5,9 +5,14 @@ from app.config import settings
 from app.db import init_db
 from app.observability.logger import configure_logging
 
-configure_logging()
-
 app = typer.Typer()
+
+@app.callback()
+def _main() -> None:
+	# Configure at invocation, not import: importing this module must stay
+	# side-effect free (a global structlog reconfigure breaks capsys-based tests
+	# and any embedder of the CLI module).
+	configure_logging()
 
 @app.command("healthcheck")
 def healthcheck():
@@ -48,13 +53,20 @@ def eval_score(
 
 @app.command("eval")
 def eval(
+	splits: list[str] = typer.Option(["regression", "dev"], "--split", help="dataset split to run; repeatable"),
+	holdout_release_run: bool = typer.Option(False, "--holdout-release-run", help="required acknowledgement before running holdout"),
 	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
 	do_score: bool = typer.Option(True, "--score/--no-score", help="run the RAGAS judge after generation (--no-score = generation only; review answers, then judge via eval-score)"),
 ):
 	from app.evals.runner import run_eval_set
 	from app.evals.report import print_report, save_scored
 
-	results, raw_path, run_tag = run_eval_set()
+	if "holdout" in splits and not holdout_release_run:
+		raise typer.BadParameter(
+			"holdout is release-only; add --holdout-release-run to acknowledge aggregate-only reporting",
+			param_hint="--holdout-release-run",
+		)
+	results, raw_path, run_tag = run_eval_set(tuple(splits))
 	typer.echo(f"\nRaw results saved to {raw_path}")
 	if not do_score:
 		typer.echo(f"Skipped judging (--no-score). Score later with: raglab eval-score {raw_path}")

@@ -36,6 +36,7 @@ class EvalRunListResponse(BaseModel):
 class Abstention(BaseModel):
     correct: int | None = None
     total: int | None = None
+    abstain_count: int | None = None
     accuracy: float | None = None
 
 
@@ -80,6 +81,7 @@ class EvalRowsResponse(BaseModel):
     row_count: int
     scored_count: int
     rows: list[EvalRow]
+    holdout_redacted: bool = False
 
 
 class OverallDiff(BaseModel):

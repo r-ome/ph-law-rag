@@ -401,9 +401,9 @@ def default_cache_dir() -> Path:
     return Path(settings.eval_results_dir) / "intent_ab_cache"
 
 
-def load_benchmark(dataset_path: Path, labels_path: Path) -> list[dict[str, str]]:
+def load_benchmark(dataset_path: Path) -> list[dict[str, str]]:
     dataset = _read_jsonl(dataset_path)
-    labels = load_intent_labels(dataset_path, labels_path)
+    labels = load_intent_labels(dataset_path)
     return [{"question": row["question"], "gold": labels[row["question"]]} for row in dataset]
 
 
@@ -483,7 +483,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run R1 intent-classifier A/B arms.")
     parser.add_argument("--arms", type=parse_arms, default=ALL_ARMS, help="Comma-separated arms: mistral,haiku,nli")
     parser.add_argument("--dataset", type=Path, default=Path(settings.eval_dataset_path))
-    parser.add_argument("--labels", type=Path, default=Path(settings.eval_intent_labels_path))
     parser.add_argument("--mistral-model", default=DEFAULT_MODELS["mistral"])
     parser.add_argument("--haiku-model", default=DEFAULT_MODELS["haiku"])
     parser.add_argument("--nli-model", default=DEFAULT_MODELS["nli"])
@@ -499,7 +498,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_arg_parser().parse_args()
     dataset_path = args.dataset
-    labels_path = args.labels
     cache_dir = args.cache_dir
     assert_non_eval_smoke_pool(dataset_path)
 
@@ -520,7 +518,6 @@ def main() -> None:
         "arms": args.arms,
         "model_ids": {arm: model_ids[arm] for arm in args.arms},
         "dataset_path": str(dataset_path),
-        "labels_path": str(labels_path),
         "cache_dir": str(cache_dir),
         "prompt_hash": _sha256(prompt_text),
         "nli_hypotheses_hash": _sha256(render_nli_prompt()),
@@ -536,7 +533,7 @@ def main() -> None:
     if args.smoke_only:
         items = [{"question": question, "gold": gold} for question, gold in SMOKE_QUESTIONS]
     else:
-        items = load_benchmark(dataset_path, labels_path)
+        items = load_benchmark(dataset_path)
 
     arm_rows = {}
     for arm in args.arms:

@@ -73,6 +73,7 @@ def run_rows(
     debug: bool = True,
     strategy_override: str | None = None,
     trace_label: str | None = "eval",
+    holdout: bool = False,
 ) -> list[dict]:
     results = []
     total = len(rows)
@@ -95,7 +96,7 @@ def run_rows(
             "reason": "not_generated" if resp.get("abstained") else "policy_default",
         }
         row = {
-            **({"eval_id": item["eval_id"]} if "eval_id" in item else {}),
+            "eval_id": item.get("id", item.get("eval_id")),
             "question": item["question"],
             "answer": resp["answer"],
             "contexts": resp["contexts"],
@@ -104,6 +105,9 @@ def run_rows(
             "ground_truth": item["ground_truth"],
             "expected_sources": item.get("expected_sources", []),
             "category": item["category"],
+            "split": item.get("split"),
+            "facet": item.get("facet"),
+            "topic": item.get("topic"),
             "abstained": resp["abstained"],
             "profile": policy.name,
             "model": model_choice["model"],
@@ -126,18 +130,24 @@ def run_rows(
         # rows (a 5h40m all-or-nothing run died to swap pressure on 2026-07-03).
         with out_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
-        flag = "ABSTAIN" if row["abstained"] else "answered"
-        print(f"[{i}/{total}] {row['category']:12} {flag:8} {elapsed:6.2f}s", flush=True)
+        if holdout:
+            print(f"[{i}/{total}]", flush=True)
+        else:
+            flag = "ABSTAIN" if row["abstained"] else "answered"
+            print(f"[{i}/{total}] {row['category']:12} {flag:8} {elapsed:6.2f}s", flush=True)
 
     return results
 
 
-def run_eval_set() -> tuple[list[dict], Path, str]:
+def run_eval_set(splits: tuple[str, ...] = ("regression", "dev")) -> tuple[list[dict], Path, str]:
     from app.observability.logger import configure_logging
 
     configure_logging()
 
-    dataset = load_dataset(settings.eval_dataset_path)
+    from app.evals.dataset import load_eval_dataset
+
+    dataset = load_eval_dataset(settings.eval_dataset_path, splits=splits)
+    holdout = "holdout" in splits
     policy = resolve_policy().policy
 
     started_at = datetime.now().astimezone()
@@ -154,7 +164,7 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
 
     answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
 
-    results = run_rows(dataset, out_path)
+    results = run_rows(dataset, out_path, holdout=holdout)
 
     times = [r["elapsed_s"] for r in results]
     print(f"\nTiming — median {statistics.median(times):.2f}s | mean {statistics.mean(times):.2f}s | "
@@ -180,6 +190,8 @@ def run_eval_set() -> tuple[list[dict], Path, str]:
         "scored_count": None,
         "git_sha": _git_sha(),
         "active_config": _active_config(),
+        "splits": list(splits),
+        "holdout": holdout,
     }
     artifacts.save_meta(run_tag, meta)
     artifacts.update_manifest(run_tag, meta=meta)

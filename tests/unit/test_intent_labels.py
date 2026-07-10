@@ -2,49 +2,36 @@ import json
 
 import pytest
 
-from app.evals.intent_labels import intent_counts, load_intent_labels
+from app.evals.intent_labels import load_intent_labels, load_intent_labels_by_id
 
 
-def test_eval_intent_labels_match_dataset_questions():
-    labels = load_intent_labels()
-
-    assert len(labels) == 81
-    assert intent_counts(labels) == {
-        "amendment_or_current_law": 13,
-        "citation_lookup": 4,
-        "default": 38,
-        "list_or_rule_synthesis": 14,
-        "out_of_scope": 12,
+def _row(question: str, intent: str = "default") -> dict:
+    return {
+        "id": "eval_001",
+        "split": "regression",
+        "question": question,
+        "ground_truth": "answer",
+        "expected_sources": ["constitution_1987"],
+        "category": "factual",
+        "topic": "constitutional_law",
+        "intent": intent,
+        "facet": "lookup",
+        "provisions": [{"source_id": "constitution_1987", "cite": "Art. III"}],
+        "difficulty": "easy",
     }
 
 
-def test_intent_label_loader_rejects_missing_and_extra_questions(tmp_path):
+def test_intent_loader_reads_v2_dataset_by_question_and_id(tmp_path):
     dataset = tmp_path / "dataset.jsonl"
-    labels = tmp_path / "labels.jsonl"
-    dataset.write_text(
-        json.dumps({"question": "known"}) + "\n",
-        encoding="utf-8",
-    )
-    labels.write_text(
-        json.dumps({"question": "other", "intent": "default"}) + "\n",
-        encoding="utf-8",
-    )
+    dataset.write_text(json.dumps(_row("known")) + "\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="missing labels.*extra labels"):
-        load_intent_labels(dataset, labels)
+    assert load_intent_labels(dataset) == {"known": "default"}
+    assert load_intent_labels_by_id(dataset) == {"eval_001": "default"}
 
 
-def test_intent_label_loader_rejects_invalid_intent(tmp_path):
+def test_intent_loader_rejects_invalid_intent(tmp_path):
     dataset = tmp_path / "dataset.jsonl"
-    labels = tmp_path / "labels.jsonl"
-    dataset.write_text(
-        json.dumps({"question": "known"}) + "\n",
-        encoding="utf-8",
-    )
-    labels.write_text(
-        json.dumps({"question": "known", "intent": "case_law_question"}) + "\n",
-        encoding="utf-8",
-    )
+    dataset.write_text(json.dumps(_row("known", "case_law_question")) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="invalid intent"):
-        load_intent_labels(dataset, labels)
+        load_intent_labels(dataset)

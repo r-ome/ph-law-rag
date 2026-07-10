@@ -49,14 +49,20 @@ def _norm_metrics(d: dict | None) -> dict:
     }
 
 
-def _load_summary(tag: str) -> dict | None:
+def _is_holdout(tag: str) -> bool:
+    """Central reporting-surface guard; raw scoring artifacts remain on disk."""
+    return bool((artifacts.load_meta(tag) or {}).get("holdout"))
+
+
+def _load_summary(tag: str, *, holdout: bool = False) -> dict | None:
     p = artifacts.existing_path(tag, "summary")
     if p is None:
         return None
     raw = artifacts.read_json(p)
     by_cat = {}
-    for cat, m in (raw.get("by_category") or {}).items():
-        by_cat[cat] = {"n": (m or {}).get("n"), **_norm_metrics(m)}
+    if not holdout:
+        for cat, m in (raw.get("by_category") or {}).items():
+            by_cat[cat] = {"n": (m or {}).get("n"), **_norm_metrics(m)}
     return {
         "overall": _norm_metrics(raw.get("overall")),
         "abstention": raw.get("abstention") or {},
@@ -70,6 +76,7 @@ def get_run(tag: str) -> dict | None:
         return None
     meta = artifacts.load_meta(tag)
     mrow = artifacts.manifest_row(tag)
+    holdout = _is_holdout(tag)
     return {
         "tag": tag,
         "model": (meta or {}).get("model") or mrow.get("model"),
@@ -80,7 +87,7 @@ def get_run(tag: str) -> dict | None:
         "scored_count": (meta or {}).get("scored_count")
         if (meta or {}).get("scored_count") is not None
         else mrow.get("scored"),
-        "summary": _load_summary(tag),
+        "summary": _load_summary(tag, holdout=holdout),
         "meta": meta,
     }
 
@@ -106,22 +113,29 @@ def get_rows(tag: str) -> dict | None:
     """Join of run.jsonl (all attempted) + scored.json metrics. Manifest-gated."""
     if tag not in _manifest_tags():
         return None
+    if _is_holdout(tag):
+        return {"tag": tag, "row_count": 0, "scored_count": 0, "rows": [], "holdout_redacted": True}
     paths = artifacts.paths_for_tag(tag)
     run_rows = _read_jsonl(paths.run)
-    scored_index: dict[tuple, dict] = {}
+    scored_by_id: dict[str, dict] = {}
+    scored_by_content: dict[tuple, dict] = {}
     if paths.scored.exists():
         for s in artifacts.read_json(paths.scored):
-            key = (s.get("user_input"), s.get("reference"))
-            scored_index[key] = {
+            metrics = {
                 "faithfulness": s.get("faithfulness"),
                 "answer_relevancy": s.get("answer_relevancy"),
                 "context_precision": s.get(_RAW_PRECISION),
                 "context_recall": s.get("context_recall"),
             }
+            if s.get("eval_id"):
+                scored_by_id[s["eval_id"]] = metrics
+            scored_by_content[(s.get("user_input"), s.get("reference"))] = metrics
     rows = []
     scored_count = 0
     for r in run_rows:
-        metrics = scored_index.get((r.get("question"), r.get("ground_truth")))
+        metrics = scored_by_id.get(r.get("eval_id")) or scored_by_content.get(
+            (r.get("question"), r.get("ground_truth"))
+        )
         if metrics:
             scored_count += 1
         rows.append({
@@ -137,7 +151,7 @@ def get_rows(tag: str) -> dict | None:
             "context_precision": (metrics or {}).get("context_precision"),
             "context_recall": (metrics or {}).get("context_recall"),
         })
-    return {"tag": tag, "row_count": len(rows), "scored_count": scored_count, "rows": rows}
+    return {"tag": tag, "row_count": len(rows), "scored_count": scored_count, "rows": rows, "holdout_redacted": False}
 
 
 def _delta(a: float | None, b: float | None) -> float | None:
@@ -149,8 +163,9 @@ def diff_runs(candidate: str, baseline: str) -> dict | None:
     tags = _manifest_tags()
     if candidate not in tags or baseline not in tags:
         return None
-    cand = _load_summary(candidate) or {"overall": _norm_metrics(None), "abstention": {}, "by_category": {}}
-    base = _load_summary(baseline) or {"overall": _norm_metrics(None), "abstention": {}, "by_category": {}}
+    redacted = _is_holdout(candidate) or _is_holdout(baseline)
+    cand = _load_summary(candidate, holdout=redacted) or {"overall": _norm_metrics(None), "abstention": {}, "by_category": {}}
+    base = _load_summary(baseline, holdout=redacted) or {"overall": _norm_metrics(None), "abstention": {}, "by_category": {}}
 
     overall_delta = {k: _delta(cand["overall"].get(k), base["overall"].get(k)) for k in _METRIC_KEYS}
     abst = {
