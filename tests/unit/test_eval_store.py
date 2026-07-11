@@ -154,6 +154,9 @@ def test_category_diff_statuses(tmp_path, monkeypatch):
 def test_holdout_rows_and_diff_report_are_redacted(tmp_path, monkeypatch):
     results_dir = tmp_path / "eval_results"
     monkeypatch.setattr(artifacts.settings, "eval_results_dir", str(results_dir))
+    dataset_path = tmp_path / "eval_dataset.jsonl"
+    dataset_path.write_text("dataset\n", encoding="utf-8")
+    monkeypatch.setattr(artifacts.settings, "eval_dataset_path", str(dataset_path))
     tag = "holdout_20260710_010000"
     run_dir = _run_dir(results_dir, "2026-07-10", tag)
     _manifest(results_dir, [{"tag": tag, "date": "2026-07-10"}])
@@ -178,3 +181,52 @@ def test_holdout_rows_and_diff_report_are_redacted(tmp_path, monkeypatch):
     text = report.read_text(encoding="utf-8")
     assert "## Per-question" not in text
     assert "private" not in text
+    ledger = results_dir / "holdout_aggregate_reads.jsonl"
+    entries = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+    assert entries[-1]["access_type"] == "diff_report"
+    assert entries[-1]["holdout_row_counts"] == {tag: 1}
+    assert entries[-1]["eval_dataset_sha256"]
+    assert entries[-1]["eval_manifest_sha256"]
+    assert "git_sha" in entries[-1]
+
+
+def test_holdout_aggregate_reads_are_logged_only_on_single_run_and_compare(tmp_path, monkeypatch):
+    results_dir = tmp_path / "eval_results"
+    monkeypatch.setattr(artifacts.settings, "eval_results_dir", str(results_dir))
+    dataset_path = tmp_path / "eval_dataset.jsonl"
+    dataset_path.write_text("dataset\n", encoding="utf-8")
+    monkeypatch.setattr(artifacts.settings, "eval_dataset_path", str(dataset_path))
+    holdout = "holdout_20260710_010000"
+    baseline = "baseline_20260710_000000"
+    _manifest(
+        results_dir,
+        [
+            {"tag": holdout, "date": "2026-07-10", "label": "release-check"},
+            {"tag": baseline, "date": "2026-07-10"},
+        ],
+    )
+    holdout_dir = _run_dir(results_dir, "2026-07-10", holdout)
+    baseline_dir = _run_dir(results_dir, "2026-07-10", baseline)
+    _write_json(holdout_dir / "meta.json", {"tag": holdout, "holdout": True, "label": "release-check"})
+    for run_dir in (holdout_dir, baseline_dir):
+        _write_json(
+            run_dir / "summary.json",
+            {"overall": {"faithfulness": 0.8}, "abstention": {"accuracy": 1.0}, "by_category": {}},
+        )
+
+    assert list_runs()
+    ledger = results_dir / "holdout_aggregate_reads.jsonl"
+    assert not ledger.exists()
+
+    assert get_run(holdout)["summary"]["overall"]["faithfulness"] == 0.8
+    assert diff_runs(holdout, baseline)["overall"]["candidate"]["faithfulness"] == 0.8
+
+    entries = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+    assert [entry["access_type"] for entry in entries] == ["single_run", "compare"]
+    assert entries[0]["tags"] == [holdout]
+    assert entries[0]["purpose"] == "release-check"
+    assert entries[0]["holdout_row_counts"] == {holdout: None}
+    assert entries[0]["eval_dataset_sha256"]
+    assert entries[0]["eval_manifest_sha256"]
+    assert "git_sha" in entries[0]
+    assert entries[1]["tags"] == [holdout, baseline]

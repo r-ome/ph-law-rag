@@ -77,6 +77,15 @@ def get_run(tag: str) -> dict | None:
     meta = artifacts.load_meta(tag)
     mrow = artifacts.manifest_row(tag)
     holdout = _is_holdout(tag)
+    if holdout:
+        from app.evals.holdout_ledger import log_holdout_aggregate_read
+
+        log_holdout_aggregate_read(
+            access_type="single_run",
+            tags=[tag],
+            purpose=(meta or {}).get("label") or mrow.get("label") or None,
+            source="eval_store.get_run",
+        )
     return {
         "tag": tag,
         "model": (meta or {}).get("model") or mrow.get("model"),
@@ -164,6 +173,17 @@ def diff_runs(candidate: str, baseline: str) -> dict | None:
     if candidate not in tags or baseline not in tags:
         return None
     redacted = _is_holdout(candidate) or _is_holdout(baseline)
+    if redacted:
+        from app.evals.holdout_ledger import log_holdout_aggregate_read
+
+        cand_meta = artifacts.load_meta(candidate) or {}
+        base_meta = artifacts.load_meta(baseline) or {}
+        log_holdout_aggregate_read(
+            access_type="compare",
+            tags=[candidate, baseline],
+            purpose=cand_meta.get("label") or base_meta.get("label") or None,
+            source="eval_store.diff_runs",
+        )
     cand = _load_summary(candidate, holdout=redacted) or {"overall": _norm_metrics(None), "abstention": {}, "by_category": {}}
     base = _load_summary(baseline, holdout=redacted) or {"overall": _norm_metrics(None), "abstention": {}, "by_category": {}}
 

@@ -50,6 +50,15 @@ def eval_score(
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
+	if any(row.get("split") == "holdout" for row in results):
+		from app.evals.holdout_ledger import log_holdout_aggregate_read
+
+		log_holdout_aggregate_read(
+			access_type="score_run",
+			tags=[run_tag],
+			purpose=settings.eval_run_label or None,
+			source="cli.eval-score",
+		)
 
 @app.command("eval")
 def eval(
@@ -68,6 +77,15 @@ def eval(
 		)
 	results, raw_path, run_tag = run_eval_set(tuple(splits))
 	typer.echo(f"\nRaw results saved to {raw_path}")
+	if "holdout" in splits:
+		from app.evals.holdout_ledger import log_holdout_aggregate_read
+
+		log_holdout_aggregate_read(
+			access_type="release_run",
+			tags=[run_tag],
+			purpose=settings.eval_run_label or None,
+			source="cli.eval",
+		)
 	if not do_score:
 		typer.echo(f"Skipped judging (--no-score). Score later with: raglab eval-score {raw_path}")
 		return
@@ -76,6 +94,37 @@ def eval(
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
+
+@app.command("eval-repeatability")
+def eval_repeatability(
+	run_path: str,
+	repeats: int = typer.Option(5, "--repeats", min=2, help="number of uncached judge passes"),
+	row_ids: list[str] = typer.Option([], "--row-id", help="eval row ID to include; repeatable"),
+	sample_size: int = typer.Option(10, "--sample-size", min=1, help="deterministic panel size when --row-id is omitted"),
+	out: str = typer.Option(None, help="JSON artifact output path"),
+):
+	from app.evals.repeatability import CAVEAT, run_repeatability_panel
+
+	payload, out_path = run_repeatability_panel(
+		run_path,
+		repeats=repeats,
+		row_ids=row_ids,
+		sample_size=sample_size,
+		out=out,
+	)
+	typer.echo(
+		f"Judge repeatability panel - rows: {payload['row_count']}, "
+		f"repeats: {payload['repeats']}"
+	)
+	for metric, stats in payload["metrics"].items():
+		typer.echo(f"\n{metric}")
+		typer.echo(f" median within-row range: {stats['median_within_row_range']}")
+		typer.echo(f" 90th-percentile range:  {stats['p90_within_row_range']}")
+		typer.echo(f" maximum observed range: {stats['max_within_row_range']}")
+		if stats["nan_count"]:
+			typer.echo(f" NaN scores ignored:      {stats['nan_count']}")
+	typer.echo(f"\nCaveat: {CAVEAT}")
+	typer.echo(f"Repeatability artifact written to {out_path}")
 
 eval_cache_app = typer.Typer(help="Manage cached RAGAS row scores")
 

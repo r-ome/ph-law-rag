@@ -163,6 +163,16 @@ def build_diff_report(experiment: str, baseline: str | None = None, out: str | N
     base_runs = _load(baseline) if baseline else {}
     holdout = _is_holdout(experiment) or bool(baseline and _is_holdout(baseline))
     if holdout:
+        from app.evals.holdout_ledger import log_holdout_aggregate_read
+
+        exp_meta = artifacts.load_meta(experiment) or {}
+        base_meta = artifacts.load_meta(baseline) if baseline else {}
+        log_holdout_aggregate_read(
+            access_type="diff_report",
+            tags=[tag for tag in [experiment, baseline] if tag],
+            purpose=(exp_meta or {}).get("label") or (base_meta or {}).get("label") or None,
+            source="evals.diff_report.build_diff_report",
+        )
         lines = [f"# Eval diff — {experiment}" + (f"  (vs {baseline})" if baseline else ""), "",
                  "## Holdout release aggregates", "",
                  "| run | n | abstain count | faithfulness | relevancy | precision | recall |",

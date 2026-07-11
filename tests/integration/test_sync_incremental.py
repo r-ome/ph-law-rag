@@ -1,4 +1,6 @@
 import sqlite3
+from pathlib import Path
+
 import pytest
 
 import app.sync_service as sync_service
@@ -27,6 +29,14 @@ def _source() -> SourceConfig:
 def sync_env(tmp_path, monkeypatch):
     db_path = tmp_path/"raglab.db"
     monkeypatch.setattr(settings, "db_path", str(db_path))
+    monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path / "eval_results"))
+    eval_dataset_path = tmp_path / "eval_dataset.jsonl"
+    eval_dataset_path.write_text(
+        '{"id":"eval_001","split":"regression","question":"q","ground_truth":"g",'
+        '"expected_sources":["civil_code"],"category":"factual","topic":"civil_law"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings, "eval_dataset_path", str(eval_dataset_path))
     init_db()
     
     state = {
@@ -101,6 +111,8 @@ def test_first_sync_creates_one_version(sync_env):
     rows = _query(db_path, "SELECT changed_from_previous FROM document_versions")
     assert len(rows) == 1
     assert rows[0][0] == 0
+    review_reports = list((Path(settings.eval_results_dir) / "source_reviews").glob("*.json"))
+    assert len(review_reports) == 1
     
 def test_unchanged_corpus_skips_second_run(sync_env):
     _, db_path = sync_env
@@ -157,6 +169,7 @@ def test_failed_fetch_writes_no_version(sync_env, monkeypatch):
 
     assert counts["failed"] == 1
     assert _query(db_path, "SELECT * FROM document_versions") == []
+    assert not (Path(settings.eval_results_dir) / "source_reviews").exists()
 
 
 def test_indexing_exception_is_isolated_and_run_recorded(sync_env, monkeypatch):

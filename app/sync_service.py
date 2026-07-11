@@ -111,6 +111,7 @@ def run_sync(sync_run_id: str | None = None) -> dict:
 	sync_run_id = sync_run_id or str(uuid4())
 	counts = _empty_counts()
 	started_at = datetime.now(timezone.utc).isoformat()
+	changed_sources: list[dict[str, str]] = []
 
 	_create_sync_run_if_absent(sync_run_id, started_at)
 	logger.info("sync_started", sync_run_id=sync_run_id)
@@ -149,6 +150,7 @@ def run_sync(sync_run_id: str | None = None) -> dict:
 					print(f"[OK] {source.source_id} — {result.status}")
 					logger.info("sync_source_ok", source_id=source.source_id, status=result.status)
 					counts["changed"] += 1
+					changed_sources.append({"source_id": source.source_id, "status": result.status})
 					continue
 
 				action, n = index_service.refresh_document_metadata(
@@ -169,6 +171,19 @@ def run_sync(sync_run_id: str | None = None) -> dict:
 				counts["failed"] += 1
 			finally:
 				conn.close()
+		try:
+			from app.evals.source_review import write_source_review_report
+
+			report_path = write_source_review_report(
+				sync_run_id=sync_run_id,
+				changed_sources=changed_sources,
+				sources=sources,
+			)
+			if report_path is not None:
+				print(f"[REVIEW] source-change eval review report: {report_path}")
+				logger.info("sync_source_review_report_written", sync_run_id=sync_run_id, path=str(report_path))
+		except Exception as e:
+			logger.warning("sync_source_review_report_failed", sync_run_id=sync_run_id, error=str(e), exc_info=True)
 	except Exception as e:
 		crashed = True
 		logger.warning("sync_crashed", sync_run_id=sync_run_id, error=str(e), exc_info=True)
