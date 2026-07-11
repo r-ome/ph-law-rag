@@ -24,8 +24,8 @@ Built as a portfolio project demonstrating production-grade retrieval pipeline d
 | Concern | Tool |
 |---|---|
 | RAG orchestration | LlamaIndex |
-| LLM | Ollama (Mistral) |
-| Embeddings | Ollama `nomic-embed-text` (768-dim) |
+| LLM | Ollama (`gemma4:e4b`) |
+| Embeddings | Ollama `qwen3-embedding:0.6b` (1024-dim) |
 | Vector store | Qdrant (local Docker) |
 | Sparse index | LlamaIndex BM25Retriever |
 | Reranker | `Qwen/Qwen3-Reranker-0.6B` (default; `ms-marco-MiniLM-L-6-v2` as the fast alternate) |
@@ -65,8 +65,8 @@ docker compose up -d qdrant
 
 # 3. Start Ollama bound to all interfaces, and pull the models
 OLLAMA_HOST=0.0.0.0:11434 ollama serve   # in its own terminal
-ollama pull mistral
-ollama pull nomic-embed-text
+ollama pull gemma4:e4b
+ollama pull qwen3-embedding:0.6b
 
 # 4. Configure
 cp .env.example .env
@@ -210,7 +210,7 @@ See [`docs/architecture.md`](docs/architecture.md) for diagrams and [`docs/ADR/`
 All config lives in `.env` and is loaded via `app/config.py`. Key settings:
 
 ```env
-llm_model=mistral
+llm_model=gemma4:e4b
 embedding_backend=ollama
 # embedding_model and embedding_dim are derived from the backend unless
 # explicitly overridden together.

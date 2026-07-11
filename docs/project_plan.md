@@ -62,8 +62,8 @@ It should:
 | Concern               | Tool                                   | Reason                                                                                                    |
 | --------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | RAG orchestration     | LlamaIndex                             | Purpose-built for document retrieval pipelines; first-class hybrid retrieval, reranking, and eval support |
-| LLM                   | Ollama (mistral or llama3)             | Local, free, model-swappable via config                                                                   |
-| Embeddings            | Ollama `nomic-embed-text`              | Local, high-quality 768-dim embeddings; swap via config                                                   |
+| LLM                   | Ollama `gemma4:e4b`                    | Graduated local default; model-swappable via config (ADR-025)                                             |
+| Embeddings            | Ollama `qwen3-embedding:0.6b`          | Local 1024-dim default with an instruction-prefixed legal query path; Nomic remains the rollback arm (ADR-024) |
 | Vector store          | Qdrant (local Docker)                  | Native hybrid search (dense + sparse in one query), metadata filtering, concurrent-safe                   |
 | Sparse index          | LlamaIndex BM25Retriever               | Exact-match keyword retrieval; pairs with dense for hybrid                                                |
 | Reranker              | Bedrock Rerank (`amazon.rerank-v1:0`) by default; MiniLM serving pin; Qwen3 research arm | Bedrock matches Qwen3 eval quality serverlessly (ADR-021); MiniLM serves (bedrock quota = 2 calls/min); Qwen3 kept for offline research |
@@ -101,7 +101,8 @@ The system has 5 parts:
 
 - Process only new or changed documents
 - Chunk via LlamaIndex `SentenceSplitter` (target ~256 tokens, overlap 32)
-- Generate embeddings via Ollama (`nomic-embed-text`)
+- Generate embeddings via Ollama (`qwen3-embedding:0.6b`; 1024 dimensions,
+  instruction-prefixed queries and unprefixed document chunks)
 - Upsert dense vectors to Qdrant collection
 - Build/update BM25 index (LlamaIndex `BM25Retriever`, persisted to disk)
 - Delete stale vectors for changed documents before re-indexing
@@ -309,7 +310,8 @@ Goal: changed documents are chunked, embedded, and stored in Qdrant and BM25.
 Build:
 
 - `chunker.py` — LlamaIndex `SentenceSplitter` with configurable size and overlap
-- `embedder.py` — Ollama embedding client (`nomic-embed-text`)
+- `embedder.py` — backend-selecting embedding client; local default is
+  `qwen3-embedding:0.6b`, cloud default is Bedrock Titan v2
 - `vector_store.py` — Qdrant wrapper: collection init, upsert, delete-by-doc, dense query
 - `bm25_store.py` — LlamaIndex `BM25Retriever` with build, persist, and load functions
 - `index_service.py` — delete stale vectors, chunk → embed → upsert, update SQLite `chunks`
@@ -442,7 +444,8 @@ Networking rules (Compose puts services on a shared network where the **service 
 
 Host prerequisites (document in README):
 
-- Ollama installed natively, models pulled (`ollama pull nomic-embed-text`, `ollama pull mistral`).
+- Ollama installed natively, models pulled (`ollama pull qwen3-embedding:0.6b`,
+  `ollama pull gemma4:e4b`).
 - Ollama must listen on all interfaces so containers can reach it: `OLLAMA_HOST=0.0.0.0:11434 ollama serve` (default `127.0.0.1` binding rejects container traffic).
 - Works on Colima (`colima start --cpu 4 --memory 8`) without Docker Desktop.
 
@@ -543,7 +546,8 @@ class Settings(BaseSettings):
     embedding_backend: Literal["ollama", "bedrock"] = "ollama"
     embedding_model: str | None = None  # backend default when unset
     embedding_dim: int | None = None     # backend/model default when unset
-    llm_model: str = "mistral"
+    embedding_query_instruction: str | None = None  # backend default when unset
+    llm_model: str = "gemma4:e4b"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_backend: Literal["minilm", "qwen3", "bedrock"] = "bedrock"
     qwen3_reranker_model: str = "Qwen/Qwen3-Reranker-0.6B"
@@ -566,7 +570,7 @@ class Settings(BaseSettings):
     consolidated_dedup_enabled: bool = True
 
     # Qdrant
-    qdrant_collection: str = "ph_law"
+    qdrant_collection: str = "ph_law_qwen06"
 
     # Misc
     request_timeout: int = 30
@@ -755,7 +759,8 @@ Phases B–E are explicitly out of the current OOS moat's in-scope set; expandin
 
 ### Dense Retrieval (Qdrant)
 
-- Embed query via `nomic-embed-text` (768 dimensions)
+- Embed query via `qwen3-embedding:0.6b` (1024 dimensions) using the legal
+  retrieval instruction recorded in ADR-024
 - Query Qdrant collection with cosine similarity
 - Retrieve top-k = 30 candidates with scores and metadata
 
@@ -921,8 +926,8 @@ uv sync
 docker-compose up -d
 
 # 3. Pull Ollama models
-ollama pull mistral
-ollama pull nomic-embed-text
+ollama pull gemma4:e4b
+ollama pull qwen3-embedding:0.6b
 
 # 4. Configure
 cp .env.example .env

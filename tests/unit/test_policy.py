@@ -39,11 +39,11 @@ def test_named_profile_overrides_behavior_settings(monkeypatch):
     resolution = resolve_policy()
 
     assert resolution.policy.name == "cloud"
-    assert resolution.policy.generator_model == "mistral"
+    assert resolution.policy.generator_model == "gemma4:e4b"
     assert resolution.policy.router_enabled is True
     assert resolution.policy.retrieval_defaults.dense_top_k == 30
     assert resolution.policy.min_chunks_for_answer == 1
-    assert resolution.policy_overrides["llm_model"] == "mistral"
+    assert resolution.policy_overrides["llm_model"] == "gemma4:e4b"
     assert resolution.env_ignored["llm_model"] == "claude-haiku-4-5"
     assert resolution.policy_overrides["router_enabled"] is True
     assert resolution.env_ignored["router_enabled"] is False

@@ -79,9 +79,8 @@ class Settings(BaseSettings):
 	# whose section was fragmented (~11/70 in eval). Judge it on CHANGED-CONTEXT rows
 	# (recall +0.136, faithfulness +0.012, precision −0.014 on those), NOT whole-run aggregate
 	# faithfulness — the untouched majority adds generator noise that swamps the signal.
-	# llm_model: str = "deepseek-r1:8b"
-	llm_model: str = "mistral"
-	# llm_model: str = "qwen3:4b"
+	# Local generator default graduated with the 131-row Qwen baseline (ADR-025).
+	llm_model: str = "gemma4:e4b"
 	# Intent router (R4): Haiku classifier in front of non-greeting queries,
 	# mapping intent -> strategy preset. Off by default so local surfaces stay
 	# routerless; cloud/demo surfaces opt in via router_enabled=true.
@@ -137,7 +136,7 @@ class Settings(BaseSettings):
 	enable_query_rewriting: bool = True   # toggle rewriting off for debugging
 	# Faithfulness self-check: optional 2nd local pass that audits the draft answer against the
 	# retrieved context and deletes unsupported claims. Targets the generator groundedness gap
-	# (local mistral drifts from context; cloud doesn't). Off by default; eval before shipping.
+	# (the original Mistral experiment drifted from context; cloud didn't). Off by default.
 	faithfulness_selfcheck_enabled: bool = False
 	# Later-enacted-text preference: extra system-prompt rule telling the generator that when
 	# context passages conflict (penalties/ages/thresholds, or a provision one passage shows was

@@ -55,7 +55,7 @@ OLLAMA_HOST=0.0.0.0:11434 ollama serve
 Pull the models (one time):
 
 ```bash
-ollama pull mistral            # generation
+ollama pull gemma4:e4b         # generation
 ollama pull nomic-embed-text   # embeddings (768-dim)
 ```
 

@@ -6,7 +6,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-025](025-gemma4-local-generator-default.md)
 
 ## Plain English
 

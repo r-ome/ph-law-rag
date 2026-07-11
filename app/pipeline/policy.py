@@ -158,7 +158,7 @@ class PolicyResolution:
 def _base_profile(name: str, settings_obj=settings) -> AnswerPolicy:
     base = AnswerPolicy(
         name=name,
-        generator_model="mistral",
+        generator_model="gemma4:e4b",
         strong_model=None,
         router_enabled=False,
         router_model="claude-haiku-4-5",
