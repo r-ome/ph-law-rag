@@ -142,6 +142,28 @@ sources:
     source_index: lawphil
     structure: hierarchical
 
+  - source_id: heinous_crimes_act
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/repacts/ra1993/ra_7659_1993.html"
+    availability: available
+    category: statute
+    doc_type: republic_act
+    tags: [criminal_law, death_penalty, heinous_crimes, penalties, revised_penal_code, plunder]
+    title: "An Act to Impose the Death Penalty on Certain Heinous Crimes, Amending for that Purpose the Revised Penal Laws, as Amended, Other Special Penal Laws, and for Other Purposes"
+    official_number: "Republic Act No. 7659"
+    approval_date: 1993-12-13
+    status: operative
+    # Mixed-target amendment: quoted RPC articles are the bulk (namespace join); its Sec. 12
+    # rewrite of RA 7080 Sec. 2 (plunder threshold P75M -> P50M) gets a wrong-namespace id —
+    # same single-namespace limitation as statutory_rape_amendments_2022. RA 6425 (dangerous
+    # drugs, also amended) is not in the corpus; no edge. Death-penalty impositions herein are
+    # overridden by RA 9346 (death_penalty_prohibition).
+    amends: [revised_penal_code, plunder_act]
+    amends_namespace: revised_penal_code
+    source_index: lawphil
+    structure: hierarchical
+
   - source_id: ip_code
     enabled: true
     file_format: html
@@ -625,6 +647,23 @@ sources:
     amends: [anti_graft]
     source_index: lawphil
     structure: hierarchical
+
+  - source_id: anti_graft_amendments_1982
+    enabled: true
+    file_format: html
+    url: "https://lawphil.net/statutes/bataspam/bp1982/bp_195_1982.html"
+    availability: available
+    category: statute
+    doc_type: batas_pambansa
+    tags: [criminal_law, special_penal_law, anti_graft, corruption, public_officers, penalties]
+    title: "An Act Amending Sections Eight, Nine, Ten, Eleven, and Thirteen of Republic Act Numbered Thirty Hundred and Nineteen, Otherwise Known as the Anti-Graft and Corrupt Practices Act"
+    official_number: "Batas Pambansa Blg. 195"
+    approval_date: 1982-03-16
+    status: operative
+    amends: [anti_graft]
+    source_index: lawphil
+    structure: hierarchical
+    notes: "Raises RA 3019 Sec. 9 penalties to 6y1m-15y and Sec. 11 prescription to 15 years. Its Sec. 11 text is itself superseded by RA 10910 (20 years, anti_graft_amendments_2016) — later-amendment-wins must leave RA 10910's splice in place."
 
   - source_id: anti_rape_law_1997
     enabled: true
