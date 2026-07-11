@@ -1,8 +1,9 @@
 # Pipeline refactor plan — decouple before CRAG
 
-Status: PR1 FROZEN (2026-07-09); PR3 machinery implemented (2026-07-09);
-cascade experiments pending; PR4 evidence/corrective slot implemented (2026-07-09);
-PR5+ draft
+Status: PR1–PR5 implemented (2026-07-09). Cloud cascade graduation (§4a) remains
+pending; the local-cascade track (§4b) is closed without graduation. CRAG remains
+available under `crag-experimental`; its first graduation A/B did not earn a
+default flip, but the experiment is retained rather than rejected.
 Owner: Jerome. Claude drafted; Jerome codes.
 
 Goal: make each answer-pipeline stage replaceable and traceable so model cascading,
@@ -179,7 +180,7 @@ YAML loader; frozen dataclasses validate for free):
 
 | Profile | Intent |
 |---|---|
-| `local` | Mirrors today's defaults exactly. mistral, routerless, no cascade. `AnswerPolicy.from_settings()` — env overrides keep working. |
+| `local` | Mirrors current defaults exactly. `gemma4:e4b`, routerless, no cascade. `AnswerPolicy.from_settings()` — env overrides keep working. |
 | `cloud` | Haiku router on, serving reranker pins unchanged, current demo generator. |
 | `eval` | Deterministic gen, trace always on; profile name lands in eval artifacts (self-labeling by profile, not just model). |
 | `cascade` | Router on, `strong_model="claude-haiku-4-5"`, `escalate_intents={"list_or_rule_synthesis", "amendment_or_current_law"}`. |
@@ -396,8 +397,9 @@ field-precedence tests for behavior-vs-infra env conflicts.
 **PR3 — ModelRouter + cascade experiments.** `model_router.py`, `route_model`
 stage, `cascade` + `local-cascade` profiles. Machinery landed 2026-07-09:
 profiles are wired and auditable, not graduated. Still pending: run §4a (cloud
-A/B) and §4b (local router benchmark + local strong-generator benchmark).
-Graduation per profile on its own evidence; negative results logged. Eval
+A/B). The §4b local track is closed without graduation: the best local router
+false-escalated 9/54 easy rows, no local arm cleared the near-zero false-fire
+bar, and the Mistral→Gemma3 mechanism was verified end-to-end. Eval
 rows/meta and trace records carry actual `model_choice` so mixed-model cascade
 runs are auditable.
 
@@ -406,8 +408,16 @@ subsuming min-chunks + answerability, `corrective_retrieve` no-op, trace fields.
 `routes_retrieval.TraceRecord` is updated in the same PR. No behavior change
 under any current profile.
 
-**PR5+ — CRAG proper.** Facet-checker evaluator, targeted re-retrieval,
-`crag-experimental` profile, judged A/B before any default flip.
+**PR5 — CRAG proper.** Facet-checker evaluator, targeted re-retrieval,
+`crag-experimental` profile, judged A/B before any default flip. Detailed plan in
+§10; sliced PR5a (checker, trace-only) → PR5b (corrective loop) → PR5c
+(graduation A/B). No default flip under any shipping profile until PR5c clears
+the bar.
+
+**Outcome (2026-07-10):** PR5a–PR5c shipped. The first 81-row graduation A/B was
+flat-to-negative under both Haiku and GPT-5-mini judges and did not earn a
+shipping-profile flip. Keep `crag-experimental` available for further corpus- or
+lane-specific work; this is a non-graduation decision, not a rejection of CRAG.
 
 ---
 
@@ -431,3 +441,260 @@ under any current profile.
 - **CRAG may not pay.** Three LLM-in-the-loop features failed A/Bs here. The
   refactor is justified independently (answer_service is at its complexity
   ceiling); CRAG itself stays gated on evidence.
+
+---
+
+## 10. PR5 — CRAG proper (detailed)
+
+This section is the historical implementation and graduation plan retained as
+the design record for the shipped experiment. Its implementation state and first
+A/B outcome are summarized above.
+
+Goal: turn the two PR4 slots into a working corrective loop — the former
+`NotImplementedError` branch for `evidence_gate="crag"` in
+`app/pipeline/evidence.py` and the former `corrective_retrieve` no-op in
+`app/pipeline/corrective.py` — and decide by A/B whether it earns a default flip.
+Everything lands behind `crag-experimental`; no
+shipping profile (`local`/`cloud`/`eval`/`cascade`) changes behavior in PR5a/PR5b.
+
+Prior evidence sets the bar (§5): the answerability gate was high-precision /
+low-recall and stayed off; both LLM query-planning A/Bs (decomposition, packaging)
+were negative. CRAG is the fourth LLM-judgment-in-the-loop attempt. It must clear
+the same bar — judged on **changed-context rows**, deterministic gen, RAGAS row
+cache — before defaulting on anywhere.
+
+### 10.1 Design invariant: CRAG adds recall, never subtracts it
+
+The failure mode of the answerability gate was false abstention. PR5 forecloses
+that by construction: **the CRAG facet checker never introduces a new abstain
+path.** The hard floor stays the existing `min_chunks` check, which runs *first*
+and unchanged. The facet checker only distinguishes `sufficient` from `partial`
+among rows that already passed `min_chunks`; a `partial` verdict triggers
+*corrective retrieval* (add chunks), never abstention. There is no `insufficient`
+outcome from the checker that abstains — if the checker would say "nothing
+relevant," `min_chunks` already handled it, and if `min_chunks` passed we generate
+regardless. This keeps CRAG strictly additive: worst case is wasted latency, not a
+dropped answer.
+
+Consequence for `evidence.py`: under `evidence_gate="crag"`, the min-chunks branch
+is preserved verbatim; only the terminal `sufficient` return is replaced by the
+facet check, which returns `sufficient` or `partial` (never `insufficient`).
+
+### 10.2 Facet checker (`evidence.py`, `method="crag_facets"`)
+
+One LLM call, structured like the answerability gate (`app/retriever/answerability.py`
+is the pattern: fail-open, lazy Anthropic/Ollama split, exact-token parse). It
+enumerates the legal ingredients the question requires and checks each against the
+selected context.
+
+Prompt contract (extends the answerability `NEEDS/ANSWERABLE` format):
+
+```
+FACETS: <semicolon-separated ingredients the question needs>
+PRESENT: <facets the passages cover>
+MISSING: <facets the passages do not cover>
+VERDICT: sufficient | partial
+```
+
+- Runs on `state.selection.pre_expansion` (same input as the answerability gate —
+  post-rerank, pre-parent-expansion), so a facet judged missing is genuinely absent,
+  not just un-expanded.
+- `missing_facets` = the parsed `MISSING` list (the field already exists on
+  `EvidenceReport` and threads to the trace + corrective input).
+- **Fail-open**, exactly like `is_answerable`: any exception, malformed output, or
+  unparseable `VERDICT` returns `sufficient` with empty `missing_facets`. A checker
+  outage must never change control flow.
+- Verdict floor: if `MISSING` is empty ⇒ `sufficient`; else `partial`. Never emit
+  `insufficient` (see §10.1).
+- Model: the checker must be pinnable per profile — `crag-experimental` needs
+  Haiku regardless of `.env`, or PR5a/PR5c evals silently run the judge on
+  whatever `settings.answerability_gate_model` happens to be (`mistral` by
+  default). `AnswerPolicy` has **no judge-model field today**, and
+  `answerability.py` reads `settings.answerability_gate_model` directly — so this
+  is a required addition, not "read it through the policy" (that path does not
+  exist yet). Add `evidence_judge_model: str` to `AnswerPolicy`;
+  `from_settings()` defaults it to `settings.answerability_gate_model` (so `local`
+  is unchanged), `crag-experimental` sets it to `"claude-haiku-4-5"`. The facet
+  checker reads `policy.evidence_judge_model`. Add `evidence_judge_model` to
+  `BEHAVIOR_FIELDS` mapped onto `settings.answerability_gate_model` so the
+  precedence summary stays correct. Leaving `answerability.py` on the raw setting
+  is fine (it is not a shipping-on gate); do not refactor it in PR5.
+
+`EvidenceReport.detail` gains `{facets, present, missing}` for the trace. No type
+change — `method` already allows `"crag_facets"` (`state.py`).
+
+### 10.3 Corrective retrieval (`corrective.py`, replaces the no-op)
+
+Contract is fixed by §5 and PR4; PR5 fills it in:
+
+- **Input:** `state.selection` + `state.evidence.missing_facets`.
+- **Per missing facet:** one targeted query against the **existing curated corpus**
+  (Qdrant + BM25) — never web. Query text = the facet phrase; optionally suffixed
+  with the question's subject for disambiguation. Run the same
+  `hybrid_retriever → rerank` path the strategy already uses (via `select_context`
+  internals), take top `reserve_n` per facet.
+- **Merge helper (prerequisite refactor):** `packaged_retrieve` does planning →
+  retrieval → rerank → round-robin merge as one unit and exposes no reusable merge
+  entry point. Before corrective can reuse it, **extract** the round-robin loop
+  (lines ~44–52 of `subquery_retrieval.py`) into a helper
+  `round_robin_merge(per_query_lists, *, seen_ids, cap) -> list[RetrievalResult]`,
+  and refactor `packaged_retrieve` to call it (behavior-identical — covered by the
+  existing subquery unit test + golden). This extraction is a named step in PR5b,
+  not an incidental import. Corrective then calls
+  `round_robin_merge(per_facet_lists, seen_ids={r.chunk_id for r in selected}, cap=...)`
+  and passes the result through `dedup.dedup_results` with the existing selected
+  set.
+- **Insertion point:** corrective runs *after* `gate_evidence`, so new chunks are
+  appended to `state.selection.selected` and re-deduped; the added chunks skip
+  parent-expansion (they are already leaf hits merged into a post-expansion set —
+  re-running expansion would reshape the baseline and confound the A/B).
+- **Bounds — added-chunk budget (chosen over a displacing final cap):** the
+  additive invariant (§10.1) forbids corrective from *removing* a baseline chunk,
+  so a "final-context cap that displaces baseline chunks" is off the table — it
+  would let a facet judgment drop a chunk the baseline kept. The cap is therefore
+  an **added-chunk budget** named `corrective_max_added`, which bounds how many
+  corrective chunks are appended; nothing is displaced. **It is not a new policy
+  field** — PR5 derives it from `policy.retrieval_defaults.subquery_reserve_n`
+  (the dormant subquery reserve, ~2), reusing an existing knob rather than growing
+  `AnswerPolicy`. The trace surfaces the resolved value as
+  `corrective_retrieval.max_added` (§10.7). Promote it to its own policy field
+  only if the PR5c A/B needs to tune it independently of `subquery_reserve_n`.
+  This means CRAG's `partial` rows answer over a **larger** context than baseline —
+  by design, and by at most `corrective_max_added` chunks. Contexts are *not* kept
+  equal-sized; the A/B controls for the difference analytically instead, using the
+  traced baseline/post lengths (§10.7) and by judging changed-context rows only.
+  Keep `corrective_max_added` small and deliberate — this is a targeted gap-fill,
+  not a re-retrieval. One corrective round; no re-check of the facet verdict after
+  the round (bounded cost; the round either helped or it didn't, which the A/B
+  measures).
+- **Trace:** `corrective_retrieval.{fired, added_chunks}` already exist; set
+  `state.corrective_added_chunks` to the real count. `missing_facets` in the
+  evidence block records what was targeted.
+
+Composition with cascade: `escalate_on_partial_evidence` (already in the model
+router, §4) fires on a `partial` verdict and swaps in the strong model. In
+`crag-experimental` this is off by default; PR5c may test crag+escalate as a
+separate arm. Cap remains one corrective round **and** one escalation (§9).
+
+### 10.4 Profile + unblocking
+
+- Remove the two `NotImplementedError` guards (`evidence.py` and
+  `resolve_policy()` in `policy.py`) once the gate is implemented (PR5a).
+- **The two CRAG flags are independent and flip on different slices.**
+  `evidence_gate="crag"` turns on the facet checker (PR5a);
+  `corrective_retrieval_enabled` turns on the loop (PR5b). The runner enters the
+  corrective branch on `partial && corrective_retrieval_enabled`, and the PR4
+  no-op unconditionally sets `corrective_ran=True` — so if `crag-experimental`
+  shipped with `corrective_retrieval_enabled=True` during PR5a, every `partial`
+  row would trace `corrective_retrieval.fired=True` for a loop that does not exist
+  yet. Therefore `crag-experimental` sets `corrective_retrieval_enabled=False`
+  through PR5a and flips it to `True` in PR5b (alongside the real
+  `corrective.py`). No `runner.py` change beyond what PR4 shipped.
+- `local`/`cloud`/`eval`/`cascade` keep `evidence_gate ∈ {min_chunks,
+  answerability}` — untouched.
+
+### 10.5 Slicing
+
+Mirror the project's measure-before-default culture; keep each slice provably
+inert on shipping profiles.
+
+- **PR5a — facet checker, trace-only.** Implement the checker in `evidence.py`
+  under `evidence_gate="crag"` and add the `evidence_judge_model` policy field
+  (§10.2). Ship `crag-experimental` with `corrective_retrieval_enabled=False` so
+  the runner's corrective branch is never entered — otherwise the PR4 no-op would
+  falsely trace `fired=True` on every `partial` row (§10.4). The checker's
+  verdict/`missing_facets` land in the trace; control flow is unchanged (a
+  `partial` generates directly). Deliverable: an **offline facet-detection quality
+  read** — run `crag-experimental` over the escalated-intent rows (synthesis +
+  amendment; the natural `partial` candidates per R1 labels) and hand-check whether
+  `missing_facets` are real gaps. No default flip. Purpose: kill a bad checker
+  before building the loop, the way the answerability gate should have been
+  audited.
+- **PR5b — corrective loop.** Extract `round_robin_merge` from
+  `packaged_retrieve` (behavior-identical, §10.3), implement `corrective.py` per
+  §10.3, and flip `crag-experimental` to `corrective_retrieval_enabled=True`. Now
+  `crag-experimental` actually re-retrieves. Unit tests: the extracted merge is
+  output-identical for the packaging path; a synthetic `partial` verdict with a
+  known-missing facet pulls the expected chunk; empty `missing_facets` is a no-op;
+  added corrective chunks respect `corrective_max_added` and both baseline/post
+  lengths are traced.
+- **PR5c — graduation A/B + decision.** Full A/B, then keep-or-shelve.
+
+### 10.6 Graduation A/B (PR5c)
+
+`eval` discipline (deterministic gen, RAGAS row cache, judge **changed-context
+rows only** — the rows corrective actually altered). Arms on the 81-row labeled
+set:
+
+1. baseline (`eval` profile, `min_chunks`) — the locked reference.
+2. `crag-experimental` (facet check + corrective, same generator as baseline).
+3. optional: crag + `escalate_on_partial_evidence` (isolates corrective-recall
+   from strong-model faithfulness).
+
+Metrics:
+
+- **Recall lift on changed-context rows** — the headline. Corrective is a
+  recall play; its whole thesis is filling a missing facet.
+- **Faithfulness flat-or-up.** Adding chunks can dilute; a faith drop sinks it.
+- **No new false abstentions** — must be zero by construction (§10.1); verify
+  empirically anyway.
+- **Cost/latency:** +1 LLM call (facet check) on every non-greeting query, +1
+  retrieval round on `partial` rows only. Report per-row from the trace, not from
+  a global model constant.
+
+**Graduation bar:** recall lift on changed-context rows exceeds judge noise
+(the ±0.25 faith swing / recall band established in prior programs) **and**
+faithfulness does not regress **and** false-abstention count stays 0. If met,
+promote CRAG into a shipping profile (candidate: fold into `cloud`, or a new
+`cloud-crag`); otherwise keep `crag-experimental` registered-but-off and log the
+negative result in the devlog with the per-arm numbers. Default-flip decision is
+the user's, on the A/B evidence — same gate every prior LLM-in-loop feature faced.
+
+### 10.7 Traceability / API (additive, per §6)
+
+Mostly populating PR4's existing keys: `evidence.{verdict,method,missing_facets,detail}`
+and `corrective_retrieval.{enabled,fired,added_chunks}` already flow through
+`routes_retrieval.TraceRecord`; PR5 fills them (`method="crag_facets"`, non-empty
+`missing_facets`, non-zero `added_chunks`).
+
+Three **new keys** are required, since the A/B controls for context size
+analytically (§10.3) and cannot without them. Add them to the existing
+`corrective_retrieval` object (keeps the additive-only, one-object shape; no new
+top-level key):
+
+- `corrective_retrieval.baseline_selected_count` — `len(selected)` before corrective.
+- `corrective_retrieval.post_selected_count` — `len(selected)` after corrective.
+- `corrective_retrieval.max_added` — the resolved `corrective_max_added` cap
+  (`policy.retrieval_defaults.subquery_reserve_n`).
+
+`routes_retrieval.TraceRecord` must widen the `corrective_retrieval` shape to
+carry these (same PR that populates them, per §6's "API schemas expose the same
+additions").
+
+**Eval rows DO need a new field — the PR5c analysis is per-row, and today's rows
+cannot join to traces.** The eval runner (`app/evals/runner.py`) calls
+`answer(...)`, which returns only the response and **discards the trace record**;
+it labels every trace with the constant `trace_label="eval"` (not per-row) and
+captures no `trace_id`. So there is no reliable row↔trace key, and the corrective
+counts live only in the trace record — not in `resp`. Rather than build a fragile
+question-text join, surface `corrective_retrieval` onto the response dict the way
+`_attach_model_metadata` already surfaces `model_choice`/`generator_model`, and
+capture it as a `corrective_retrieval` column on the eval row (next to the
+existing `model_choice`). PR5c reads corrective counts straight from the row. This
+is the one eval-schema addition PR5 requires. Implementation note: keep the
+response attachment beside `_attach_model_metadata` in `app/pipeline/runner.py` so
+response-level pipeline metadata stays in one place, and add a unit assertion in
+`test_eval_runner.py` that eval rows preserve `corrective_retrieval`.
+
+### 10.8 Risks specific to PR5
+
+- **Facet checker is the 4th LLM-in-loop attempt; three failed.** Mitigated by
+  PR5a's offline audit gate and the additive-only invariant (§10.1) — a bad
+  checker wastes latency, it cannot drop answers.
+- **Corpus too small for corrective to find the missing facet.** At 23 sources a
+  facet judged "missing" may simply not exist in-corpus; corrective then adds
+  noise. The changed-context-rows-only judging isolates this; if corrective mostly
+  fires without helping, that is the negative result.
+- **Cost of the always-on facet call.** One extra judge call per query even when
+  context is sufficient. If PR5c shows the `sufficient` rate is high, consider
+  gating the facet check behind cheap heuristics later — out of scope for PR5.
