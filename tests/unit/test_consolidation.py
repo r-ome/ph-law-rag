@@ -156,7 +156,7 @@ def test_bucket_classification_reports_exclusions(tmp_path, monkeypatch):
 		_version(conn, source_id, path)
 	sources.append(_source("amend_chain_b", "2021-01-01", amends=["base"]))
 	path = tmp_path / "amend_chain_b.txt"
-	path.write_text('"Article 1. Replacement text.')
+	path.write_text('"Article 3. Replacement text.')
 	_version(conn, "amend_chain_b", path)
 	_version(conn, "base", tmp_path / "base.txt")
 	_patch_sources(monkeypatch, sources)
@@ -177,10 +177,15 @@ def test_bucket_classification_reports_exclusions(tmp_path, monkeypatch):
 
 	plan = build_splice_plan(conn)
 
-	assert [s.key for s in plan.splices_by_base_doc["base"]] == ["base:article:1"]
+	assert [s.key for s in plan.splices_by_base_doc["base"]] == ["base:article:1", "base:article:3"]
+	# Chains resolve latest-wins; every link's inserted copy is hidden.
+	chain_splice = plan.splices_by_base_doc["base"][1]
+	assert chain_splice.amendment_source_id == "amend_chain_b"
+	assert plan.hidden_keys_by_amendment["amend_chain_a"] == ("base:article:3",)
+	assert plan.hidden_keys_by_amendment["amend_chain_b"] == ("base:article:3",)
 	reasons = {item["key"]: item["reason"] for item in plan.exclusions}
+	assert "base:article:3" not in reasons
 	assert reasons["base:article:2"] == "partial"
-	assert reasons["base:article:3"] == "chain"
 	assert reasons["base:article:4"] == "ratio_outlier"
 	assert reasons["base:article:5"] == "no_base"
 	assert reasons["base:article:6"] == "override_collision"

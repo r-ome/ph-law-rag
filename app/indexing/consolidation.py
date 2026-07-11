@@ -55,11 +55,12 @@ def build_splice_plan(conn) -> SplicePlan:
 		if not base_entries:
 			exclusions.append(_exclusion(key, "no_base", _entry_detail(insertion_entries)))
 			continue
-		if len(insertion_entries) != 1:
-			exclusions.append(_exclusion(key, "chain", _entry_detail(insertion_entries)))
-			continue
 
-		insertion = insertion_entries[0]
+		# Chains resolve latest-wins: timeline entries are approval_date-ordered
+		# (multi-entry timelines with missing dates never reach here), so the last
+		# insertion is the current restatement. Earlier links are hidden below —
+		# they are stale intermediate law, not retrievable history.
+		insertion = insertion_entries[-1]
 		base = base_entries[0]
 		if insertion.provision_partial:
 			exclusions.append(_exclusion(key, "partial", _entry_detail([insertion])))
@@ -110,9 +111,10 @@ def build_splice_plan(conn) -> SplicePlan:
 			unit_number=_first_or_none(_unit_numbers(insertion)),
 		)
 		splices_by_base.setdefault(base.source_id, []).append(splice)
-		hidden_by_amendment.setdefault(insertion.source_id, []).append(key)
-		if insertion.provision_id != key:
-			hidden_by_amendment.setdefault(insertion.source_id, []).append(insertion.provision_id)
+		for entry in insertion_entries:
+			hidden_by_amendment.setdefault(entry.source_id, []).append(key)
+			if entry.provision_id != key:
+				hidden_by_amendment.setdefault(entry.source_id, []).append(entry.provision_id)
 
 	return SplicePlan(
 		splices_by_base_doc={
