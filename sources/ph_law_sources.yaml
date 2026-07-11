@@ -142,8 +142,13 @@ sources:
     source_index: lawphil
     structure: hierarchical
 
+  # DISABLED 2026-07-11 pending mixed-target / per-insertion namespace resolution: with a
+  # single amends_namespace, all 49 chunks landed as show-status RPC-namespace provisions —
+  # exposing the stale P75M plunder threshold alongside P50M AND RA 7659's amendments to
+  # RA 6425 (wholly repealed by RA 9165) as apparently-operative law. Chunks/vectors purged;
+  # documents/versions/artifacts kept for provenance. Re-enable gate: mixed-target support.
   - source_id: heinous_crimes_act
-    enabled: true
+    enabled: false
     file_format: html
     url: "https://lawphil.net/statutes/repacts/ra1993/ra_7659_1993.html"
     availability: available

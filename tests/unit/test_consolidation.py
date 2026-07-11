@@ -191,6 +191,32 @@ def test_bucket_classification_reports_exclusions(tmp_path, monkeypatch):
 	assert reasons["base:article:6"] == "override_collision"
 
 
+def test_chain_winner_validation_failure_still_hides_intermediates(tmp_path, monkeypatch):
+	conn = _conn()
+	sources = [
+		_source("base"),
+		_source("amend_chain_a", "2020-01-01", amends=["base"]),
+		_source("amend_chain_b", "2021-01-01", amends=["base"]),
+	]
+	_patch_sources(monkeypatch, sources)
+	monkeypatch.setattr("app.indexing.consolidation.load_provision_overrides", lambda: {})
+	_version(conn, "base", tmp_path / "base.txt")
+	_version(conn, "amend_chain_a", tmp_path / "amend_chain_a.txt")
+	_version(conn, "amend_chain_b", tmp_path / "amend_chain_b.txt")
+	_chunk(conn, pid="base:article:1", source_id="base", number="1", char_count=100)
+	_chunk(conn, pid="base:article:1", source_id="amend_chain_a", number="1", inserted_into="base", char_count=100)
+	_chunk(conn, pid="base:article:1", source_id="amend_chain_b", number="1", inserted_into="base", char_count=50)
+
+	plan = build_splice_plan(conn)
+
+	# The winner (latest link) is a ratio outlier, so no splice happens and
+	# base-plus-winner stay visible — but the stale intermediate link is still hidden.
+	assert plan.splices_by_base_doc == {}
+	reasons = {item["key"]: item["reason"] for item in plan.exclusions}
+	assert reasons["base:article:1"] == "ratio_outlier"
+	assert plan.hidden_keys_by_amendment == {"amend_chain_a": ("base:article:1",)}
+
+
 def test_preflight_partial_mismatch_excludes_candidate(tmp_path, monkeypatch):
 	conn = _conn()
 	sources = [_source("base"), _source("amend", "2020-01-01", amends=["base"])]
