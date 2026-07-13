@@ -56,6 +56,7 @@ const trace: TraceRecord = {
   retrieval_strategy: { strategy: "default", knobs: {} },
   intent_router: { enabled: false, model: null, decision: null },
   feature_flags: { trace_logging_enabled: true },
+  policy: {},
   abstained: false,
   error: false,
   stages: [],

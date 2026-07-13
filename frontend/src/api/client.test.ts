@@ -8,12 +8,14 @@ import {
   getEvalDiff,
   getEvalRows,
   getEvalRun,
+  getEvalRunLogs,
   getStats,
   getTrace,
   inspectRetrieval,
   listEvalRuns,
   listDocuments,
   listTraces,
+  lookupChunks,
   startSync,
 } from "@/api/client";
 
@@ -270,4 +272,30 @@ test("eval client helpers hit eval endpoints", async () => {
   expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/evals/runs/t");
   expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/evals/runs/t/rows");
   expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/evals/runs/a/diff?baseline=b");
+});
+
+test("lookupChunks posts chunk_ids to /api/chunks/lookup", async () => {
+  const payload = { chunks: [], missing: [] };
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  const result = await lookupChunks(["a"]);
+
+  expect(fetchMock).toHaveBeenCalledWith("/api/chunks/lookup", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chunk_ids: ["a"] }),
+  });
+  expect(result.chunks).toEqual([]);
+});
+
+test("getEvalRunLogs builds level query param", async () => {
+  const payload = { tag: "t", window: null, entries: [], count: 0, truncated: false, holdout_redacted: false };
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  const result = await getEvalRunLogs("t", { level: "info" });
+
+  expect(fetchMock).toHaveBeenCalledWith("/api/evals/runs/t/logs?level=info");
+  expect(result.count).toBe(0);
 });

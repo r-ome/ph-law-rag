@@ -327,6 +327,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evals/runs/{tag}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** App-log slice for the run's time window */
+        get: operations["run_logs_evals_runs__tag__logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chunks/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve chunk IDs to chunks */
+        post: operations["lookup_chunks_chunks_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -337,6 +371,8 @@ export interface components {
             correct?: number | null;
             /** Total */
             total?: number | null;
+            /** Abstain Count */
+            abstain_count?: number | null;
             /** Accuracy */
             accuracy?: number | null;
         };
@@ -420,6 +456,33 @@ export interface components {
             /** Chunks */
             chunks: components["schemas"]["ChunkSummary"][];
         };
+        /** ChunkLookupHit */
+        ChunkLookupHit: {
+            /** Chunk Id */
+            chunk_id: string;
+            /** Doc Id */
+            doc_id: string;
+            /** Chunk Index */
+            chunk_index?: number | null;
+            /** Text */
+            text: string;
+            /** Char Count */
+            char_count?: number | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** ChunkLookupRequest */
+        ChunkLookupRequest: {
+            /** Chunk Ids */
+            chunk_ids?: string[];
+        };
+        /** ChunkLookupResponse */
+        ChunkLookupResponse: {
+            /** Chunks */
+            chunks: components["schemas"]["ChunkLookupHit"][];
+            /** Missing */
+            missing: string[];
+        };
         /** ChunkSummary */
         ChunkSummary: {
             /** Chunk Id */
@@ -487,14 +550,35 @@ export interface components {
         };
         /** ConfigView */
         ConfigView: {
+            /** Profile */
+            profile: string;
+            /** Policy Overrides */
+            policy_overrides: {
+                [key: string]: unknown;
+            };
+            /** Env Ignored */
+            env_ignored: {
+                [key: string]: unknown;
+            };
             /** Embedding Backend */
             embedding_backend: string;
             /** Embedding Model */
             embedding_model?: string | null;
             /** Embedding Dim */
             embedding_dim?: number | null;
+            /** Embedding Query Instruction */
+            embedding_query_instruction?: string | null;
             /** Llm Model */
             llm_model: string;
+            /** Strong Model */
+            strong_model?: string | null;
+            /**
+             * Escalate Intents
+             * @default []
+             */
+            escalate_intents: string[];
+            /** Escalate On Partial Evidence */
+            escalate_on_partial_evidence: boolean;
             /** Generator Backend */
             generator_backend: string;
             /** Reranker Backend */
@@ -511,6 +595,12 @@ export interface components {
             chunk_overlap: number;
             /** Min Chunks For Answer */
             min_chunks_for_answer: number;
+            /** Evidence Gate */
+            evidence_gate: string;
+            /** Evidence Judge Model */
+            evidence_judge_model: string;
+            /** Corrective Retrieval Enabled */
+            corrective_retrieval_enabled: boolean;
             /** Max Conversation Turns */
             max_conversation_turns: number;
             /** Router Enabled */
@@ -527,18 +617,6 @@ export interface components {
             later_enacted_preference_enabled: boolean;
             /** Aws Region */
             aws_region: string;
-            /** Profile */
-            profile: string;
-            /** Evidence Gate */
-            evidence_gate: string;
-            /** Evidence Judge Model */
-            evidence_judge_model: string;
-            /** Corrective Retrieval Enabled */
-            corrective_retrieval_enabled: boolean;
-            /** Strong Model */
-            strong_model?: string | null;
-            /** Escalate On Partial Evidence */
-            escalate_on_partial_evidence: boolean;
         };
         /** ConversationDetail */
         ConversationDetail: {
@@ -700,6 +778,21 @@ export interface components {
              */
             tags: string[];
         };
+        /** EvalCorrective */
+        EvalCorrective: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Fired */
+            fired?: boolean | null;
+            /** Added Chunks */
+            added_chunks?: number | null;
+            /** Baseline Selected Count */
+            baseline_selected_count?: number | null;
+            /** Post Selected Count */
+            post_selected_count?: number | null;
+            /** Max Added */
+            max_added?: number | null;
+        };
         /** EvalDiff */
         EvalDiff: {
             /** Candidate Tag */
@@ -715,6 +808,36 @@ export interface components {
             by_category: {
                 [key: string]: components["schemas"]["CategoryDiff"];
             };
+        };
+        /** EvalEvidence */
+        EvalEvidence: {
+            /** Verdict */
+            verdict?: string | null;
+            /** Method */
+            method?: string | null;
+            /**
+             * Missing Facets
+             * @default []
+             */
+            missing_facets: string[];
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** EvalLogWindow */
+        EvalLogWindow: {
+            /** Started At */
+            started_at?: string | null;
+            /** Completed At */
+            completed_at?: string | null;
+        };
+        /** EvalModelChoice */
+        EvalModelChoice: {
+            /** Model */
+            model?: string | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** EvalRow */
         EvalRow: {
@@ -746,6 +869,51 @@ export interface components {
             context_precision?: number | null;
             /** Context Recall */
             context_recall?: number | null;
+            /** Split */
+            split?: string | null;
+            /** Topic */
+            topic?: string | null;
+            /** Facet */
+            facet?: string | null;
+            /** Profile */
+            profile?: string | null;
+            /** Generator Model */
+            generator_model?: string | null;
+            /** Elapsed S */
+            elapsed_s?: number | null;
+            /**
+             * Expected Sources
+             * @default []
+             */
+            expected_sources: string[];
+            /**
+             * Retrieved Sources
+             * @default []
+             */
+            retrieved_sources: string[];
+            /**
+             * Cited Sources
+             * @default []
+             */
+            cited_sources: string[];
+            /**
+             * Expected Missing
+             * @default []
+             */
+            expected_missing: string[];
+            /**
+             * Selected Chunk Ids
+             * @default []
+             */
+            selected_chunk_ids: string[];
+            evidence?: components["schemas"]["EvalEvidence"] | null;
+            corrective_retrieval?: components["schemas"]["EvalCorrective"] | null;
+            model_choice?: components["schemas"]["EvalModelChoice"] | null;
+            /**
+             * Debug Stages
+             * @default []
+             */
+            debug_stages: components["schemas"]["EvalStage"][];
         };
         /** EvalRowsResponse */
         EvalRowsResponse: {
@@ -757,6 +925,11 @@ export interface components {
             scored_count: number;
             /** Rows */
             rows: components["schemas"]["EvalRow"][];
+            /**
+             * Holdout Redacted
+             * @default false
+             */
+            holdout_redacted: boolean;
         };
         /** EvalRunDetail */
         EvalRunDetail: {
@@ -785,6 +958,26 @@ export interface components {
             /** Runs */
             runs: components["schemas"]["EvalRunSummary"][];
         };
+        /** EvalRunLogsResponse */
+        EvalRunLogsResponse: {
+            /** Tag */
+            tag: string;
+            window?: components["schemas"]["EvalLogWindow"] | null;
+            /** Entries */
+            entries: components["schemas"]["LogEntry"][];
+            /** Count */
+            count: number;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /**
+             * Holdout Redacted
+             * @default false
+             */
+            holdout_redacted: boolean;
+        };
         /** EvalRunSummary */
         EvalRunSummary: {
             /** Tag */
@@ -799,6 +992,13 @@ export interface components {
             questions?: number | null;
             /** Scored */
             scored?: number | null;
+            /**
+             * Holdout
+             * @default false
+             */
+            holdout: boolean;
+            /** Git Sha */
+            git_sha?: string | null;
             /** Abstention Accuracy */
             abstention_accuracy?: number | null;
             /** Faithfulness */
@@ -809,6 +1009,23 @@ export interface components {
             context_precision?: number | null;
             /** Context Recall */
             context_recall?: number | null;
+        };
+        /** EvalStage */
+        EvalStage: {
+            /** Name */
+            name: string;
+            /** In N */
+            in_n?: number | null;
+            /** Out N */
+            out_n?: number | null;
+            /** Ms */
+            ms?: number | null;
+            /** Fired */
+            fired?: boolean | null;
+            /** Model */
+            model?: string | null;
+            /** Prompt Length */
+            prompt_length?: number | null;
         };
         /** EvalSummary */
         EvalSummary: {
@@ -1041,6 +1258,15 @@ export interface components {
             feature_flags: {
                 [key: string]: unknown;
             };
+            /** Profile */
+            profile?: string | null;
+            /**
+             * Policy
+             * @default {}
+             */
+            policy: {
+                [key: string]: unknown;
+            };
             /**
              * Abstained
              * @default false
@@ -1062,6 +1288,18 @@ export interface components {
             prompt_length?: number | null;
             /** Generator Model */
             generator_model?: string | null;
+            /** Model Choice */
+            model_choice?: {
+                [key: string]: unknown;
+            } | null;
+            /** Evidence */
+            evidence?: {
+                [key: string]: unknown;
+            } | null;
+            /** Corrective Retrieval */
+            corrective_retrieval?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TraceSummary */
         TraceSummary: {
@@ -1630,6 +1868,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalDiff"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_logs_evals_runs__tag__logs_get: {
+        parameters: {
+            query?: {
+                level?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                tag: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalRunLogsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_chunks_chunks_lookup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChunkLookupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkLookupResponse"];
                 };
             };
             /** @description Validation Error */

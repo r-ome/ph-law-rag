@@ -1,6 +1,6 @@
 import json
 
-from app.eval_store import diff_runs, get_rows, get_run, list_runs
+from app.eval_store import diff_runs, get_rows, get_run, get_run_logs, list_runs
 from app.api.routes_evals import run_rows as api_run_rows
 from app.evals import artifacts
 from app.evals.diff_report import build_diff_report
@@ -230,3 +230,104 @@ def test_holdout_aggregate_reads_are_logged_only_on_single_run_and_compare(tmp_p
     assert entries[0]["eval_manifest_sha256"]
     assert "git_sha" in entries[0]
     assert entries[1]["tags"] == [holdout, baseline]
+
+
+def test_debug_passthrough_modern_and_legacy_rows(tmp_path, monkeypatch):
+    results_dir = tmp_path / "eval_results"
+    monkeypatch.setattr(artifacts.settings, "eval_results_dir", str(results_dir))
+    tag = "modern_eval_20260711_010000"
+    run_dir = _run_dir(results_dir, "2026-07-11", tag)
+    _manifest(results_dir, [{"tag": tag, "date": "2026-07-11"}])
+    _write_jsonl(
+        run_dir / "run.jsonl",
+        [
+            {
+                "eval_id": "eval_001",
+                "question": "q1",
+                "answer": "a1",
+                "ground_truth": "g1",
+                "category": "civil",
+                "contexts": ["ctx"],
+                "abstained": False,
+                "split": "regression",
+                "topic": "civil_code",
+                "facet": "obligations",
+                "profile": "default",
+                "generator_model": "haiku",
+                "elapsed_s": 1.5,
+                "expected_sources": ["a", "b"],
+                "retrieved_sources": ["b", "b", "c"],
+                "cited_sources": ["b"],
+                "selected_chunk_ids": ["chunk-1", "chunk-2"],
+                "evidence": {"verdict": "sufficient", "method": "heuristic", "missing_facets": []},
+                "corrective_retrieval": {"enabled": True, "fired": False},
+                "model_choice": {"model": "haiku", "reason": "default"},
+                "debug_stages": [{"name": "hybrid_retriever", "out_n": 10, "ms": 12.3}],
+            },
+            {
+                "eval_id": "eval_002",
+                "question": "q2",
+                "answer": "a2",
+                "ground_truth": "g2",
+                "category": "civil",
+                "contexts": [],
+                "abstained": False,
+            },
+        ],
+    )
+
+    result = get_rows(tag)
+
+    assert result is not None
+    modern, legacy = result["rows"]
+    assert modern["debug_stages"] == [{"name": "hybrid_retriever", "out_n": 10, "ms": 12.3}]
+    assert modern["evidence"] == {"verdict": "sufficient", "method": "heuristic", "missing_facets": []}
+    assert modern["expected_missing"] == ["a"]
+
+    assert legacy["evidence"] is None
+    assert legacy["debug_stages"] == []
+    assert legacy["expected_sources"] == []
+    assert legacy["retrieved_sources"] == []
+    assert legacy["selected_chunk_ids"] == []
+    assert legacy["expected_missing"] == []
+
+
+def test_expected_missing_derivation(tmp_path, monkeypatch):
+    results_dir = tmp_path / "eval_results"
+    monkeypatch.setattr(artifacts.settings, "eval_results_dir", str(results_dir))
+    tag = "missing_eval_20260711_010000"
+    run_dir = _run_dir(results_dir, "2026-07-11", tag)
+    _manifest(results_dir, [{"tag": tag, "date": "2026-07-11"}])
+    _write_jsonl(
+        run_dir / "run.jsonl",
+        [{
+            "eval_id": "eval_001",
+            "question": "q1",
+            "answer": "a1",
+            "expected_sources": ["a", "b"],
+            "retrieved_sources": ["b", "b", "c"],
+        }],
+    )
+
+    result = get_rows(tag)
+
+    assert result["rows"][0]["expected_missing"] == ["a"]
+
+
+def test_holdout_logs_redaction(tmp_path, monkeypatch):
+    results_dir = tmp_path / "eval_results"
+    monkeypatch.setattr(artifacts.settings, "eval_results_dir", str(results_dir))
+    tag = "holdout_20260711_010000"
+    run_dir = _run_dir(results_dir, "2026-07-11", tag)
+    _manifest(results_dir, [{"tag": tag, "date": "2026-07-11"}])
+    _write_json(run_dir / "meta.json", {
+        "tag": tag, "holdout": True,
+        "started_at": "2026-07-11T01:00:00+08:00", "completed_at": "2026-07-11T02:00:00+08:00",
+    })
+
+    result = get_run_logs(tag)
+
+    assert result == {
+        "tag": tag, "window": None, "entries": [], "count": 0,
+        "truncated": False, "holdout_redacted": True,
+    }

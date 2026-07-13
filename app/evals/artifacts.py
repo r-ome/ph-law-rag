@@ -190,6 +190,8 @@ def manifest_row(tag: str, meta: dict[str, Any] | None = None, summary: dict[str
         "label": meta.get("label", ""),
         "questions": meta.get("question_count") or _count_jsonl(run_path),
         "scored": meta.get("scored_count") if meta.get("scored_count") is not None else _count_scored(scored_path),
+        "holdout": bool(meta.get("holdout")),
+        "git_sha": meta.get("git_sha"),
         "abstention_accuracy": abstention.get("accuracy"),
         "faithfulness": overall.get("faithfulness"),
         "answer_relevancy": overall.get("answer_relevancy"),

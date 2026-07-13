@@ -62,6 +62,8 @@ def test_save_scored_updates_bundled_meta_manifest_and_latest(tmp_path, monkeypa
             "context_recall": 0.25,
             "date": "2026-07-06",
             "faithfulness": 1.0,
+            "git_sha": None,
+            "holdout": False,
             "label": "label",
             "layout": "bundled",
             "model": "model",

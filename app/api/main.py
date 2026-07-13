@@ -14,6 +14,7 @@ from app.api.routes_retrieval import router as retrieval_router
 from app.api.routes_traces import router as traces_router
 from app.api.routes_logs import router as logs_router
 from app.api.routes_evals import router as evals_router
+from app.api.routes_chunks import router as chunks_router
 
 app = FastAPI(title="PH Law RAG API", version="0.1.0")
 
@@ -28,3 +29,4 @@ app.include_router(retrieval_router)
 app.include_router(traces_router)
 app.include_router(logs_router)
 app.include_router(evals_router)
+app.include_router(chunks_router)

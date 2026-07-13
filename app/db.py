@@ -261,3 +261,22 @@ def corpus_counts() -> dict:
         }
     finally:
         conn.close()
+
+def get_chunks_by_ids(chunk_ids: list[str]) -> list[dict]:
+    if not chunk_ids:
+        return []
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" for _ in chunk_ids)
+        rows = conn.execute(
+            f"""
+                SELECT c.chunk_id, c.doc_id, c.chunk_index, c.text, c.char_count, d.title
+                FROM chunks c
+                LEFT JOIN documents d ON d.doc_id = c.doc_id
+                WHERE c.chunk_id IN ({placeholders})
+            """,
+            chunk_ids,
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()

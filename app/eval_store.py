@@ -118,6 +118,35 @@ def _read_jsonl(path: Path | None) -> list[dict]:
     return out
 
 
+def _row_debug(r: dict) -> dict:
+    """Debug/pipeline fields passthrough — every field optional (legacy runs lack them)."""
+    expected = r.get("expected_sources") or []
+    retrieved = r.get("retrieved_sources") or []
+    retrieved_set = set(retrieved)
+
+    def _dict_or_none(key: str) -> dict | None:
+        v = r.get(key)
+        return v if isinstance(v, dict) else None
+
+    return {
+        "split": r.get("split"),
+        "topic": r.get("topic"),
+        "facet": r.get("facet"),
+        "profile": r.get("profile"),
+        "generator_model": r.get("generator_model"),
+        "elapsed_s": r.get("elapsed_s"),
+        "expected_sources": expected,
+        "retrieved_sources": retrieved,
+        "cited_sources": r.get("cited_sources") or [],
+        "expected_missing": [s for s in expected if s not in retrieved_set],
+        "selected_chunk_ids": r.get("selected_chunk_ids") or [],
+        "evidence": _dict_or_none("evidence"),
+        "corrective_retrieval": _dict_or_none("corrective_retrieval"),
+        "model_choice": _dict_or_none("model_choice"),
+        "debug_stages": [s for s in (r.get("debug_stages") or []) if isinstance(s, dict)],
+    }
+
+
 def get_rows(tag: str) -> dict | None:
     """Join of run.jsonl (all attempted) + scored.json metrics. Manifest-gated."""
     if tag not in _manifest_tags():
@@ -159,6 +188,7 @@ def get_rows(tag: str) -> dict | None:
             "answer_relevancy": (metrics or {}).get("answer_relevancy"),
             "context_precision": (metrics or {}).get("context_precision"),
             "context_recall": (metrics or {}).get("context_recall"),
+            **_row_debug(r),
         })
     return {"tag": tag, "row_count": len(rows), "scored_count": scored_count, "rows": rows, "holdout_redacted": False}
 
@@ -217,4 +247,33 @@ def diff_runs(candidate: str, baseline: str) -> dict | None:
         "overall": {"candidate": cand["overall"], "baseline": base["overall"], "delta": overall_delta},
         "abstention": abst,
         "by_category": by_cat,
+    }
+
+
+def get_run_logs(tag: str, level: str | None = None, limit: int = 2000) -> dict | None:
+    """App-log slice for the run's [started_at, completed_at] window. Manifest-gated."""
+    if tag not in _manifest_tags():
+        return None
+    empty = {"tag": tag, "window": None, "entries": [], "count": 0,
+             "truncated": False, "holdout_redacted": False}
+    if _is_holdout(tag):
+        return {**empty, "holdout_redacted": True}
+    meta = artifacts.load_meta(tag) or {}
+    started = meta.get("started_at")
+    completed = meta.get("completed_at")
+    if not started:
+        return empty  # legacy run without meta.json — no window to query
+    from datetime import datetime, timezone
+
+    until = completed or datetime.now(timezone.utc).isoformat()
+    from app.log_reader import read_logs_window
+
+    entries, truncated = read_logs_window(since=started, until=until, level=level, limit=limit)
+    return {
+        "tag": tag,
+        "window": {"started_at": started, "completed_at": completed},
+        "entries": entries,
+        "count": len(entries),
+        "truncated": truncated,
+        "holdout_redacted": False,
     }

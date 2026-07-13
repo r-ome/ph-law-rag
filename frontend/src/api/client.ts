@@ -42,6 +42,10 @@ type EvalRowsResponse =
   paths["/evals/runs/{tag}/rows"]["get"]["responses"]["200"]["content"]["application/json"];
 type EvalDiff =
   paths["/evals/runs/{tag}/diff"]["get"]["responses"]["200"]["content"]["application/json"];
+type ChunkLookupResponse =
+  paths["/chunks/lookup"]["post"]["responses"]["200"]["content"]["application/json"];
+type EvalRunLogsResponse =
+  paths["/evals/runs/{tag}/logs"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type DocumentSummary = DocumentListResponse["documents"][number];
 export type ChatSource = AskResponse["sources"][number];
@@ -54,6 +58,8 @@ export type ChunkTrace = TraceRecord["retrieved_chunks"][number];
 export type EvalRunSummary = EvalRunListResponse["runs"][number];
 export type EvalRow = EvalRowsResponse["rows"][number];
 export type { EvalRunDetail, EvalDiff };
+export type ChunkLookupHit = ChunkLookupResponse["chunks"][number];
+export type { EvalRunLogsResponse };
 
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
@@ -154,5 +160,22 @@ export function getEvalRows(tag: string): Promise<EvalRowsResponse> {
 export function getEvalDiff(tag: string, baseline: string): Promise<EvalDiff> {
   return apiGet<EvalDiff>(
     `/evals/runs/${encodeURIComponent(tag)}/diff?baseline=${encodeURIComponent(baseline)}`,
+  );
+}
+
+export function lookupChunks(chunkIds: string[]): Promise<ChunkLookupResponse> {
+  return apiPost<ChunkLookupResponse>("/chunks/lookup", { chunk_ids: chunkIds });
+}
+
+export function getEvalRunLogs(
+  tag: string,
+  params?: { level?: string; limit?: number },
+): Promise<EvalRunLogsResponse> {
+  const q = new URLSearchParams();
+  if (params?.level) q.set("level", params.level);
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiGet<EvalRunLogsResponse>(
+    `/evals/runs/${encodeURIComponent(tag)}/logs${qs ? `?${qs}` : ""}`,
   );
 }
