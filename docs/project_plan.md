@@ -8,6 +8,285 @@ This is the project reference document for `ph-law-rag`.
 
 See also: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-devlog.md`
 
+## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
+
+The retrieval experiment now has an explicit `original_only` versus
+`original_plus_rewrite` runtime arm, exposed only by
+`raglab eval-retrieve --legal-query-separation/--original-only`. Public
+`run_answer()` does not accept or pass the seam, so serving remains structurally
+original-only. Rewrite-enabled capture holds the Checkpoint 3 process lock from
+before eval-artifact creation through publication and releases it in `finally`;
+holdout rejection happens before cache, artifact, lock, rewriter, or model
+access. Resume rejects arm or complete retrieval-identity drift.
+
+After history rewriting, intent classification, and retrieval planning, an
+accepted strict legal rewrite is forwarded through every strategy. Decomposition
+and subquery packaging are rejected before rewrite/retrieval in this arm. Dense
+and sparse retrieval run independently for the original and legal-rewrite lanes
+with identical knobs, followed by within-lane RRF and deterministic equal-weight
+cross-lane RRF with original-lane tie precedence and `chunk_id` deduplication.
+The combined pool is reranked exactly once against the original production query;
+existing cutoffs, expansion, selection, evidence, corrective behavior, and
+fallback metadata remain unchanged.
+
+Schema 1.1 rows retain lane diagnostics, add provenance only to genuinely
+combined results, publish exactly one canonical `fused/combined` pre-rerank pool,
+and freeze the rewrite decision plus per-row semantic-input hashes and the sealed
+`ordered_legal_query_separation_semantic_input_hash`. Latency and cache status
+are excluded from semantic identity. Generation replay and original-only capture
+remain isolated from the legal rewriter and Anthropic. The schema identity now
+mirrors the exact Checkpoint 3 prompt contract without importing the rewriter;
+the Checkpoint 3 parser/cache contract itself is unchanged.
+
+Mocked verification passed: the focused Checkpoint 4 selection reported 24
+passing tests, and the full unit suite reported 315 passing tests with the same
+eight existing RAGAS import deprecation warnings. No smoke, paid experiment,
+live retrieval, generation, external/model call, or holdout access was run. The
+mechanism remains an offline CLI experiment and has not graduated to serving.
+
+### Post-Checkpoint-4 hardening follow-ups (2026-07-15)
+
+The four Phase 2 checkpoints remain accepted and closed. Schema 1.1
+`eval-retrieve` now rejects resolved subquery packaging for both query-separation
+arms after the holdout-first gate and before eval-artifact, lock, rewriter,
+retrieval, or model access. Public `run_answer()` is unchanged, so serving may
+still use its existing packaging behavior; original-only capture remains
+isolated from the legal rewriter and Anthropic. The rewrite-arm pipeline/context
+guards remain as defense in depth.
+
+The strict parser now permits an existing identifier rendered as
+`Republic Act No. 9262` or `RA No. 9262` without treating `No.` as answer prose.
+Standalone suffixes beginning `No, ...` or `Yes, ...` remain rejected, and no
+other parser, cache, pending-marker, or locking contract changed. Mocked focused
+verification reported 52 passed; the full unit suite reported 321 passed with
+the same eight existing RAGAS import deprecation warnings. No smoke, experiment,
+external/model call, retrieval, or holdout access ran. Scoped whitespace checks
+reported no diagnostics.
+
+#### Five-row Phase 2 smoke result (2026-07-15)
+
+The authorized non-holdout five-row smoke sealed original-only, first-rewrite,
+cached-rewrite, and comparison artifacts. The control made no rewrite call; the
+first rewrite pass wrote five cache misses with no pending residue; and the
+cached pass returned five hits. All five Haiku outputs were rejected as
+`invalid_output`, so fallback pool/context hashes matched control for every row,
+each row reranked once against the original query, and the comparison recorded
+zero pool or context changes. No generation or holdout artifact was created.
+
+This passes the smoke's isolation, cache, fallback-parity, rerank, sealing, and
+artifact-scope gates, but zero accepted rewrites means the two-lane behavior has
+not received live quality evidence. The 131-row experiment remains unrun pending
+review; no cache reset, retry, or contract change is implied.
+
+#### One-call v1 parser diagnostic (2026-07-15)
+
+One authorized standalone Haiku call used a predeclared non-holdout query and
+the v1 prompt/request parameters, with transport retries disabled. It bypassed
+the pipeline, retrieval, rewrite cache, and sealed artifacts; raw text remained
+only in a mode-0600 `/private/tmp` scratch file. The first failed parser branch
+was `shape.confidence_not_string`: Haiku emitted numeric JSON confidence rather
+than the required `"high" | "low"` string. Production parsing therefore
+returned `invalid`. No retry or implementation/contract change followed. This
+single response diagnoses one concrete v1 prompt-compliance gap but cannot
+identify the failure branch of the five hash-only smoke outputs.
+
+#### v2 prompt/prefill hardening and smoke (2026-07-15)
+
+The rewrite prompt now pins the compact JSON schema, exact field types,
+`citations=[]`, and string-only `"high" | "low"` confidence. The final Anthropic
+message pre-seeds `{"legal_query":"`; parser input is the pinned prefill plus
+the returned continuation. Both the prefill and reconstruction rule are included
+in the prompt identity mirrored by schema 1.1 without importing the rewriter in
+the original-only arm. The v2 prompt hash is
+`0737db82638fa3624b591cfbf006a372dc74e147dcf0594683c7ae3c902ee598`,
+so retained v1 fallbacks cannot hit v2 keys. The strict parser, cache/pending/
+locking contract, fallback behavior, serving path, and general generation seam
+are unchanged; `raw_output_hash` remains the hash of the API continuation.
+
+Mocked verification passed 55 focused tests and 324 full unit tests with the same
+eight RAGAS deprecation warnings. The newly tagged five-row control made no
+rewrite call; the v2 rewrite wrote five misses with no pending residue; and the
+cached repeat returned five hits with no new calls. `eval_001` and `eval_034`
+were accepted and changed both pool and selected context. `eval_053`, `eval_058`,
+and `eval_124` fell back at `literal_violation` with byte-exact control parity.
+Every row had one original-query rerank, all bundles sealed, comparison reported
+2/5 pool and 2/5 context changes exactly on accepted rows, and no generation or
+holdout artifact was created. The 131-row experiment remains unrun pending a
+separate review decision.
+
+#### Predeclared v3 prompt and gate-7 amendment (2026-07-15)
+
+Before any v3 smoke or full result, the next prompt version is limited to one
+additional instruction: never emit a statute number, act number, article number,
+section number, or case/docket number; describe the doctrine or legal concept in
+words. The parser, prefill/reconstruction, cache/locking, serving, and retrieval
+contracts remain unchanged, while the prompt identity rotates and retains
+isolated v1/v2 records.
+
+Gate 7 now separates mechanism reliability from safe non-activation. Across all
+131 durable rewrite decisions, operational fallbacks (`timeout`, `llm_error`,
+`invalid_output`, `interrupted_after_request`) must be at most 6, regardless of
+cache status. Separately, at least 24 of the 31 pooled Paraphrase/Ambiguous rows
+must be accepted, valid, high-confidence rewrites. `literal_violation` and
+`low_confidence` are reported safety outcomes rather than operational failures,
+but count against the target-slice acceptance floor. OOS safety remains governed
+by the existing abstention/context gate. These thresholds are frozen before the
+v3 smoke and may not be changed after the 131-row result.
+
+The v3 prompt-only amendment is implemented with final prompt hash
+`a4ce4cd52e55e5ca23d532106bb5ce0532cb0bd4631cbda52ffc16120dcc2a91`;
+real v1/v2 cache keys are isolated. Focused tests passed 56 and the full unit
+suite passed 325 with the same eight warnings. A fresh five-row control made no
+rewrite call, the rewrite pass wrote five v3 misses with no pending residue, and
+the cached repeat returned five hits with no new call. The Paraphrase and
+Ambiguous smoke rows (`eval_034`, `eval_053`) were both accepted and changed pool
+and context. The Factual, OOS, and Synthesis-control rows fell back at
+`literal_violation` with byte-exact control parity. Thus v3 produced 2/2 target-
+slice smoke activation, zero operational failures, 2/5 pool and context changes,
+one original-query rerank per row, sealed bundles, and no generation or holdout
+artifact. At that checkpoint, the 131-row experiment remained unrun pending
+separate authorization; its subsequently authorized result follows.
+
+#### Full 131-row Phase 2 experiment result (2026-07-15)
+
+The authorized matched regression/dev control and v3 rewrite captures and their
+comparator sealed under `phase2-original-minilm`,
+`phase2-legal-rewrite-minilm`, and
+`phase2-legal-rewrite-minilm-comparison`. They used the eval profile,
+Qwen3-Embedding at 1024 dimensions, collection `ph_law_qwen06`, MiniLM,
+decomposition/packaging disabled, and prompt identity v3 /
+`a4ce4cd52e55e5ca23d532106bb5ce0532cb0bd4631cbda52ffc16120dcc2a91`.
+Before the paid run, the direct Anthropic client was pinned to `max_retries=0`
+so one cache miss cannot make hidden SDK transport retries; the focused suite
+remained 56 passing tests and the full unit suite 325 with the same eight RAGAS
+deprecation warnings.
+
+Both arms contain the same 131 non-holdout rows in the same order. The control
+made no rewrite access and left the cache unchanged. The rewrite arm produced
+73 accepted rows, 47 `literal_violation` fallbacks, 11 `low_confidence`
+fallbacks, and zero operational fallbacks. Its five smoke keys were cache hits
+and 126 new keys were `miss_written`, for exactly 126 paid requests; the durable
+cache ended at v1=5, v2=5, v3=131 with no pending marker. All fallback pools and
+contexts are byte-exact with control, accepted rows contain both retrieval lanes
+and the combined pool, every row has one original-query rerank, and the largest
+rerank input was 60 against the bound of 80. No generation or holdout artifact
+was created.
+
+The frozen gates do not graduate the mechanism. Gates 1, 2, 7, and 13 fail:
+pooled Paraphrase/Ambiguous provision Hit@8 remains 25/31 rather than improving;
+pooled leaf Hit@8 falls 6/11 to 5/11 and leaf MRR `.3212→.2909`; target-slice
+activation is 21/31 rather than 24/31 despite zero operational failures; and
+manual review finds 19 broadened, altered, or invented legal renderings. Gates
+3–6 and 8–12 pass. Factual primary Hit@8 is unchanged at 60/70, Synthesis
+improves 16/18 to 17/18 through `eval_050`, OOS hard abstention remains 0/12 and
+mean selected count rises 1.5625%, retrieval p95 rises only 185.54 ms, and all
+schema/provenance/corpus/index identities match. Of 73 hash-changed contexts,
+54 retain byte-identical selected chunk text/order and 19 change content;
+manual effects are 3 helpful, 10 harmful, and 60 neutral. The complete metrics,
+identity hashes, gate evidence, and 73-row review are in
+`docs/retrieval_strategy_review.md`.
+
+Legal-query separation therefore remains an offline, non-graduated experiment.
+Serving stays original-only, and no generation replay, rollback implementation,
+or further prompt version is implied.
+
+## Phase 2 Checkpoint 3: Strict Legal Rewriter and Paid-Call Cache (implemented 2026-07-15)
+
+The legal-query rewrite experiment now has standalone infrastructure without any
+production retrieval integration. `app.retriever.legal_query_rewriter` enforces
+the versioned raw-JSON contract, exact original-query and delimiter preservation,
+empty citations, high-confidence activation, bounded single-line output, no new
+legal numeric identifiers, and answer-prose/alternative rejection. Every invalid,
+low-confidence, timeout, or API result produces an original-only fallback.
+
+Rewrite requests use a lazy direct Anthropic seam and a versioned file cache under
+`data/eval_results/legal_rewrite_cache/v1/`. A nonblocking process-wide `flock`
+can cover the complete future rewrite-enabled capture, while per-key `O_EXCL`
+pending markers, atomic replacement, and file/directory `fsync` prevent duplicate
+paid calls across interruption and resume. Accepted and fallback decisions are
+cached, cached records are validated before use, and pending or malformed-final
+residue becomes a durable no-call fallback. Raw model output is never persisted;
+only its SHA-256 hash is recorded.
+
+The three rewrite settings are infrastructure defaults only. No enable flag,
+serving-path import, two-lane retrieval, generation change, database/API/frontend
+change, holdout access, or live/paid model execution is part of this checkpoint.
+They are classified only in `INFRA_FIELDS`, not `BEHAVIOR_FIELDS`, so named
+profiles cannot pull them into answer-policy resolution.
+Checkpoint 4 now supplies the CLI-only arm wiring and holds the capture lock
+before eval artifact creation; serving remains original-only.
+
+## Phase 2 Checkpoint 2: Frozen Retrieval Schema and Comparator (implemented 2026-07-15)
+
+New retrieval-only bundles use frozen-context schema 1.1. Each original-only row
+retains its dense/sparse/original-fused lane diagnostics and adds one ordered
+`fused/combined` snapshot with `pool_role=pre_rerank_pool` immediately before
+reranking. Only that canonical snapshot feeds the aggregate fused metrics,
+candidate/stage counts, and score-free pre-rerank pool hash; lane metrics remain
+available separately by query variant. Validation dispatches pool semantics by
+schema minor, accepts only 1.0 and 1.1, and preserves sealed 1.0 validation and
+generation replay.
+
+Schema 1.1 retrieval provenance separates common retrieval identity
+(`shared_values`/`shared_hash`) from the complete versioned query-separation
+contract and its `full_hash`. The current capture arm remains `original_only`;
+the identity records the approved future rewrite contract without enabling a
+rewriter or two-lane retrieval. Resume compares the complete adapted identity,
+while schema 1.0 metadata adapts its former retrieval hash as the shared identity
+with an implicit original-only arm.
+
+`raglab eval-retrieval-compare BASELINE_TAG CANDIDATE_TAG --tag REPORT_TAG`
+validates two sealed non-holdout bundles before creating output, enforces matched
+dataset/target/corpus/index/embedding/reranker/cutoff/selection/evidence identity,
+requires original-only versus original-plus-rewrite arms, and atomically publishes
+a dated per-row pool/context-change report. The comparator imports no retrieval,
+generation, embedding, reranker, Anthropic, or Haiku implementation. This
+checkpoint establishes experiment plumbing only; legal rewriting, two-lane
+retrieval, experiment execution, and graduation remain pending.
+
+## Phase 1: Reproducible Retrieval Harness (implemented 2026-07-14)
+
+Retrieval preparation is internally separable from generation while the public
+`answer()` contract remains unchanged. `app.pipeline.runner.prepare_answer_state`
+executes the serving preparation order and `app.pipeline.frozen_generation` is a
+generation-only seam used by both normal answers and replay. Retrieval-only
+bundles freeze selected results, candidate snapshots, evidence/corrective state,
+model routing, and prompt identities under
+`data/eval_results/runs/YYYY-MM-DD/<tag>/`; replay reads only a sealed bundle and
+does not query retrieval services.
+
+`raglab eval-retrieve` accepts only regression/dev rows and `raglab eval-generate`
+creates a separate normal eval bundle. Both use append-and-fsync JSONL rows and
+atomic publication. Reranker/embedding release hooks are best-effort; process
+separation remains the hard memory boundary. Legacy `raglab eval` and artifact
+readers remain available. The holdout remains sealed and is not captured or
+replayed by Phase 1 commands.
+
+Retrieval bundles contain `frozen_contexts.jsonl`, `retrieval_trace.jsonl`,
+`retrieval_summary.json`, `retrieval_state.json`, and `meta.json`. Schema 1.0
+records have canonical per-row hashes; the sealed metadata records ordered row,
+pre-rerank-pool, and selected-context hashes plus dataset, target, resolved
+retrieval/generation configuration, code, SQLite corpus, BM25, and combined index
+identities. Partial JSONL is resumable only when its ordered prefix and provenance
+still match; a truncated final fragment is removed, while a valid-but-tampered row
+is rejected. Retrieval capture fingerprints SQLite, BM25, and Qdrant both before
+and after the row loop; any changed identity or failed end fingerprint leaves the
+partial bundle unsealed with a failed state. Replay re-renders context and prompts
+from the verbatim frozen metadata, validates all recorded hashes, and passes those
+same validated rendered inputs to the generator.
+
+Generation bundles record parity mode and the source frozen-prompt hashes on each
+row. Candidate snapshots are stored once at the frozen-record top level and are
+rejoined only while deriving the Phase 0-compatible retrieval trace and summary.
+
+MiniLM/Qwen/Bedrock reranker comparisons graduate only when their retrieval
+bundles have identical dataset, target, corpus, index, and
+`ordered_pre_rerank_pool_hash` identities. Retrieval quality/latency is compared
+from the derived Phase 0-compatible summaries; generation comparisons replay the
+same sealed retrieval bundle. A best-effort unload warning is recorded but is not
+itself a failed experiment because the CLI process boundary is the hard memory
+release guarantee.
+
 ---
 
 ## Goal
@@ -123,15 +402,25 @@ The system has 5 parts:
 ### 4. Eval Pipeline
 
 - Load eval questions from `data/eval_dataset.jsonl`
+- Load canonical non-holdout retrieval targets from
+  `data/eval_retrieval_targets.jsonl`; the hash-locked question dataset remains
+  unchanged and the release holdout has no target sidecar.
 - Run each question through the full ask pipeline
+- Capture opt-in dense, sparse, fused, fully scored rerank, expanded, selected,
+  and corrective candidate snapshots without changing serving defaults or
+  selected context.
 - Score results via RAGAS metrics: faithfulness, answer relevance, context precision, context recall
 - Save eval artifacts under `data/eval_results/`: new runs use
   `runs/YYYY-MM-DD/<tag>/` with `run.jsonl`, `meta.json`, `summary.json`,
-  and `scored.json`; legacy flat files remain readable through the artifact
-  resolver
+  `scored.json`, `retrieval_trace.jsonl`, and `retrieval_summary.json`; legacy
+  flat files remain readable through the artifact resolver. Candidate rows are
+  appended per eval row with a completion sentinel so truncated rows are
+  excluded from aggregate retrieval metrics.
 - Maintain `manifest.jsonl` and `latest.json` pointers for listing and
   comparing runs without opening every artifact bundle
-- Print category-level report
+- Print category-level RAGAS, retrieval, and complete abstention counts. Holdout
+  release runs persist aggregate operational retrieval counts and latency only;
+  they never write target-quality or category retrieval metrics.
 
 ### 5. Interface Layer
 
@@ -343,6 +632,9 @@ Build:
 - Observability: every real `answer()` call persists a local JSONL retrieval trace
   when `trace_logging_enabled=True`, independent of whether debug data is returned
   to the caller. Internal synthetic calls opt out with `trace=False`.
+- Eval-only candidate capture is an internal `run_answer()` option. It forces a
+  collector even when debug and operational trace logging are disabled, while
+  the public `answer()` wrapper and normal serving behavior remain unchanged.
 
 Definition of done:
 
