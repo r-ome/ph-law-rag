@@ -111,9 +111,10 @@ def test_default_strategy_passes_resolved_knobs(monkeypatch):
     expected = _knobs(dense_top_k=12)
     monkeypatch.setitem(strategy._PRESET_KNOBS, "default", expected)
 
-    def fake_select_context(question, knobs=None):
+    def fake_select_context(question, knobs=None, *, legal_query=None):
         captured["question"] = question
         captured["knobs"] = knobs
+        captured["legal_query"] = legal_query
         return SelectionResult(retrieved=[], pre_expansion=[], selected=[])
 
     monkeypatch.setattr("app.retriever.context_selection.select_context", fake_select_context)
@@ -121,7 +122,11 @@ def test_default_strategy_passes_resolved_knobs(monkeypatch):
     selection = strategy.STRATEGIES["default"].execute("standalone question")
 
     assert selection == SelectionResult(retrieved=[], pre_expansion=[], selected=[])
-    assert captured == {"question": "standalone question", "knobs": expected}
+    assert captured == {
+        "question": "standalone question",
+        "knobs": expected,
+        "legal_query": None,
+    }
 
 
 def test_pinned_preset_flows_through_real_select_context(monkeypatch):
@@ -226,7 +231,7 @@ def test_packaged_retrieve_caps_with_resolved_rerank_top_n(monkeypatch):
     monkeypatch.setattr(
         subquery_retrieval,
         "rerank",
-        lambda query, results, knobs=None: results,
+        lambda query, results, knobs=None, **_lane: results,
     )
 
     out = subquery_retrieval.packaged_retrieve("question", knobs=knobs)

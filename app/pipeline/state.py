@@ -1,9 +1,20 @@
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from app.pipeline.policy import AnswerPolicy
 from app.retriever.context_selection import SelectionResult
 from app.retriever.strategy import RetrievalKnobs, resolve_knobs
+
+if TYPE_CHECKING:
+    from app.retriever.legal_query_rewriter import LegalRewriteDecision
+
+
+LegalQuerySeparationArm = Literal[
+    "original_only",
+    "original_plus_rewrite",
+]
 
 
 @dataclass(frozen=True)
@@ -37,6 +48,8 @@ class AnswerState:
     debug_enabled: bool
     session_id: str | None = None
     effective_question: str | None = None
+    query_separation_arm: LegalQuerySeparationArm = "original_only"
+    legal_rewrite_decision: LegalRewriteDecision | None = None
     strategy_name: str = "default"
     strategy_knobs: RetrievalKnobs = field(default_factory=lambda: resolve_knobs("default"))
     selection: SelectionResult = field(

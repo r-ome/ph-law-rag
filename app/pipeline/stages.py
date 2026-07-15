@@ -147,18 +147,63 @@ def classify_intent(state: AnswerState, strategy_override: str | None = None) ->
 
 
 def plan_retrieval(state: AnswerState) -> None:
+    from dataclasses import replace
+
     policy = _policy(state)
-    state.strategy_knobs = (
+    knobs = (
         policy.retrieval_defaults
         if state.strategy_name == "default"
         else resolve_knobs(state.strategy_name)
     )
+    defaults = policy.retrieval_defaults
+    if (
+        knobs.query_decomposition_enabled != policy.query_decomposition_enabled
+        or knobs.query_planner_model != defaults.query_planner_model
+        or knobs.reranker_backend != defaults.reranker_backend
+    ):
+        knobs = replace(
+            knobs,
+            query_decomposition_enabled=policy.query_decomposition_enabled,
+            query_planner_model=defaults.query_planner_model,
+            reranker_backend=defaults.reranker_backend,
+        )
+    state.strategy_knobs = knobs
+
+
+def prepare_legal_query_separation(state: AnswerState) -> None:
+    if state.query_separation_arm == "original_only":
+        return
+    if state.query_separation_arm != "original_plus_rewrite":
+        raise ValueError(
+            f"unsupported query-separation arm {state.query_separation_arm!r}"
+        )
+    if state.strategy_knobs.query_decomposition_enabled:
+        raise ValueError(
+            "legal query separation requires query decomposition to be disabled"
+        )
+    if state.strategy_knobs.subquery_packaging_enabled:
+        raise ValueError(
+            "legal query separation requires subquery packaging to be disabled"
+        )
+
+    from app.retriever.legal_query_rewriter import rewrite_legal_query
+
+    state.legal_rewrite_decision = rewrite_legal_query(
+        state.effective_question or state.question
+    )
 
 
 def retrieve_context(state: AnswerState) -> None:
+    decision = state.legal_rewrite_decision
+    legal_query = (
+        decision.legal_query
+        if decision is not None and decision.status == "accepted"
+        else None
+    )
     state.selection = STRATEGIES[state.strategy_name].execute(
         state.effective_question or state.question,
         knobs=state.strategy_knobs,
+        legal_query=legal_query,
     )
 
 
@@ -179,9 +224,13 @@ def gate_evidence(state: AnswerState) -> None:
 
 
 def corrective_retrieve(state: AnswerState) -> None:
+    from app.observability.context import stage_timer
     from app.pipeline.corrective import corrective_retrieve as run_corrective
 
-    run_corrective(state, _policy(state))
+    with stage_timer("corrective_retrieval", in_n=len(state.selection.selected)) as stage:
+        run_corrective(state, _policy(state))
+        stage["out_n"] = len(state.selection.selected)
+        stage["fields"] = {"fired": state.corrective_ran}
 
 
 def route_model(state: AnswerState) -> None:
@@ -194,50 +243,27 @@ def generate_answer(state: AnswerState) -> None:
     policy = _policy(state)
     if state.model_choice is None:
         route_model(state)
-    model = state.model_choice.model
-    question = state.effective_question or state.question
-    context_block, sources = build_context(state.selection.selected)
+    from app.pipeline.frozen_generation import generate_frozen
 
-    user_prompt = build_user_prompt(question, context_block)
-    state.prompt = user_prompt
-    system_prompt = SYSTEM_PROMPT
-    if policy.later_enacted_preference_enabled:
-        system_prompt = SYSTEM_PROMPT + LATER_ENACTED_RULE
-    try:
-        answer_text = generate(system_prompt, user_prompt, model=model)
-    except LLMError as e:
-        logger.warning("generation_failed", error=str(e), model=model)
-        state.response = _package(
-            f"The language model could not be reached: {e}",
-            sources=[],
-            abstained=False,
-            selection=state.selection,
-            prompt=user_prompt,
-            error=True,
-            debug=state.debug_enabled,
-        )
-        return
-
-    if policy.selfcheck_enabled and not is_abstention(answer_text):
-        from app.retriever.prompts import SELFCHECK_SYSTEM, build_selfcheck_prompt
-
-        try:
-            revised = generate(
-                SELFCHECK_SYSTEM,
-                build_selfcheck_prompt(question, context_block, answer_text),
-                model=model,
-            )
-            if revised.strip():
-                answer_text = revised
-        except LLMError:
-            pass
-
-    soft_abstained = is_abstention(answer_text)
+    result = generate_frozen(
+        question=state.effective_question or state.question,
+        selected=[
+            {"chunk_id": r.chunk_id, "text": r.text, "score": r.score, "metadata": dict(r.metadata)}
+            for r in state.selection.selected
+        ],
+        model=state.model_choice.model,
+        later_enacted_preference=policy.later_enacted_preference_enabled,
+        selfcheck_enabled=policy.selfcheck_enabled,
+        generate_fn=generate,
+        build_context_fn=build_context,
+    )
+    state.prompt = result["user_prompt"]
     state.response = _package(
-        answer_text,
-        sources=[] if soft_abstained else _cited_sources(answer_text, sources),
-        abstained=soft_abstained,
+        result["answer"],
+        sources=result["sources"],
+        abstained=result["abstained"],
         selection=state.selection,
-        prompt=user_prompt,
+        prompt=result["user_prompt"],
+        error=result["error"],
         debug=state.debug_enabled,
     )

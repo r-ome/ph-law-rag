@@ -6,7 +6,7 @@ from app.retriever.hybrid_retriever import hybrid_retriever
 from app.retriever.reranker import rerank
 from app.retriever.strategy import RetrievalKnobs
 from app.retriever.types import RetrievalResult
-from app.observability.context import stage_timer
+from app.observability.context import capture_candidates, stage_timer
 
 
 @dataclass
@@ -31,11 +31,17 @@ def _snapshot_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
 def select_context(
     question: str,
     knobs: RetrievalKnobs | None = None,
+    *,
+    legal_query: str | None = None,
 ) -> SelectionResult:
     subquery_packaging_enabled = (
         knobs.subquery_packaging_enabled if knobs else settings.subquery_packaging_enabled
     )
     if subquery_packaging_enabled:
+        if legal_query is not None:
+            raise ValueError(
+                "legal query separation requires subquery packaging to be disabled"
+            )
         from app.retriever.subquery_retrieval import packaged_retrieve
 
         with stage_timer("packaged_retrieve") as stage:
@@ -45,9 +51,27 @@ def select_context(
         retrieved_trace = _snapshot_results(retrieved)
     else:
         with stage_timer("hybrid_retriever") as stage:
-            retrieved = hybrid_retriever(question, knobs=knobs)
+            if legal_query is None:
+                retrieved = hybrid_retriever(question, knobs=knobs)
+            else:
+                retrieved = hybrid_retriever(
+                    question,
+                    knobs=knobs,
+                    legal_query=legal_query,
+                )
             stage["out_n"] = len(retrieved)
         retrieved_trace = _snapshot_results(retrieved)
+        # Schema 1.1 names the exact ordered pool entering reranking. This is a
+        # diagnostic clone only; capture_candidates never mutates the results.
+        capture_candidates(
+            "fused",
+            retrieved,
+            query_variant="combined",
+            query_text=question,
+            query_ordinal=0,
+            pool_role="pre_rerank_pool",
+            score_field="fused_score",
+        )
         with stage_timer("rerank", in_n=len(retrieved)) as stage:
             pre_expansion = rerank(question, retrieved, knobs=knobs)
             stage["out_n"] = len(pre_expansion)
@@ -87,6 +111,15 @@ def select_context(
             stage["out_n"] = len(selected)
             stage["fields"] = {"fired": [r.chunk_id for r in selected] != before_ids}
 
+    capture_candidates(
+        "expanded",
+        selected,
+        query_variant="original",
+        query_text=question,
+        query_ordinal=0,
+        selected_ids={result.chunk_id for result in selected},
+    )
+
     consolidated_dedup_enabled = (
         knobs.consolidated_dedup_enabled if knobs else settings.consolidated_dedup_enabled
     )
@@ -98,6 +131,15 @@ def select_context(
             selected = dedup_results(selected)
             stage["out_n"] = len(selected)
             stage["fields"] = {"fired": len(selected) != before}
+
+    capture_candidates(
+        "selected",
+        selected,
+        query_variant="original",
+        query_text=question,
+        query_ordinal=0,
+        selected_ids={result.chunk_id for result in selected},
+    )
 
     return SelectionResult(
         retrieved=retrieved_trace,

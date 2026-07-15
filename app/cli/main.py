@@ -47,6 +47,12 @@ def eval_score(
 
 	results = load_dataset(run_path)
 	run_tag = artifacts.tag_from_run_path(run_path)
+	paths = artifacts.paths_for_tag(run_tag)
+	if not paths.retrieval_summary.exists():
+		from app.evals.retrieval_metrics import rebuild_for_tag
+
+		if rebuild_for_tag(run_tag) is None:
+			typer.echo("Retrieval metrics unavailable: this historical run has no candidate trace.")
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
@@ -94,6 +100,52 @@ def eval(
 	scored = score(results, use_cache=use_cache)
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
+
+@app.command("eval-retrieve")
+def eval_retrieve(
+	splits: list[str] = typer.Option(["regression", "dev"], "--split", help="dataset split; repeatable"),
+	row_ids: list[str] = typer.Option([], "--row-id", help="eval row ID; repeatable"),
+	tag: str = typer.Option(..., "--tag"),
+	resume: bool = typer.Option(False, "--resume"),
+	keep_retrieval_models: bool = typer.Option(False, "--keep-retrieval-models", help="diagnostics only"),
+	legal_query_separation: bool = typer.Option(
+		False,
+		"--legal-query-separation/--original-only",
+	),
+):
+	if "holdout" in splits:
+		raise typer.BadParameter("holdout is sealed and unavailable to eval-retrieve")
+	from app.evals.dataset import load_eval_dataset
+	from app.evals.retrieval_runner import retrieve_rows
+	rows = load_eval_dataset(settings.eval_dataset_path, splits=tuple(splits), row_ids=row_ids or None)
+	query_separation_arm = (
+		"original_plus_rewrite" if legal_query_separation else "original_only"
+	)
+	typer.echo(
+		"Retrieval bundle written to "
+		f"{retrieve_rows(rows, tag=tag, resume=resume, keep_retrieval_models=keep_retrieval_models, query_separation_arm=query_separation_arm)}"
+	)
+
+@app.command("eval-generate")
+def eval_generate(
+	retrieval_tag: str,
+	tag: str = typer.Option(..., "--tag"),
+	generator_model: str = typer.Option(None, "--generator-model"),
+	resume: bool = typer.Option(False, "--resume"),
+):
+	from app.evals.generation_replay import generate_bundle
+	typer.echo(f"Generation bundle written to {generate_bundle(retrieval_tag, tag=tag, model_override=generator_model, resume=resume)}")
+
+@app.command("eval-retrieval-compare")
+def eval_retrieval_compare(
+	baseline_tag: str,
+	candidate_tag: str,
+	tag: str = typer.Option(..., "--tag"),
+):
+	from app.evals.retrieval_comparison import compare_retrieval_bundles
+
+	path = compare_retrieval_bundles(baseline_tag, candidate_tag, tag=tag)
+	typer.echo(f"Retrieval comparison written to {path}")
 
 @app.command("eval-repeatability")
 def eval_repeatability(

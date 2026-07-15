@@ -87,7 +87,7 @@ def test_answer_router_on_uses_current_law_strategy_knobs(monkeypatch):
     class FakeStrategy:
         name = "current_law"
 
-        def execute(self, question, knobs=None):
+        def execute(self, question, knobs=None, *, legal_query=None):
             captured["question"] = question
             captured["knobs"] = knobs
             return SelectionResult(retrieved=[], pre_expansion=[], selected=[])
@@ -154,7 +154,7 @@ def test_cascade_profile_routes_generation_to_strong_model(monkeypatch):
     class FakeStrategy:
         name = "current_law"
 
-        def execute(self, question, knobs=None):
+        def execute(self, question, knobs=None, *, legal_query=None):
             return SelectionResult(
                 retrieved=[],
                 pre_expansion=[RetrievalResult("c1", "context", 1.0, {})],
@@ -252,7 +252,7 @@ def test_llm_error_path_returns_error_response(monkeypatch):
     monkeypatch.setattr(settings, "min_chunks_for_answer", 1)
 
     class FakeStrategy:
-        def execute(self, question, knobs=None):
+        def execute(self, question, knobs=None, *, legal_query=None):
             return SelectionResult(
                 retrieved=[],
                 pre_expansion=[RetrievalResult("c1", "context", 1.0, {})],
@@ -298,7 +298,7 @@ def test_hard_abstain_when_min_chunks_not_met(monkeypatch):
     monkeypatch.setattr(settings, "min_chunks_for_answer", 2)
 
     class FakeStrategy:
-        def execute(self, question, knobs=None):
+        def execute(self, question, knobs=None, *, legal_query=None):
             return SelectionResult(
                 retrieved=[],
                 pre_expansion=[RetrievalResult("c1", "context", 1.0, {})],

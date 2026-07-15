@@ -27,6 +27,8 @@ class RetrievalKnobs:
     parent_expansion_max_chars: int = 8000
     query_planner_model: str = "mistral"
     query_planner_max_subqueries: int = 3
+    query_decomposition_enabled: bool = False
+    reranker_backend: str | None = None
     subquery_packaging_enabled: bool = False
     subquery_reserve_n: int = 2
 
@@ -46,6 +48,7 @@ class RetrievalKnobs:
             parent_expansion_max_chars=settings_obj.parent_expansion_max_chars,
             query_planner_model=settings_obj.query_planner_model,
             query_planner_max_subqueries=settings_obj.query_planner_max_subqueries,
+            query_decomposition_enabled=settings_obj.query_decomposition_enabled,
             prefer_operative_enabled=settings_obj.prefer_operative_enabled,
             retrieval_operative_only=settings_obj.retrieval_operative_only,
             consolidated_dedup_enabled=settings_obj.consolidated_dedup_enabled,
@@ -72,7 +75,13 @@ class RetrievalKnobs:
 class Strategy(Protocol):
     name: str
 
-    def execute(self, question: str, knobs: RetrievalKnobs | None = None) -> "SelectionResult":
+    def execute(
+        self,
+        question: str,
+        knobs: RetrievalKnobs | None = None,
+        *,
+        legal_query: str | None = None,
+    ) -> "SelectionResult":
         ...
 
 
@@ -80,10 +89,20 @@ class Strategy(Protocol):
 class StrategyPreset:
     name: str
 
-    def execute(self, question: str, knobs: RetrievalKnobs | None = None) -> "SelectionResult":
+    def execute(
+        self,
+        question: str,
+        knobs: RetrievalKnobs | None = None,
+        *,
+        legal_query: str | None = None,
+    ) -> "SelectionResult":
         from app.retriever.context_selection import select_context
 
-        return select_context(question, knobs=knobs or resolve_knobs(self.name))
+        return select_context(
+            question,
+            knobs=knobs or resolve_knobs(self.name),
+            legal_query=legal_query,
+        )
 
 
 _PRESET_KNOBS: dict[str, RetrievalKnobs | None] = {

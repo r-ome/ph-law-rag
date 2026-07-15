@@ -112,7 +112,11 @@ class Settings(BaseSettings):
 	trace_logging_enabled: bool = True
 	trace_max_text_preview: int = 200
 	eval_dataset_path: str = "data/eval_dataset.jsonl"
+	eval_retrieval_targets_path: str = "data/eval_retrieval_targets.jsonl"
 	eval_results_dir: str = "data/eval_results"
+	legal_query_rewrite_model: str = "claude-haiku-4-5"
+	legal_query_rewrite_timeout_seconds: float = 15.0
+	legal_query_rewrite_cache_dir: str = "data/eval_results/legal_rewrite_cache"
 	eval_run_label: str = ""  # optional A/B tag baked into eval output filenames
 	ragas_score_cache_path: str = "data/eval_results/ragas_score_cache.sqlite"
 	ragas_judge_backend: str = "anthropic"  # anthropic | openai — selects the RAGAS judge LLM
