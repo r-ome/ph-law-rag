@@ -5,7 +5,62 @@ from app.retriever.hybrid_retriever import _fuse
 from app.retriever.query_planner import _plan
 from app.retriever.reranker import rerank
 from app.config import settings
+from app.observability.context import capture_candidates, stage_timer
 from app.retriever.strategy import RetrievalKnobs
+
+
+def _retrieve_lane(
+    query: str,
+    *,
+    knobs: RetrievalKnobs | None,
+    query_variant: str,
+    query_ordinal: int,
+) -> list[RetrievalResult]:
+    with stage_timer(
+        "dense_retriever",
+        query_variant=query_variant,
+        query_ordinal=query_ordinal,
+    ) as stage:
+        dense = dense_retriever(query, knobs=knobs)
+        stage["out_n"] = len(dense)
+    capture_candidates(
+        "dense",
+        dense,
+        query_variant=query_variant,
+        query_text=query,
+        query_ordinal=query_ordinal,
+        score_field="dense_score",
+    )
+    with stage_timer(
+        "sparse_retriever",
+        query_variant=query_variant,
+        query_ordinal=query_ordinal,
+    ) as stage:
+        sparse = sparse_retriever(query, knobs=knobs)
+        stage["out_n"] = len(sparse)
+    capture_candidates(
+        "sparse",
+        sparse,
+        query_variant=query_variant,
+        query_text=query,
+        query_ordinal=query_ordinal,
+        score_field="sparse_score",
+    )
+    with stage_timer("fusion", in_n=len(dense) + len(sparse)) as stage:
+        fused = _fuse(
+            [dense, sparse],
+            score_fields=["dense_score", "sparse_score"],
+        )
+        stage["out_n"] = len(fused)
+    capture_candidates(
+        "fused",
+        fused,
+        query_variant=query_variant,
+        query_text=query,
+        query_ordinal=query_ordinal,
+        score_field="fused_score",
+    )
+    return fused
 
 
 def round_robin_merge(
@@ -48,19 +103,37 @@ def packaged_retrieve(
     reserve_n = knobs.subquery_reserve_n if knobs else settings.subquery_reserve_n
 
     if len(subqueries) <= 1:                       # baseline path (output-identical)
-        fused = _fuse([
-            dense_retriever(question, knobs=knobs),
-            sparse_retriever(question, knobs=knobs),
-        ])
-        return rerank(question, fused, knobs=knobs)
+        fused = _retrieve_lane(
+            question,
+            knobs=knobs,
+            query_variant="original",
+            query_ordinal=0,
+        )
+        return rerank(
+            question,
+            fused,
+            knobs=knobs,
+            query_variant="original",
+            query_ordinal=0,
+        )
 
     per_sub: list[list[RetrievalResult]] = []
-    for sub in subqueries:
-        fused = _fuse([
-            dense_retriever(sub, knobs=knobs),
-            sparse_retriever(sub, knobs=knobs),
-        ])
-        per_sub.append(rerank(sub, fused, knobs=knobs)[:reserve_n])
+    for ordinal, sub in enumerate(subqueries, start=1):
+        fused = _retrieve_lane(
+            sub,
+            knobs=knobs,
+            query_variant="facet",
+            query_ordinal=ordinal,
+        )
+        per_sub.append(
+            rerank(
+                sub,
+                fused,
+                knobs=knobs,
+                query_variant="facet",
+                query_ordinal=ordinal,
+            )[:reserve_n]
+        )
 
     return round_robin_merge(
         per_sub,

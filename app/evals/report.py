@@ -4,18 +4,34 @@ from app.evals import artifacts
 
 def abstention_accuracy(results: list[dict]) -> dict:
     """Out of scope rows SHOULD abstain; everything else should NOT."""
-    correct = total = 0
-    for r in results:
-        should_abstain = r["category"] == "out-of-scope"
-        if r["abstained"] == should_abstain:
-            correct += 1
-        total += 1
+    total = len(results)
+    abstained = sum(bool(row["abstained"]) for row in results)
+    expected = [row for row in results if row["category"] == "out-of-scope"]
+    expected_answers = [row for row in results if row["category"] != "out-of-scope"]
+    correct_abstentions = sum(bool(row["abstained"]) for row in expected)
+    false_abstentions = sum(bool(row["abstained"]) for row in expected_answers)
+    answer_leaks = sum(not row["abstained"] for row in expected)
+    correct = correct_abstentions + sum(not row["abstained"] for row in expected_answers)
     return {
         "correct": correct,
         "total": total,
-        "abstain_count": sum(bool(row["abstained"]) for row in results),
+        "answered": total - abstained,
+        "abstained": abstained,
+        "abstain_count": abstained,
+        "expected_abstentions": len(expected),
+        "correct_abstentions": correct_abstentions,
+        "false_abstentions": false_abstentions,
+        "answer_leaks": answer_leaks,
+        "target_present_despite_abstention": sum(
+            bool(row["abstained"]) and bool(row.get("retrieval_target_present"))
+            for row in results
+        ),
         "accuracy": correct / total if total else 0.0,
     }
+
+
+def _category_counts(results: list[dict]) -> dict:
+    return abstention_accuracy(results)
 
 def _is_holdout(results: list[dict]) -> bool:
     return any(row.get("split") == "holdout" for row in results)
@@ -27,8 +43,27 @@ def print_report(results: list[dict], scored) -> None:
     print("\n=== ABSTENTION ===")
     ab = abstention_accuracy(results)
     print(f" correct abstention decisions: {ab['correct']}/{ab['total']} ({ab['accuracy']:.0%})")
+    print(
+        f" answered: {ab['answered']} | abstained: {ab['abstained']} | "
+        f"false abstentions: {ab['false_abstentions']} | answer leaks: {ab['answer_leaks']}"
+    )
     if _is_holdout(results):
         print(f" abstain count: {ab['abstain_count']}")
+    else:
+        print("\n=== ALL ROWS BY CATEGORY ===")
+        for category in sorted({row["category"] for row in results}):
+            counts = _category_counts(
+                [row for row in results if row["category"] == category]
+            )
+            print(
+                f" {category:12} total={counts['total']} answered={counts['answered']} "
+                f"abstained={counts['abstained']} expected_abstentions="
+                f"{counts['expected_abstentions']} correct_abstentions="
+                f"{counts['correct_abstentions']} false_abstentions="
+                f"{counts['false_abstentions']} answer_leaks={counts['answer_leaks']} "
+                f"target_present_despite_abstention="
+                f"{counts['target_present_despite_abstention']}"
+            )
 
     if ragas_result is None:
         print("\n=== RAGAS === \n no scorable (non-abstained rows)")
@@ -40,6 +75,7 @@ def print_report(results: list[dict], scored) -> None:
     df["category"] = [r["category"] for r in scorable]
 
     print("\n=== RAGAS overall ===")
+    print(f" n={len(scorable)} answered rows scored")
     for m in metric_cols:
         print(f" {m:36} {df[m].mean():.3f}")
 
@@ -60,9 +96,19 @@ def build_summary(results: list[dict], scored, *, holdout: bool | None = None) -
     holdout = _is_holdout(results) if holdout is None else holdout
     summary = {
         "abstention": abstention_accuracy(results),
-        "overall": {},
+        "overall": {"n": 0, "all_rows": len(results)},
         "by_category": {},
     }
+    categories = sorted({row["category"] for row in results})
+    for category in categories:
+        category_rows = [row for row in results if row["category"] == category]
+        summary["by_category"][category] = {
+            "n": 0,
+            "all_rows": len(category_rows),
+            **_category_counts(category_rows),
+        }
+    if holdout:
+        summary["by_category"] = {}
     if ragas_result is None:
         return summary
 
@@ -70,13 +116,19 @@ def build_summary(results: list[dict], scored, *, holdout: bool | None = None) -
     metric_cols = list(df.select_dtypes(include="number").columns)
     df["category"] = [r["category"] for r in scorable]
 
-    summary["overall"] = {m: round(float(df[m].mean()), 4) for m in metric_cols}
+    summary["overall"] = {
+        "n": len(scorable),
+        "all_rows": len(results),
+        **{m: round(float(df[m].mean()), 4) for m in metric_cols},
+    }
     if not holdout:
         for cat, grp in df.groupby("category"):
-            summary["by_category"][cat] = {
+            summary["by_category"][cat].update({
                 "n": int(len(grp)),
                 **{m: round(float(grp[m].mean()), 4) for m in metric_cols},
-            }
+            })
+    else:
+        summary["by_category"] = {}
     return summary
 
 

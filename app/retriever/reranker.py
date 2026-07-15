@@ -1,6 +1,7 @@
 import time
 
 from sentence_transformers import CrossEncoder
+from app.observability.context import capture_candidates, record_stage
 from app.retriever.types import RetrievalResult
 from app.config import settings
 from app.observability.logger import get_logger
@@ -15,6 +16,42 @@ _bedrock_client = None
 # Per-call scoring latency (ms), appended by rerank(). The eval runner reads this to
 # report selector cost alongside answer timing — the Qwen3 ship decision is gated on it.
 rerank_timings_ms: list[float] = []
+
+
+def release_reranker_models() -> dict[str, object]:
+    """Drop local reranker references and release accelerator caches."""
+    global _model, _qwen, _bedrock_client
+    attempted = True
+    warning = None
+    _model = None
+    _qwen = None
+    _bedrock_client = None
+    try:
+        import gc
+        import sys
+        gc.collect()
+        torch = sys.modules.get("torch")
+        if torch is not None and hasattr(torch, "mps") and torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+    except Exception as exc:  # best effort; process exit is the hard boundary
+        warning = str(exc)
+    return {"attempted": attempted, "result": warning is None, "warning": warning}
+
+
+def release_retrieval_models() -> dict[str, object]:
+    result: dict[str, object] = {"attempted": True, "reranker": release_reranker_models()}
+    try:
+        from app.indexing.embedder import release_embedding_model
+        result["embedding"] = release_embedding_model()
+    except Exception as exc:
+        result["embedding"] = {"attempted": True, "result": False, "warning": str(exc)}
+    warnings = [
+        detail.get("warning")
+        for detail in (result["reranker"], result["embedding"])
+        if isinstance(detail, dict) and detail.get("warning")
+    ]
+    result["warning"] = "; ".join(str(item) for item in warnings) or None
+    return result
 
 
 def _get_model() -> CrossEncoder:
@@ -163,36 +200,75 @@ def rerank(
     query_text: str,
     results: list[RetrievalResult],
     knobs: RetrievalKnobs | None = None,
+    *,
+    query_variant: str = "original",
+    query_ordinal: int = 0,
 ) -> list[RetrievalResult]:
     if not results:
+        capture_candidates(
+            "reranked",
+            [],
+            query_variant=query_variant,
+            query_text=query_text,
+            query_ordinal=query_ordinal,
+            score_field="rerank_score",
+            survived_ids=set(),
+        )
         return []
     top_n = knobs.rerank_top_n if knobs else settings.rerank_top_n
+    backend = (
+        knobs.reranker_backend
+        if knobs is not None and knobs.reranker_backend
+        else settings.reranker_backend
+    )
 
     start = time.perf_counter()
-    if settings.reranker_backend == "qwen3":
+    if backend == "qwen3":
         scores = _get_qwen().score(query_text, [r.text for r in results])
-    elif settings.reranker_backend == "bedrock":
+    elif backend == "bedrock":
         scores = _bedrock_scores(query_text, [r.text for r in results])
     else:
         model = _get_model()
         scores = model.predict([(query_text, r.text) for r in results])
     elapsed_ms = (time.perf_counter() - start) * 1000
     rerank_timings_ms.append(elapsed_ms)
+    record_stage(
+        "rerank_scoring",
+        in_n=len(results),
+        out_n=len(results),
+        ms=elapsed_ms,
+        query_variant=query_variant,
+        query_ordinal=query_ordinal,
+        backend=backend,
+    )
 
     for r, score in zip(results, scores):
         r.score = float(score)
+        r.metadata["_retrieval_scores"] = {
+            **dict(r.metadata.get("_retrieval_scores", {}) or {}),
+            "rerank_score": r.score,
+        }
 
     results.sort(key=lambda r: r.score, reverse=True)
 
-    if settings.reranker_backend in ("qwen3", "bedrock"):
+    if backend in ("qwen3", "bedrock"):
         # Plain top-8: rerank_score_margin is calibrated to MiniLM logit spread and does
         # not transfer — qwen3 emits [0,1] probabilities, bedrock uncalibrated relevance
         # floats (ordering only; no probability semantics). A native floor per backend
         # is the replacement if trimming proves needed — backlog.
         kept = results[:top_n]
+        capture_candidates(
+            "reranked",
+            results,
+            query_variant=query_variant,
+            query_text=query_text,
+            query_ordinal=query_ordinal,
+            score_field="rerank_score",
+            survived_ids={result.chunk_id for result in kept},
+        )
         logger.debug(
             "rerank_completed",
-            backend=settings.reranker_backend,
+            backend=backend,
             in_count=len(results),
             out_count=len(kept),
             top_score=kept[0].score if kept else None,
@@ -206,9 +282,18 @@ def rerank(
     )
     kept = [r for r in results if r.score >= top - rerank_score_margin]
     kept = kept[:top_n]
+    capture_candidates(
+        "reranked",
+        results,
+        query_variant=query_variant,
+        query_text=query_text,
+        query_ordinal=query_ordinal,
+        score_field="rerank_score",
+        survived_ids={result.chunk_id for result in kept},
+    )
     logger.debug(
         "rerank_completed",
-        backend=settings.reranker_backend,
+        backend=backend,
         in_count=len(results),
         out_count=len(kept),
         top_score=kept[0].score if kept else None,

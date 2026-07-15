@@ -1,0 +1,131 @@
+{"eval_id":"eval_001","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:13","unit_label":"Section 13"}]}
+{"eval_id":"eval_002","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-xi:section:2","unit_label":"Section 2"}]}
+{"eval_id":"eval_003","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:2","unit_label":"Section 2"}]}
+{"eval_id":"eval_004","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:17","unit_label":"Section 17"}]}
+{"eval_id":"eval_005","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-vii:section:4","unit_label":"Section 4"}]}
+{"eval_id":"eval_006","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-vi:section:2","unit_label":"Section 2"}]}
+{"eval_id":"eval_007","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:3"}]}
+{"eval_id":"eval_008","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:8"}]}
+{"eval_id":"eval_009","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:11"}]}
+{"eval_id":"eval_010","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:315"}]}
+{"eval_id":"eval_011","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:2"}]}
+{"eval_id":"eval_012","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:35"}]}
+{"eval_id":"eval_013","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:45"}]}
+{"eval_id":"eval_014","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1458"}]}
+{"eval_id":"eval_015","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1475"}]}
+{"eval_id":"eval_016","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1318"}]}
+{"eval_id":"eval_017","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1157"}]}
+{"eval_id":"eval_018","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1144"}]}
+{"eval_id":"eval_019","match_mode":"exact","targets":[{"source_id":"ip_code","provision_id":"ip_code:chapter-ii:section:21"}]}
+{"eval_id":"eval_020","match_mode":"exact","targets":[{"source_id":"data_privacy_act","provision_id":"data_privacy_act:chapter-i:section:3","unit_label":"Section 3(b)"}]}
+{"eval_id":"eval_021","match_mode":"exact","targets":[{"source_id":"data_privacy_act","provision_id":"data_privacy_act:chapter-iv:section:16"}]}
+{"eval_id":"eval_022","match_mode":"exact","targets":[{"source_id":"cybercrime_prevention_act","provision_id":"cybercrime_prevention_act:chapter-ii:section:6"}]}
+{"eval_id":"eval_023","match_mode":"exact","targets":[{"source_id":"vawc","provision_id":"vawc:section:8"}]}
+{"eval_id":"eval_024","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_act","provision_id":"dangerous_drugs_act:article-ii:section:11"}]}
+{"eval_id":"eval_025","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_act","provision_id":"dangerous_drugs_act:article-ii:section:5"}]}
+{"eval_id":"eval_026","match_mode":"source_only","targets":[{"source_id":"rpc_penalty_amendments_2017","provision_id":null},{"source_id":"revised_penal_code","provision_id":null}]}
+{"eval_id":"eval_027","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_act","provision_id":"dangerous_drugs_act:article-ii:section:21"},{"source_id":"dangerous_drugs_amendments_2014","provision_id":"dangerous_drugs_amendments_2014:section:1"}]}
+{"eval_id":"eval_028","match_mode":"exact","targets":[{"source_id":"bp_22","provision_id":"bp_22:section:1"}]}
+{"eval_id":"eval_029","match_mode":"exact","targets":[{"source_id":"public_land_act","provision_id":"public_land_act:chapter-iv-homestead:section:12"}]}
+{"eval_id":"eval_030","match_mode":"exact","targets":[{"source_id":"labor_code","provision_id":"labor_code:article:280"}]}
+{"eval_id":"eval_031","match_mode":"exact","targets":[{"source_id":"labor_code","provision_id":"labor_code:article:282"}]}
+{"eval_id":"eval_032","match_mode":"exact","targets":[{"source_id":"judiciary_reorganization_act","provision_id":"judiciary_reorganization_act:chapter-ii:section:19"}]}
+{"eval_id":"eval_033","match_mode":"exact","targets":[{"source_id":"adr_act","provision_id":"adr_act:chapter-1-general-provisions:section:3"}]}
+{"eval_id":"eval_034","match_mode":"exact","targets":[{"source_id":"bp_22","provision_id":"bp_22:section:1"}]}
+{"eval_id":"eval_035","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-xi:section:2","unit_label":"Section 2"}]}
+{"eval_id":"eval_036","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:2","unit_label":"Section 2"}]}
+{"eval_id":"eval_037","match_mode":"exact","targets":[{"source_id":"labor_code","provision_id":"labor_code:article:282"}]}
+{"eval_id":"eval_038","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1475"}]}
+{"eval_id":"eval_039","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_act","provision_id":"dangerous_drugs_act:article-ii:section:11"}]}
+{"eval_id":"eval_040","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-vii:section:4","unit_label":"Section 4"}]}
+{"eval_id":"eval_041","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:45","unit_label":"Article 45(3)"}]}
+{"eval_id":"eval_042","match_mode":"exact","targets":[{"source_id":"cybercrime_prevention_act","provision_id":"cybercrime_prevention_act:chapter-ii:section:4","unit_label":"Section 4(c)(4)"},{"source_id":"cybercrime_prevention_act","provision_id":"cybercrime_prevention_act:chapter-ii:section:6"},{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:355"}]}
+{"eval_id":"eval_043","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_act","provision_id":"dangerous_drugs_act:article-ii:section:26"},{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:8"}]}
+{"eval_id":"eval_044","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1157"}]}
+{"eval_id":"eval_045","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:17","unit_label":"Section 17"}]}
+{"eval_id":"eval_046","match_mode":"exact","targets":[{"source_id":"judiciary_reorganization_act","provision_id":"judiciary_reorganization_act:chapter-ii:section:19"},{"source_id":"civil_code","provision_id":"civil_code:article:1144"}]}
+{"eval_id":"eval_047","match_mode":"exact","targets":[{"source_id":"adr_act","provision_id":"adr_act:chapter-1-general-provisions:section:3"}]}
+{"eval_id":"eval_048","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:35"},{"source_id":"family_code","provision_id":"family_code:article:45","unit_label":"Article 45(1)"}]}
+{"eval_id":"eval_049","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:2"},{"source_id":"family_code","provision_id":"family_code:article:3"},{"source_id":"family_code","provision_id":"family_code:article:4"}]}
+{"eval_id":"eval_050","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:309"},{"source_id":"rpc_penalty_amendments_2017","provision_id":"rpc_penalty_amendments_2017:section:81"}]}
+{"eval_id":"eval_051","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_act","provision_id":"dangerous_drugs_act:article-ii:section:21"},{"source_id":"dangerous_drugs_amendments_2014","provision_id":"dangerous_drugs_amendments_2014:section:1"}]}
+{"eval_id":"eval_052","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1484"}]}
+{"eval_id":"eval_053","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1403","unit_label":"Article 1403(2)(e)"}]}
+{"eval_id":"eval_054","match_mode":"exact","targets":[{"source_id":"family_code","provision_id":"family_code:article:45","unit_label":"Article 45(1)"}]}
+{"eval_id":"eval_055","match_mode":"exact","targets":[{"source_id":"cybercrime_prevention_act","provision_id":"cybercrime_prevention_act:chapter-ii:section:6"}]}
+{"eval_id":"eval_056","match_mode":"exact","targets":[{"source_id":"civil_code","provision_id":"civil_code:article:1145"},{"source_id":"civil_code","provision_id":"civil_code:article:1144"}]}
+{"eval_id":"eval_057","match_mode":"exact","targets":[{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:13","unit_label":"Section 13"}]}
+{"eval_id":"eval_058","match_mode":"exact","targets":[]}
+{"eval_id":"eval_059","match_mode":"exact","targets":[]}
+{"eval_id":"eval_060","match_mode":"exact","targets":[]}
+{"eval_id":"eval_061","match_mode":"exact","targets":[]}
+{"eval_id":"eval_062","match_mode":"exact","targets":[]}
+{"eval_id":"eval_063","match_mode":"exact","targets":[]}
+{"eval_id":"eval_064","match_mode":"exact","targets":[]}
+{"eval_id":"eval_065","match_mode":"exact","targets":[]}
+{"eval_id":"eval_066","match_mode":"exact","targets":[]}
+{"eval_id":"eval_067","match_mode":"exact","targets":[]}
+{"eval_id":"eval_068","match_mode":"exact","targets":[]}
+{"eval_id":"eval_069","match_mode":"exact","targets":[]}
+{"eval_id":"eval_070","match_mode":"source_only","targets":[{"source_id":"oposa_v_factoran","provision_id":null}]}
+{"eval_id":"eval_071","match_mode":"exact","targets":[{"source_id":"statutory_rape_amendments_2022","provision_id":"statutory_rape_amendments_2022:section:1"}]}
+{"eval_id":"eval_072","match_mode":"exact","targets":[{"source_id":"statutory_rape_amendments_2022","provision_id":"statutory_rape_amendments_2022:section:1"}]}
+{"eval_id":"eval_073","match_mode":"exact","targets":[{"source_id":"statutory_rape_amendments_2022","provision_id":"statutory_rape_amendments_2022:section:1"}]}
+{"eval_id":"eval_074","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:335"},{"source_id":"anti_rape_law_1997","provision_id":"anti_rape_law_1997:section:2"},{"source_id":"anti_rape_law_1997","provision_id":"anti_rape_law_1997:section:4"}]}
+{"eval_id":"eval_075","match_mode":"exact","targets":[{"source_id":"anti_rape_law_1997","provision_id":"anti_rape_law_1997:section:2"},{"source_id":"anti_rape_law_1997","provision_id":"revised_penal_code:article:266-c"}]}
+{"eval_id":"eval_076","match_mode":"exact","targets":[{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:335"},{"source_id":"anti_rape_law_1997","provision_id":"anti_rape_law_1997:section:2"},{"source_id":"anti_rape_law_1997","provision_id":"anti_rape_law_1997:section:4"},{"source_id":"statutory_rape_amendments_2022","provision_id":"statutory_rape_amendments_2022:section:1"}]}
+{"eval_id":"eval_077","match_mode":"exact","targets":[{"source_id":"death_penalty_prohibition","provision_id":"death_penalty_prohibition:section:1"},{"source_id":"death_penalty_prohibition","provision_id":"death_penalty_prohibition:section:2"}]}
+{"eval_id":"eval_078","match_mode":"exact","targets":[{"source_id":"death_penalty_prohibition","provision_id":"death_penalty_prohibition:section:3"}]}
+{"eval_id":"eval_079","match_mode":"exact","targets":[{"source_id":"anti_trafficking_expanded_2013","provision_id":"anti_trafficking_expanded_2013:section:5"},{"source_id":"anti_trafficking_expanded_2013","provision_id":"anti_trafficking:section:4-a"}]}
+{"eval_id":"eval_080","match_mode":"exact","targets":[{"source_id":"anti_trafficking_amendments_2022","provision_id":"anti_trafficking:section:6"}]}
+{"eval_id":"eval_081","match_mode":"exact","targets":[{"source_id":"probation_amendments_2015","provision_id":"probation_amendments_2015:section:1"},{"source_id":"probation_law","provision_id":"probation_law:section:4"}]}
+{"eval_id":"eval_082","match_mode":"exact","targets":[{"source_id":"judiciary_reorganization_amendments_2021","provision_id":"judiciary_reorganization_amendments_2021:section:2"},{"source_id":"judiciary_reorganization_act","provision_id":"judiciary_reorganization_act:chapter-iii:section:33"}]}
+{"eval_id":"eval_083","match_mode":"exact","targets":[{"source_id":"judiciary_reorganization_amendments_2021","provision_id":"judiciary_reorganization_amendments_2021:section:2"},{"source_id":"judiciary_reorganization_act","provision_id":"judiciary_reorganization_act:chapter-iii:section:33"}]}
+{"eval_id":"eval_084","match_mode":"exact","targets":[{"source_id":"judiciary_reorganization_amendments_2021","provision_id":"judiciary_reorganization_amendments_2021:section:4"}]}
+{"eval_id":"eval_085","match_mode":"exact","targets":[{"source_id":"indeterminate_sentence_law","provision_id":"indeterminate_sentence_law:section:1"}]}
+{"eval_id":"eval_086","match_mode":"exact","targets":[{"source_id":"indeterminate_sentence_law","provision_id":"indeterminate_sentence_law:section:2"}]}
+{"eval_id":"eval_087","match_mode":"exact","targets":[{"source_id":"indeterminate_sentence_law","provision_id":"indeterminate_sentence_law:section:8"}]}
+{"eval_id":"eval_088","match_mode":"exact","targets":[{"source_id":"anti_carnapping","provision_id":"anti_carnapping:section:3"}]}
+{"eval_id":"eval_089","match_mode":"exact","targets":[{"source_id":"anti_carnapping","provision_id":"anti_carnapping:section:3"}]}
+{"eval_id":"eval_090","match_mode":"exact","targets":[{"source_id":"anti_carnapping","provision_id":"anti_carnapping:section:3"},{"source_id":"constitution_1987","provision_id":"constitution_1987:article-iii:section:13","unit_label":"Section 13"}]}
+{"eval_id":"eval_091","match_mode":"exact","targets":[{"source_id":"anti_carnapping","provision_id":"anti_carnapping:section:22"}]}
+{"eval_id":"eval_092","match_mode":"exact","targets":[{"source_id":"juvenile_justice","provision_id":"juvenile_justice:chapter-2:section:6"},{"source_id":"juvenile_justice_amendments_2013","provision_id":"juvenile_justice_amendments_2013:section:3"}]}
+{"eval_id":"eval_093","match_mode":"exact","targets":[{"source_id":"juvenile_justice","provision_id":"juvenile_justice:title-policy-and-definition-of-terms:section:4"},{"source_id":"juvenile_justice_amendments_2013","provision_id":"juvenile_justice_amendments_2013:section:2"}]}
+{"eval_id":"eval_094","match_mode":"exact","targets":[{"source_id":"juvenile_justice_amendments_2013","provision_id":"juvenile_justice:section:20-a"},{"source_id":"juvenile_justice_amendments_2013","provision_id":"juvenile_justice:section:6"}]}
+{"eval_id":"eval_095","match_mode":"exact","targets":[{"source_id":"juvenile_justice_amendments_2013","provision_id":"juvenile_justice:section:57-a"},{"source_id":"juvenile_justice_amendments_2013","provision_id":"juvenile_justice:section:11"}]}
+{"eval_id":"eval_096","match_mode":"exact","targets":[{"source_id":"child_abuse_act","provision_id":"child_abuse_act:article-i-title-policy-principles-and-definitions-of-terms:section:3","unit_label":"Section 3(b)"}]}
+{"eval_id":"eval_097","match_mode":"exact","targets":[{"source_id":"child_abuse_act","provision_id":"child_abuse_act:article-iv-title-policy-principles-and-definitions-of-terms:section:7"},{"source_id":"statutory_rape_amendments_2022","provision_id":"statutory_rape_amendments_2022:section:3"}]}
+{"eval_id":"eval_098","match_mode":"exact","targets":[{"source_id":"child_abuse_act","provision_id":"child_abuse_act:article-iii-title-policy-principles-and-definitions-of-terms:section:5","unit_label":"Section 5(b)"},{"source_id":"statutory_rape_amendments_2022","provision_id":"statutory_rape_amendments_2022:section:3"},{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:336"}]}
+{"eval_id":"eval_099","match_mode":"exact","targets":[{"source_id":"firearms_act","provision_id":"firearms_act:article-ii-title-declaration-of-policy-and-definition-of-terms:section:4"}]}
+{"eval_id":"eval_100","match_mode":"exact","targets":[{"source_id":"firearms_act","provision_id":"firearms_act:article-v-title-declaration-of-policy-and-definition-of-terms:section:29"}]}
+{"eval_id":"eval_101","match_mode":"exact","targets":[{"source_id":"firearms_act","provision_id":"firearms_act:article-iii-title-declaration-of-policy-and-definition-of-terms:section:19"}]}
+{"eval_id":"eval_102","match_mode":"exact","targets":[{"source_id":"safe_spaces_act","provision_id":"safe_spaces_act:article-i:section:11","unit_label":"Section 11(a)"},{"source_id":"safe_spaces_act","provision_id":"safe_spaces_act:article-i:section:4"}]}
+{"eval_id":"eval_103","match_mode":"exact","targets":[{"source_id":"safe_spaces_act","provision_id":"safe_spaces_act:article-iii:section:15"}]}
+{"eval_id":"eval_104","match_mode":"exact","targets":[{"source_id":"safe_spaces_act","provision_id":"safe_spaces_act:article-vii:section:36"}]}
+{"eval_id":"eval_105","match_mode":"exact","targets":[{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:5"},{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:4"}]}
+{"eval_id":"eval_106","match_mode":"exact","targets":[{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:3"},{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:4"}]}
+{"eval_id":"eval_107","match_mode":"exact","targets":[{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:4"},{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:10"}]}
+{"eval_id":"eval_108","match_mode":"exact","targets":[{"source_id":"osaec_csaem_act","provision_id":"osaec_csaem_act:section:44"}]}
+{"eval_id":"eval_109","match_mode":"exact","targets":[{"source_id":"juvenile_justice","provision_id":"juvenile_justice:chapter-i:section:23"},{"source_id":"juvenile_justice","provision_id":"juvenile_justice:chapter-3:section:37"}]}
+{"eval_id":"eval_110","match_mode":"exact","targets":[{"source_id":"juvenile_justice","provision_id":"juvenile_justice:chapter-3:section:38"}]}
+{"eval_id":"eval_111","match_mode":"exact","targets":[{"source_id":"juvenile_justice","provision_id":"juvenile_justice:chapter-1:section:58"}]}
+{"eval_id":"eval_112","match_mode":"exact","targets":[{"source_id":"safe_spaces_act","provision_id":"safe_spaces_act:article-i:section:7"},{"source_id":"juvenile_justice","provision_id":"juvenile_justice:chapter-2:section:6"},{"source_id":"juvenile_justice","provision_id":"juvenile_justice:title-iv:section:20"}]}
+{"eval_id":"eval_113","match_mode":"exact","targets":[{"source_id":"bp_22","provision_id":"bp_22:section:2"}]}
+{"eval_id":"eval_114","match_mode":"exact","targets":[{"source_id":"death_penalty_prohibition","provision_id":"death_penalty_prohibition:section:2"}]}
+{"eval_id":"eval_115","match_mode":"exact","targets":[{"source_id":"dangerous_drugs_amendments_2014","provision_id":"dangerous_drugs_amendments_2014:section:1"}]}
+{"eval_id":"eval_116","match_mode":"exact","targets":[{"source_id":"probation_law","provision_id":"probation_law:section:9"},{"source_id":"probation_amendments_2015","provision_id":"probation_amendments_2015:section:2"}]}
+{"eval_id":"eval_117","match_mode":"exact","targets":[{"source_id":"probation_law","provision_id":"probation_law:section:16"},{"source_id":"probation_amendments_2015","provision_id":"probation_amendments_2015:section:3"}]}
+{"eval_id":"eval_118","match_mode":"exact","targets":[{"source_id":"vawc","provision_id":"vawc:section:3"},{"source_id":"vawc","provision_id":"vawc:section:5","unit_label":"Section 5(e)(2)"},{"source_id":"vawc","provision_id":"vawc:section:5","unit_label":"Section 5(i)"}]}
+{"eval_id":"eval_119","match_mode":"exact","targets":[{"source_id":"vawc","provision_id":"vawc:section:14"}]}
+{"eval_id":"eval_120","match_mode":"exact","targets":[{"source_id":"vawc","provision_id":"vawc:section:26"},{"source_id":"revised_penal_code","provision_id":"revised_penal_code:article:11"}]}
+{"eval_id":"eval_121","match_mode":"exact","targets":[{"source_id":"anti_trafficking","provision_id":"anti_trafficking:section:3","unit_label":"Section 3(a)"},{"source_id":"anti_trafficking_amendments_2022","provision_id":"anti_trafficking:section:3"}]}
+{"eval_id":"eval_122","match_mode":"exact","targets":[{"source_id":"anti_trafficking","provision_id":"anti_trafficking:section:6","unit_label":"Section 6(a)"},{"source_id":"anti_trafficking_amendments_2022","provision_id":"anti_trafficking:section:6"},{"source_id":"anti_trafficking_expanded_2013","provision_id":"anti_trafficking_expanded_2013:section:12"}]}
+{"eval_id":"eval_123","match_mode":"exact","targets":[{"source_id":"anti_trafficking","provision_id":"anti_trafficking:section:12"},{"source_id":"anti_trafficking_expanded_2013","provision_id":"anti_trafficking_expanded_2013:section:14"}]}
+{"eval_id":"eval_124","match_mode":"exact","targets":[{"source_id":"ip_code","provision_id":"ip_code:chapter-v:section:54"},{"source_id":"ip_code","provision_id":"ip_code:chapter-xiii:section:145"},{"source_id":"ip_code","provision_id":"ip_code:chapter-xiii:section:146"},{"source_id":"ip_code","provision_id":"ip_code:chapter-xvi:section:213"}]}
+{"eval_id":"eval_125","match_mode":"exact","targets":[{"source_id":"ip_code","provision_id":"ip_code:chapter-viii:section:185"}]}
+{"eval_id":"eval_126","match_mode":"exact","targets":[{"source_id":"data_privacy_act","provision_id":"data_privacy_act:chapter-v:section:20","unit_label":"Section 20(f)"},{"source_id":"data_privacy_act","provision_id":"data_privacy_act:chapter-viii:section:30"}]}
+{"eval_id":"eval_127","match_mode":"exact","targets":[{"source_id":"data_privacy_act","provision_id":"data_privacy_act:chapter-iii:section:13"}]}
+{"eval_id":"eval_128","match_mode":"exact","targets":[{"source_id":"adr_act","provision_id":"adr_act:chapter-1-general-provisions:section:6"}]}
+{"eval_id":"eval_129","match_mode":"exact","targets":[{"source_id":"adr_act","provision_id":"adr_act:chapter-2-mediation:section:9"},{"source_id":"adr_act","provision_id":"adr_act:chapter-2-mediation:section:10"},{"source_id":"adr_act","provision_id":"adr_act:chapter-2-mediation:section:11"}]}
+{"eval_id":"eval_130","match_mode":"exact","targets":[{"source_id":"public_land_act","provision_id":"public_land_act:chapter-iv-homestead:section:12"},{"source_id":"public_land_act","provision_id":"public_land_act:chapter-iv-homestead:section:19"},{"source_id":"constitution_1987","provision_id":"constitution_1987:article-xii:section:3","unit_label":"Section 3"}]}
+{"eval_id":"eval_131","match_mode":"source_only","targets":[{"source_id":"oposa_v_factoran","provision_id":null},{"source_id":"constitution_1987","provision_id":null}]}

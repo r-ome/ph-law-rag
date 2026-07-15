@@ -180,11 +180,11 @@ def test_corrective_retrieve_adds_bounded_deduped_chunks(monkeypatch):
 
     calls = []
 
-    def fake_hybrid(query, knobs=None):
+    def fake_hybrid(query, knobs=None, **_lane):
         calls.append(query)
         return [RetrievalResult(f"raw-{len(calls)}", query, 1.0, {})]
 
-    def fake_rerank(query, retrieved, knobs=None):
+    def fake_rerank(query, retrieved, knobs=None, **_lane):
         if "penalty" in query:
             return [
                 RetrievalResult("add-1", "new penalty", 2.0, {}),
@@ -237,10 +237,10 @@ def test_corrective_drops_additions_irrelevant_to_question(monkeypatch):
         subquery_reserve_n=2,
     )
 
-    def fake_hybrid(query, knobs=None):
+    def fake_hybrid(query, knobs=None, **_lane):
         return [RetrievalResult("raw", query, 1.0, {})]
 
-    def fake_rerank(query, retrieved, knobs=None):
+    def fake_rerank(query, retrieved, knobs=None, **_lane):
         if "topic" in query:  # facet query: both look good against the facet phrase
             return [
                 RetrievalResult("keep", "on point", 5.0, {}),

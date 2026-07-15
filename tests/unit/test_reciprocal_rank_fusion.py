@@ -2,7 +2,7 @@ import pytest
 
 from app.retriever import hybrid_retriever as hr
 from app.retriever.types import RetrievalResult
-from app.retriever.hybrid_retriever import hybrid_retriever, RRF_K
+from app.retriever.hybrid_retriever import _fuse, hybrid_retriever, RRF_K
 
 def _result(chunk_id: str) -> RetrievalResult:
     return RetrievalResult(chunk_id=chunk_id,text=f"text-{chunk_id}", score=0.0, metadata={})
@@ -48,3 +48,26 @@ def test_results_sorted_by_score_descending(monkeypatch):
 def test_empty_inputs_return_empty(monkeypatch):
     _patch(monkeypatch=monkeypatch, dense=[], sparse=[])
     assert hybrid_retriever("q") == []
+
+
+def test_fusion_clones_results_without_overwriting_arm_scores():
+    dense_a = RetrievalResult("A", "dense-a", 0.91, {"arm": "dense"})
+    dense_b = RetrievalResult("B", "dense-b", 0.72, {})
+    sparse_a = RetrievalResult("A", "sparse-a", 7.5, {"arm": "sparse"})
+
+    fused = _fuse(
+        [[dense_a, dense_b], [sparse_a]],
+        score_fields=["dense_score", "sparse_score"],
+    )
+
+    assert [result.chunk_id for result in fused] == ["A", "B"]
+    assert dense_a.score == 0.91
+    assert dense_b.score == 0.72
+    assert sparse_a.score == 7.5
+    assert dense_a.metadata == {"arm": "dense"}
+    assert fused[0] is not dense_a
+    assert fused[0].metadata["_retrieval_scores"] == {
+        "dense_score": 0.91,
+        "sparse_score": 7.5,
+        "fused_score": pytest.approx(2 / RRF_K),
+    }

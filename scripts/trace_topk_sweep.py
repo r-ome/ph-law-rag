@@ -13,8 +13,9 @@ from app.config import settings
 from app.indexing.embedder import get_embed_model
 from app.indexing.index_service import get_qdrant_client
 from app.indexing.vector_store import operative_filter, query
+from app.retriever.dense_retriever import _format_embedding_query
 from app.retriever.hybrid_retriever import _fuse
-from app.retriever.reranker import _get_model, rerank
+from app.retriever.reranker import _get_bedrock_client, _get_model, _get_qwen, rerank
 from app.retriever.sparse_retriever import sparse_retriever
 from app.retriever.types import RetrievalResult
 
@@ -101,7 +102,12 @@ def _matches(result: RetrievalResult, targets: list[dict[str, str]]) -> bool:
     return False
 
 
-def _first_hit(results: list[RetrievalResult], targets: list[dict[str, str]]) -> StageHit:
+def _first_hit(
+    results: list[RetrievalResult],
+    targets: list[dict[str, str]],
+    *,
+    dense_distance: bool = False,
+) -> StageHit:
     for rank, result in enumerate(results, start=1):
         if _matches(result, targets):
             return StageHit(
@@ -112,14 +118,36 @@ def _first_hit(results: list[RetrievalResult], targets: list[dict[str, str]]) ->
                 provision_id=result.metadata.get("provision_id"),
                 unit_label=result.metadata.get("unit_label"),
                 score=result.score,
-                distance=(1 - result.score) if result.score <= 1 else None,
+                distance=(1 - result.score) if dense_distance else None,
             )
     return StageHit(False)
 
 
+def _hit_payload(
+    hit: StageHit,
+    *,
+    score_field: str,
+    include_distance: bool = False,
+) -> dict:
+    payload = {
+        "present": hit.present,
+        "rank": hit.rank,
+        "chunk_id": hit.chunk_id,
+        "source_id": hit.source_id,
+        "provision_id": hit.provision_id,
+        "unit_label": hit.unit_label,
+        score_field: hit.score,
+        "score_provenance": score_field,
+    }
+    if include_distance:
+        payload["distance"] = hit.distance
+        payload["distance_provenance"] = "1 - qdrant_cosine_similarity"
+    return payload
+
+
 def _dense_raw(query_text: str, top_k: int) -> list[RetrievalResult]:
     embed_model = get_embed_model()
-    query_vector = embed_model.get_query_embedding(query_text)
+    query_vector = embed_model.get_query_embedding(_format_embedding_query(query_text))
     client = get_qdrant_client()
     points = query(client, query_vector, top_k, query_filter=operative_filter(None))
     return [
@@ -141,14 +169,15 @@ def _trace(question: str, targets: list[dict[str, str]], top_k: int) -> dict:
     dense_raw = _dense_raw(question, top_k)
     dense_filtered = _distance_filter(dense_raw)
     sparse = sparse_retriever(question)
-    fused = _fuse([dense_filtered, sparse])
+    fused = _fuse([dense_filtered, sparse], score_fields=["dense_score", "sparse_score"])
 
     start = time.perf_counter()
-    reranked = rerank(question, [RetrievalResult(r.chunk_id, r.text, r.score, dict(r.metadata)) for r in fused])
+    rerank_input = [RetrievalResult(r.chunk_id, r.text, r.score, dict(r.metadata)) for r in fused]
+    reranked = rerank(question, rerank_input)
     rerank_ms = (time.perf_counter() - start) * 1000
 
-    dense_raw_hit = _first_hit(dense_raw, targets)
-    dense_filtered_hit = _first_hit(dense_filtered, targets)
+    dense_raw_hit = _first_hit(dense_raw, targets, dense_distance=True)
+    dense_filtered_hit = _first_hit(dense_filtered, targets, dense_distance=True)
     hybrid_hit = _first_hit(fused, targets)
     final_hit = _first_hit(reranked, targets)
 
@@ -160,10 +189,27 @@ def _trace(question: str, targets: list[dict[str, str]], top_k: int) -> dict:
         "hybrid_n": len(fused),
         "final_n": len(reranked),
         "rerank_ms": round(rerank_ms, 1),
-        "dense_pool": dense_raw_hit.__dict__,
-        "distance_pass": dense_filtered_hit.__dict__,
-        "hybrid_candidate": hybrid_hit.__dict__,
-        "final": final_hit.__dict__,
+        "dense_pool": _hit_payload(
+            dense_raw_hit, score_field="dense_score", include_distance=True
+        ),
+        "distance_pass": _hit_payload(
+            dense_filtered_hit, score_field="dense_score", include_distance=True
+        ),
+        "hybrid_candidate": _hit_payload(hybrid_hit, score_field="fused_score"),
+        "final": _hit_payload(final_hit, score_field="rerank_score"),
+        "provenance": {
+            "embedding_query_formatter": "app.retriever.dense_retriever._format_embedding_query",
+            "embedding_query_instruction": settings.embedding_query_instruction,
+            "fusion": "rrf",
+            "reranker_backend": settings.reranker_backend,
+            "reranker_model": (
+                settings.qwen3_reranker_model
+                if settings.reranker_backend == "qwen3"
+                else settings.bedrock_rerank_model
+                if settings.reranker_backend == "bedrock"
+                else settings.reranker_model
+            ),
+        },
     }
 
 
@@ -174,7 +220,12 @@ def main() -> None:
         raise SystemExit(f"workset question not found in eval dataset: {missing}")
 
     # Load the reranker before timing so the reported latency is pair scoring, not model startup.
-    _get_model()
+    if settings.reranker_backend == "qwen3":
+        _get_qwen()
+    elif settings.reranker_backend == "bedrock":
+        _get_bedrock_client()
+    else:
+        _get_model()
 
     output = []
     for row in WORKSET:

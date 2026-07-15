@@ -6,7 +6,14 @@ from typing import Any, Literal
 
 from app.config import settings
 
-ArtifactKind = Literal["run", "scored", "summary", "meta"]
+ArtifactKind = Literal[
+    "run",
+    "scored",
+    "summary",
+    "meta",
+    "retrieval_trace",
+    "retrieval_summary",
+]
 
 
 @dataclass(frozen=True)
@@ -17,6 +24,8 @@ class EvalArtifactPaths:
     scored: Path
     summary: Path
     meta: Path | None
+    retrieval_trace: Path
+    retrieval_summary: Path
     layout: Literal["bundled", "legacy"]
 
 
@@ -39,6 +48,8 @@ def create_run_paths(tag: str, started_at: datetime) -> EvalArtifactPaths:
         scored=run_dir / "scored.json",
         summary=run_dir / "summary.json",
         meta=run_dir / "meta.json",
+        retrieval_trace=run_dir / "retrieval_trace.jsonl",
+        retrieval_summary=run_dir / "retrieval_summary.json",
         layout="bundled",
     )
 
@@ -75,6 +86,8 @@ def paths_for_tag(tag: str) -> EvalArtifactPaths:
             scored=run_dir / "scored.json",
             summary=run_dir / "summary.json",
             meta=run_dir / "meta.json",
+            retrieval_trace=run_dir / "retrieval_trace.jsonl",
+            retrieval_summary=run_dir / "retrieval_summary.json",
             layout="bundled",
         )
 
@@ -86,6 +99,8 @@ def paths_for_tag(tag: str) -> EvalArtifactPaths:
         scored=base / f"scored_{tag}.json",
         summary=base / f"summary_{tag}.json",
         meta=None,
+        retrieval_trace=base / f"retrieval_trace_{tag}.jsonl",
+        retrieval_summary=base / f"retrieval_summary_{tag}.json",
         layout="legacy",
     )
 
@@ -141,6 +156,14 @@ def write_latest(tag: str) -> None:
             "run_path": _relative(paths.run),
             "summary_path": _relative(paths.summary) if paths.summary.exists() else None,
             "scored_path": _relative(paths.scored) if paths.scored.exists() else None,
+            "retrieval_trace_path": (
+                _relative(paths.retrieval_trace) if paths.retrieval_trace.exists() else None
+            ),
+            "retrieval_summary_path": (
+                _relative(paths.retrieval_summary)
+                if paths.retrieval_summary.exists()
+                else None
+            ),
         },
     )
 

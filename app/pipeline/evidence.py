@@ -1,8 +1,11 @@
+from app.observability.logger import get_logger
 from app.pipeline.policy import AnswerPolicy
 from app.pipeline.state import AnswerState, EvidenceReport
 from app.retriever.answerability import _gate_complete, is_answerable
 from app.retriever.context_builder import build_context
 from app.retriever.types import RetrievalResult
+
+logger = get_logger(__name__)
 
 _CRAG_SYSTEM = """You are a facet checker for a Philippine-law retrieval system.
 A "facet" is a SUBSTANTIVE legal element the question needs answered — a rule,
@@ -77,17 +80,46 @@ def _check_crag_facets(
 Question: {question}
 
 FACETS:"""
+    output: str | None = None
+    error: str | None = None
     try:
         output = _gate_complete(_CRAG_SYSTEM, user_prompt, model, max_tokens=512)
         parsed = _parse_crag_output(output)
-    except Exception:
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
         parsed = None
 
     if parsed is None:
-        return "sufficient", [], {"facets": [], "present": [], "missing": []}
+        logger.warning(
+            "crag_judge_failed",
+            model=model,
+            error=error,
+            judge_output=output,
+        )
+        return "sufficient", [], {
+            "facets": [],
+            "present": [],
+            "missing": [],
+            "judge_output": output,
+            "judge_error": error,
+            "parse_failed": True,
+        }
 
     facets, present, missing, verdict = parsed
-    return verdict, missing, {"facets": facets, "present": present, "missing": missing}
+    logger.info(
+        "crag_judge_verdict",
+        model=model,
+        verdict=verdict,
+        facet_count=len(facets),
+        missing_count=len(missing),
+        judge_output=output,
+    )
+    return verdict, missing, {
+        "facets": facets,
+        "present": present,
+        "missing": missing,
+        "judge_output": output,
+    }
 
 
 def evaluate_evidence(state: AnswerState, policy: AnswerPolicy) -> EvidenceReport:

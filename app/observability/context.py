@@ -13,6 +13,8 @@ import structlog
 @dataclass
 class TraceCollector:
 	stages: list[dict[str, Any]] = field(default_factory=list)
+	capture_candidate_stages: bool = False
+	candidate_stages: list[dict[str, Any]] = field(default_factory=list)
 
 	def stage(
 		self,
@@ -31,6 +33,53 @@ class TraceCollector:
 			record["ms"] = round(ms, 2)
 		record.update(fields)
 		self.stages.append(record)
+
+	def candidates(
+		self,
+		stage: str,
+		results: list[Any],
+		*,
+		query_variant: str = "original",
+		query_text: str = "",
+		query_ordinal: int = 0,
+		pool_role: str | None = None,
+		score_field: str | None = None,
+		survived_ids: set[str] | None = None,
+		selected_ids: set[str] | None = None,
+	) -> None:
+		"""Snapshot a candidate pool without retaining mutable result objects."""
+		if not self.capture_candidate_stages:
+			return
+		candidates: list[dict[str, Any]] = []
+		for rank, result in enumerate(results, start=1):
+			metadata = dict(getattr(result, "metadata", {}) or {})
+			scores = dict(metadata.get("_retrieval_scores", {}) or {})
+			score = float(getattr(result, "score", 0.0))
+			if score_field:
+				scores[score_field] = score
+			candidate = {
+				"rank": rank,
+				"chunk_id": str(getattr(result, "chunk_id", "")),
+				"text": str(getattr(result, "text", "")),
+				"score": score,
+				"metadata": metadata,
+				**scores,
+			}
+			if survived_ids is not None:
+				candidate["survived"] = candidate["chunk_id"] in survived_ids
+			if selected_ids is not None:
+				candidate["selected"] = candidate["chunk_id"] in selected_ids
+			candidates.append(candidate)
+		snapshot = {
+				"stage": stage,
+				"query_variant": query_variant,
+				"query_text": query_text,
+				"query_ordinal": query_ordinal,
+				"candidates": candidates,
+			}
+		if pool_role is not None:
+			snapshot["pool_role"] = pool_role
+		self.candidate_stages.append(snapshot)
 
 
 _trace_collector_var: contextvars.ContextVar[TraceCollector | None] = contextvars.ContextVar(
@@ -57,6 +106,33 @@ def record_stage(
 	collector = current_trace_collector()
 	if collector is not None:
 		collector.stage(name, in_n=in_n, out_n=out_n, ms=ms, **fields)
+
+
+def capture_candidates(
+	stage: str,
+	results: list[Any],
+	*,
+	query_variant: str = "original",
+	query_text: str = "",
+	query_ordinal: int = 0,
+	pool_role: str | None = None,
+	score_field: str | None = None,
+	survived_ids: set[str] | None = None,
+	selected_ids: set[str] | None = None,
+) -> None:
+	collector = current_trace_collector()
+	if collector is not None:
+		collector.candidates(
+			stage,
+			results,
+			query_variant=query_variant,
+			query_text=query_text,
+			query_ordinal=query_ordinal,
+			pool_role=pool_role,
+			score_field=score_field,
+			survived_ids=survived_ids,
+			selected_ids=selected_ids,
+		)
 
 
 @contextmanager
@@ -96,4 +172,3 @@ def stage_timer(name: str, in_n: int | None = None, **fields: Any) -> Iterator[d
 			ms=(time.perf_counter() - start) * 1000,
 			**record_fields,
 		)
-

@@ -8,7 +8,7 @@ from pathlib import Path
 from app.config import settings
 from app.evals import artifacts
 from app.pipeline.policy import resolve_policy
-from app.retriever.answer_service import answer
+from app.pipeline.runner import run_answer
 
 def load_dataset(path: str) -> list[dict]:
     items = []
@@ -75,20 +75,57 @@ def run_rows(
     trace_label: str | None = "eval",
     holdout: bool = False,
 ) -> list[dict]:
+    from app.evals.retrieval_metrics import save_retrieval_summary
+    from app.evals.retrieval_targets import load_retrieval_targets
+    from app.evals.retrieval_trace import (
+        append_completed_row,
+        candidate_count_metadata,
+        candidate_lines,
+    )
+
     results = []
+    holdout_operational: list[dict] = []
     total = len(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     policy = resolve_policy().policy
+    targets_by_id = {} if holdout else load_retrieval_targets()
+    if out_path.name == "run.jsonl":
+        retrieval_trace_path = out_path.parent / "retrieval_trace.jsonl"
+        retrieval_summary_path = out_path.parent / "retrieval_summary.json"
+    else:
+        tag = artifacts.tag_from_run_path(out_path)
+        retrieval_trace_path = out_path.with_name(f"retrieval_trace_{tag}.jsonl")
+        retrieval_summary_path = out_path.with_name(f"retrieval_summary_{tag}.json")
 
     for i, item in enumerate(rows, start=1):
         start = time.perf_counter()
-        resp = answer(
+        resp, trace_record = run_answer(
             item["question"],
             debug=debug,
             trace_label=trace_label,
             strategy_override=strategy_override,
+            capture_candidate_stages=True,
         )
+        if trace_record is None:
+            raise RuntimeError("candidate capture did not produce an internal trace")
         elapsed = time.perf_counter() - start
+        eval_id = item.get("id", item.get("eval_id"))
+        target_record = targets_by_id.get(eval_id)
+        trace_lines = (
+            []
+            if holdout
+            else candidate_lines(item, resp, trace_record, target_record)
+        )
+        target_match_field = (
+            "expected_source_match"
+            if (target_record or {}).get("match_mode") == "source_only"
+            else "expected_provision_match"
+        )
+        retrieval_target_present = any(
+            line.get("stage") in {"selected", "corrective"}
+            and line.get(target_match_field) is True
+            for line in trace_lines
+        )
         debug_chunks = resp.get("debug", {}).get("chunks", [])
         debug_stages = resp.get("debug", {}).get("stages", [])
         model_choice = resp.get("model_choice") or {
@@ -96,7 +133,7 @@ def run_rows(
             "reason": "not_generated" if resp.get("abstained") else "policy_default",
         }
         row = {
-            "eval_id": item.get("id", item.get("eval_id")),
+            "eval_id": eval_id,
             "question": item["question"],
             "answer": resp["answer"],
             "contexts": resp["contexts"],
@@ -109,6 +146,7 @@ def run_rows(
             "facet": item.get("facet"),
             "topic": item.get("topic"),
             "abstained": resp["abstained"],
+            "retrieval_target_present": retrieval_target_present,
             "profile": policy.name,
             "model": model_choice["model"],
             "generator_model": model_choice["model"],
@@ -130,12 +168,79 @@ def run_rows(
         # rows (a 5h40m all-or-nothing run died to swap pressure on 2026-07-03).
         with out_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        (
+            captured_candidate_count,
+            stage_candidate_counts,
+            stage_candidate_counts_by_query_variant,
+        ) = candidate_count_metadata(trace_record.get("candidate_stages", []))
+        if holdout:
+            holdout_operational.append(
+                {
+                    "candidate_count": captured_candidate_count,
+                    "retrieval_latency_ms": float(
+                        trace_record.get("retrieval_latency_ms", 0.0)
+                    ),
+                }
+            )
+        else:
+            append_completed_row(
+                retrieval_trace_path,
+                eval_id,
+                trace_lines,
+                retrieval_latency_ms=trace_record.get("retrieval_latency_ms", 0.0),
+                abstained=bool(resp.get("abstained")),
+                category=item.get("category"),
+                target_record=target_record,
+                candidate_count=captured_candidate_count,
+                stage_candidate_counts=stage_candidate_counts,
+                stage_candidate_counts_by_query_variant=(
+                    stage_candidate_counts_by_query_variant
+                ),
+                stage_timings_ms=trace_record.get("retrieval_stage_timings_ms", {}),
+            )
         if holdout:
             print(f"[{i}/{total}]", flush=True)
         else:
             flag = "ABSTAIN" if row["abstained"] else "answered"
             print(f"[{i}/{total}] {row['category']:12} {flag:8} {elapsed:6.2f}s", flush=True)
 
+    if holdout:
+        artifacts.write_json(
+            retrieval_summary_path,
+            {
+                "available": True,
+                "holdout": True,
+                "operational": {
+                    "rows": len(holdout_operational),
+                    "candidate_count_mean": (
+                        round(
+                            statistics.mean(
+                                row["candidate_count"] for row in holdout_operational
+                            ),
+                            4,
+                        )
+                        if holdout_operational
+                        else None
+                    ),
+                    "retrieval_latency_ms_mean": (
+                        round(
+                            statistics.mean(
+                                row["retrieval_latency_ms"] for row in holdout_operational
+                            ),
+                            4,
+                        )
+                        if holdout_operational
+                        else None
+                    ),
+                },
+            },
+        )
+    else:
+        save_retrieval_summary(
+            retrieval_trace_path,
+            retrieval_summary_path,
+            holdout=False,
+        )
     return results
 
 
@@ -162,7 +267,7 @@ def run_eval_set(splits: tuple[str, ...] = ("regression", "dev")) -> tuple[list[
     print("Active config:")
     print(json.dumps(_active_config(), indent=2), flush=True)
 
-    answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
+    run_answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
 
     results = run_rows(dataset, out_path, holdout=holdout)
 

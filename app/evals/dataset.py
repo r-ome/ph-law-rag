@@ -134,6 +134,7 @@ def validate_rows(rows: list[dict], enabled_source_ids: set[str]) -> None:
 def load_eval_dataset(
     path: str | Path | None = None,
     splits: tuple[str, ...] | None = None,
+    row_ids: list[str] | tuple[str, ...] | None = None,
 ) -> list[dict]:
     """Load and validate v2 JSONL, defaulting to non-holdout splits."""
     if splits is not None:
@@ -151,8 +152,18 @@ def load_eval_dataset(
     rows = _read_jsonl(dataset_path)
     validate_rows(rows, _enabled_source_ids())
     selected = set(splits)
-    return [
+    result = [
         {key: value for key, value in row.items() if key not in {"__line__", "__path__"}}
         for row in rows
         if row["split"] in selected
     ]
+    if row_ids is not None:
+        requested = list(row_ids)
+        by_id = {row["id"]: row for row in result}
+        missing = [row_id for row_id in requested if row_id not in by_id]
+        if missing:
+            raise ValueError(f"row ID(s) not present in requested split(s): {', '.join(missing)}")
+        if len(set(requested)) != len(requested):
+            raise ValueError("duplicate row ID")
+        result = [by_id[row_id] for row_id in requested]
+    return result

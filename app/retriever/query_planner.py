@@ -1,5 +1,8 @@
+from app.observability.logger import get_logger
 from app.retriever.llm_client import generate, LLMError
 from app.config import settings
+
+logger = get_logger(__name__)
 
 _SYSTEM = (
     "You rewrite a user's Philippine-law question into search queries for retrieval.\n"
@@ -38,7 +41,8 @@ def _plan(
             _USER.format(question=question),
             model=model,
         )
-    except LLMError:
+    except LLMError as exc:
+        logger.warning("query_decomposition_failed", model=model, error=str(exc))
         return [question]
 
     seen: set[str] = set()
@@ -52,10 +56,28 @@ def _plan(
         if len(subs) >= max_subqueries:
             break
 
-    return subs or [question]
+    result = subs or [question]
+    logger.info(
+        "query_decomposed",
+        model=model,
+        question=question,
+        subqueries=result,
+        split=len(result) > 1 or result[0] != question,
+    )
+    return result
 
 
-def plan_queries(question: str) -> list[str]:
-    if not settings.query_decomposition_enabled:
+def plan_queries(question: str, knobs=None) -> list[str]:
+    enabled = (
+        knobs.query_decomposition_enabled if knobs is not None
+        else settings.query_decomposition_enabled
+    )
+    if not enabled:
         return [question]
+    if knobs is not None:
+        return _plan(
+            question,
+            model=knobs.query_planner_model,
+            max_subqueries=knobs.query_planner_max_subqueries,
+        )
     return _plan(question)
