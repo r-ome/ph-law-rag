@@ -56,6 +56,31 @@ The retrieval-only A/B entry point is
 `raglab eval-retrieve --strategy sibling_aware`; without `--strategy`, capture
 continues to use the resolved profile default.
 
+### Phase 3 retrieval-only gate result (2026-07-16)
+
+The 131-row non-holdout MiniLM arm sealed as
+`phase3-sibling-aware-minilm` with capture consistency matched. Dataset,
+targets, corpus, index, embeddings, reranker, cutoffs, and pre-rerank pools
+matched the frozen `phase2-original-minilm` baseline; sibling expansion was the
+only selection delta. All 131 pre-rerank pool hashes matched.
+
+Sibling expansion fired on 64 rows and added 167 selected chunks. All 64 changed
+contexts were additive: no baseline selected chunk or source, provision, or leaf
+target was lost. The only target gain was `eval_053`, where Article 1403(2)(e)
+was recovered at both `expanded` and `selected`. Selected exact-leaf coverage
+rose from 0.5769 to 0.6154; selected source recall, parent-provision coverage,
+and overall target survival were unchanged. The structural census therefore
+reports 1/1 eligible recovery, but remains descriptive because N=1.
+
+Mean final-context size rose 9.7% (4,725 to 5,182 characters; 1,184 to 1,298
+estimated tokens), while mean retrieval latency rose 1.9% (1,049 ms to 1,069
+ms). The sibling stage itself averaged 15.4 ms. Per-row limits held: the largest
+addition was 2,977 characters and 746 tokens. Only one of 167 additions was a
+target leaf, so a matched generation A/B must assess evidence-gate and answer
+quality effects before any serving-default or router graduation. The
+retrieval-only gate passes in the predeclared descriptive regime; generation
+and serving graduation remain pending.
+
 ## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
 
 The retrieval experiment now has an explicit `original_only` versus

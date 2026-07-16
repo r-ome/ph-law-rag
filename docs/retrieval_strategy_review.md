@@ -349,6 +349,40 @@ percentage gate is therefore descriptive for this experiment; the binding
 decision uses the no-regression gates and row-level inspection. This census did
 not run retrieval, generation, a model, or the holdout.
 
+### Checkpoint 7 retrieval-only result (2026-07-16)
+
+The explicit `sibling_aware` retrieval command, tagged
+`phase3-sibling-aware-minilm`, completed all 131 dev and regression rows and
+sealed a non-holdout bundle with matched capture consistency. Both source
+bundles validated before comparison. Dataset, target, corpus, and index hashes
+matched the frozen `phase2-original-minilm` baseline, and every pre-rerank pool
+hash was unchanged.
+
+The sibling arm changed 64 selected contexts, all additively: zero baseline
+chunks were removed and there were no source-, provision-, or leaf-target loss
+rows. `eval_053` was the only target gain; Article 1403(2)(e) was present at both
+the expanded and selected snapshots. The candidate census reports 1/1 eligible
+recovery (100%), explicitly descriptive at N=1. Selected exact-leaf coverage
+improved by one row, from 0.5769 to 0.6154, while aggregate selected source
+recall, parent-provision coverage, and target survival were unchanged.
+
+The mechanism fired on 64/131 rows and added 167 chunks (mean 1.27 per query;
+2.61 when fired). Only one addition was target-bearing. Mean final context grew
+9.7%, mean retrieval latency grew 1.9%, and sibling expansion itself averaged
+15.4 ms. The largest row stayed inside both declared limits at 2,977 characters
+and 746 tokens. These results pass the retrieval-only gates in the predeclared
+descriptive regime, but the low target-bearing ratio makes the matched
+generation A/B a required next gate. No serving default, router mapping, ADR,
+generation run, external model call, or holdout access followed from this
+result.
+
+The existing `eval-retrieval-compare` publisher remains specific to Phase 2's
+original-versus-rewrite arm contract, so it was not used for this two-original-
+query selection comparison. The two sealed bundles were integrity-validated
+and compared directly by identity, row hashes, target sets, and summaries; a
+general selection-arm comparison artifact remains tooling follow-up rather than
+a Phase 3 retrieval result dependency.
+
 No holdout, paid Bedrock run, ADR, automatic router mapping, or serving-default
 change is part of Phase 3. A matched generation A/B follows only after the
 retrieval gates pass and must inspect evidence-gate effects from the additional
