@@ -55,11 +55,17 @@ export type SyncRun = SyncRunListResponse["runs"][number];
 export type TraceSummary = TraceListResponse["traces"][number];
 export type { TraceRecord };
 export type ChunkTrace = TraceRecord["retrieved_chunks"][number];
+export type LogEntry = LogResponse["entries"][number];
 export type EvalRunSummary = EvalRunListResponse["runs"][number];
 export type EvalRow = EvalRowsResponse["rows"][number];
 export type { EvalRunDetail, EvalDiff };
 export type ChunkLookupHit = ChunkLookupResponse["chunks"][number];
 export type { EvalRunLogsResponse };
+export type EvalPolicy = {
+  noise_floor: number;
+  quality_bands: { key: "strong" | "fair" | "weak"; label: string; min: number | null; range: string }[];
+  splits: { key: string; name: string; count: number; plain: string }[];
+};
 
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
@@ -147,6 +153,10 @@ export function getLogs(params?: { lines?: number; level?: string }): Promise<Lo
 
 export function listEvalRuns(): Promise<EvalRunListResponse> {
   return apiGet<EvalRunListResponse>("/evals/runs");
+}
+
+export function getEvalPolicy(): Promise<EvalPolicy> {
+  return apiGet<EvalPolicy>("/evals/runs/policy");
 }
 
 export function getEvalRun(tag: string): Promise<EvalRunDetail> {

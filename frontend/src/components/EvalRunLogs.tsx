@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getEvalRunLogs } from "@/api/client";
+import { LogTable } from "@/components/LogTable";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,43 +13,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type Level = "all" | "debug" | "info" | "warning" | "error";
-
-function levelVariant(level?: string | null): "default" | "secondary" | "destructive" | "outline" {
-  if (level === "error" || level === "critical") return "destructive";
-  if (level === "warning") return "secondary";
-  if (level === "info") return "default";
-  return "outline";
-}
 
 export default function EvalRunLogs({ tag }: { tag: string }) {
   const [level, setLevel] = useState<Level>("all");
   const [loggerFilter, setLoggerFilter] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const logsQuery = useQuery({
     queryKey: ["evalRunLogs", tag, level],
     queryFn: () => getEvalRunLogs(tag, level === "all" ? undefined : { level }),
+    enabled: expanded,
   });
 
   const data = logsQuery.data;
+  const loggerNeedle = loggerFilter.trim().toLowerCase();
   const entries = (data?.entries ?? []).filter((entry) =>
-    loggerFilter.trim() ? (entry.logger ?? "").toLowerCase().includes(loggerFilter.trim().toLowerCase()) : true,
+    loggerNeedle ? (entry.logger ?? "").toLowerCase().includes(loggerNeedle) : true,
   );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Run Logs</CardTitle>
+        <CardAction>
+          <Button type="button" variant="outline" size="sm" onClick={() => setExpanded((value) => !value)}>
+            {expanded ? "Hide logs" : "Show logs"}
+          </Button>
+        </CardAction>
       </CardHeader>
-      <CardContent className="space-y-3">
+      {expanded && <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Select value={level} onValueChange={(v) => setLevel((v ?? "all") as Level)}>
             <SelectTrigger className="w-[150px]" aria-label="Log level">
@@ -87,31 +82,12 @@ export default function EvalRunLogs({ tag }: { tag: string }) {
           <p className="text-sm text-muted-foreground">
             No entries in window — the app log has likely rotated past this run.
           </p>
+        ) : data && entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No entries match the logger filter.</p>
         ) : data ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Level</TableHead>
-                <TableHead>Logger</TableHead>
-                <TableHead>Event</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map((entry, index) => (
-                <TableRow key={`${entry.timestamp ?? index}-${index}`} className="font-mono text-xs">
-                  <TableCell className="whitespace-nowrap">{entry.timestamp ?? "n/a"}</TableCell>
-                  <TableCell>
-                    <Badge variant={levelVariant(entry.level)}>{entry.level ?? "raw"}</Badge>
-                  </TableCell>
-                  <TableCell>{entry.logger ?? ""}</TableCell>
-                  <TableCell className="break-all">{entry.event ?? entry.raw ?? ""}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <LogTable entries={entries} />
         ) : null}
-      </CardContent>
+      </CardContent>}
     </Card>
   );
 }

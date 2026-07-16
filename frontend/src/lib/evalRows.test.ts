@@ -48,25 +48,6 @@ test("filterRows: search matches eval_id case-insensitively", () => {
   expect(result[0]!.eval_id).toBe("EVAL_042");
 });
 
-test("filterRows: verdict none keeps only rows with evidence null", () => {
-  const rows = [
-    row({ evidence: { verdict: "sufficient", method: null, missing_facets: [], detail: null } }),
-    row({ evidence: null }),
-  ];
-  const result = filterRows(rows, { ...defaultRowFilters, verdict: "none" });
-  expect(result).toHaveLength(1);
-  expect(result[0]!.evidence).toBeNull();
-});
-
-test("filterRows: verdict specific value matches evidence.verdict", () => {
-  const rows = [
-    row({ evidence: { verdict: "insufficient", method: null, missing_facets: [], detail: null } }),
-    row({ evidence: { verdict: "sufficient", method: null, missing_facets: [], detail: null } }),
-  ];
-  const result = filterRows(rows, { ...defaultRowFilters, verdict: "insufficient" });
-  expect(result).toHaveLength(1);
-});
-
 test("filterRows: sourceMissOnly keeps only non-empty expected_missing", () => {
   const rows = [row({ expected_missing: ["ra_9262"] }), row({ expected_missing: [] })];
   const result = filterRows(rows, { ...defaultRowFilters, sourceMissOnly: true });

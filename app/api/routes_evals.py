@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.api.routes_logs import LogEntry
-from app.eval_store import diff_runs, get_rows, get_run, get_run_logs, list_runs
+from app.eval_store import diff_runs, eval_policy, get_rows, get_run, get_run_logs, list_runs
 
 router = APIRouter(prefix="/evals/runs", tags=["evals"])
 
@@ -161,9 +161,34 @@ class EvalDiff(BaseModel):
     by_category: dict[str, CategoryDiff] = {}
 
 
+class EvalQualityBand(BaseModel):
+    key: Literal["strong", "fair", "weak"]
+    label: str
+    min: float | None = None
+    range: str
+
+
+class EvalSplitPolicy(BaseModel):
+    key: str
+    name: str
+    count: int
+    plain: str
+
+
+class EvalPolicyResponse(BaseModel):
+    noise_floor: float
+    quality_bands: list[EvalQualityBand]
+    splits: list[EvalSplitPolicy]
+
+
 @router.get("", response_model=EvalRunListResponse, summary="List eval runs (manifest)")
 def runs() -> EvalRunListResponse:
     return EvalRunListResponse(runs=list_runs())
+
+
+@router.get("/policy", response_model=EvalPolicyResponse, summary="Evaluation display policy")
+def policy() -> EvalPolicyResponse:
+    return EvalPolicyResponse(**eval_policy())
 
 
 @router.get("/{tag}", response_model=EvalRunDetail, summary="Eval run meta + summary")

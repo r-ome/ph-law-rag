@@ -6,6 +6,7 @@ from pathlib import Path
 from app.config import settings
 
 _LEVEL_RANK = {"debug": 10, "info": 20, "warning": 30, "error": 40, "critical": 50}
+_CORE_KEYS = {"timestamp", "level", "event", "logger"}
 
 
 def read_logs(lines: int = 200, level: str | None = None) -> list[dict]:
@@ -24,15 +25,17 @@ def read_logs(lines: int = 200, level: str | None = None) -> list[dict]:
             continue
         try:
             rec = json.loads(raw)
+            extra = {k: v for k, v in rec.items() if k not in _CORE_KEYS}
             entry = {
                 "timestamp": rec.get("timestamp"),
                 "level": rec.get("level"),
                 "event": rec.get("event"),
                 "logger": rec.get("logger"),
                 "raw": None,
+                "extra": extra or None,
             }
         except (ValueError, TypeError):
-            entry = {"timestamp": None, "level": None, "event": None, "logger": None, "raw": raw}
+            entry = {"timestamp": None, "level": None, "event": None, "logger": None, "raw": raw, "extra": None}
         rank = _LEVEL_RANK.get((entry["level"] or "").lower(), 0)
         if rank >= min_rank:
             out.append(entry)
@@ -76,6 +79,11 @@ def read_logs_window(
     for path in [*backups, log_dir / "app.log"]:
         if not path.exists():
             continue
+        try:
+            if datetime.fromtimestamp(path.stat().st_mtime, timezone.utc) < lo:
+                continue
+        except OSError:
+            continue
         with path.open(encoding="utf-8", errors="replace") as f:
             for raw in f:
                 raw = raw.strip()
@@ -86,8 +94,10 @@ def read_logs_window(
                 except (ValueError, TypeError):
                     continue
                 ts = _parse_ts(rec.get("timestamp"))
-                if ts is None or ts < lo or ts > hi:
+                if ts is None or ts < lo:
                     continue
+                if ts > hi:
+                    return out, truncated
                 rank = _LEVEL_RANK.get((rec.get("level") or "").lower(), 0)
                 if rank < min_rank:
                     continue

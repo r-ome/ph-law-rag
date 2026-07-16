@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -12,6 +14,7 @@ class LogEntry(BaseModel):
     event: str | None = None
     logger: str | None = None
     raw: str | None = None
+    extra: dict[str, Any] | None = None
 
 
 class LogResponse(BaseModel):

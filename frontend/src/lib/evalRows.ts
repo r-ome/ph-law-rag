@@ -4,7 +4,6 @@ export type RowFilters = {
   search: string; // case-insensitive substring on question + eval_id
   category: string | "all";
   split: string | "all";
-  verdict: "all" | "sufficient" | "partial" | "insufficient" | "none"; // none = evidence null
   abstainedOnly: boolean;
   sourceMissOnly: boolean; // expected_missing.length > 0
 };
@@ -13,7 +12,6 @@ export const defaultRowFilters: RowFilters = {
   search: "",
   category: "all",
   split: "all",
-  verdict: "all",
   abstainedOnly: false,
   sourceMissOnly: false,
 };
@@ -28,13 +26,6 @@ export function filterRows(rows: EvalRow[], f: RowFilters): EvalRow[] {
     }
     if (f.category !== "all" && row.category !== f.category) return false;
     if (f.split !== "all" && row.split !== f.split) return false;
-    if (f.verdict !== "all") {
-      if (f.verdict === "none") {
-        if (row.evidence != null) return false;
-      } else if (row.evidence?.verdict !== f.verdict) {
-        return false;
-      }
-    }
     if (f.abstainedOnly && !row.abstained) return false;
     if (f.sourceMissOnly && row.expected_missing.length === 0) return false;
     return true;

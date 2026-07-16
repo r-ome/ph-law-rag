@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getLogs } from "@/api/client";
-import { Badge } from "@/components/ui/badge";
+import { LogTable } from "@/components/LogTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,23 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type Level = "all" | "debug" | "info" | "warning" | "error";
-
-function variant(level?: string | null): "default" | "secondary" | "destructive" | "outline" {
-  if (level === "error" || level === "critical") return "destructive";
-  if (level === "warning") return "secondary";
-  if (level === "info") return "default";
-  return "outline";
-}
 
 export default function Logs() {
   const [level, setLevel] = useState<Level>("all");
@@ -70,28 +55,7 @@ export default function Logs() {
 
           {logsQuery.isLoading && <p>Loading...</p>}
           {logsQuery.error && <p className="text-sm text-red-600">Failed to load logs.</p>}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Level</TableHead>
-                <TableHead>Logger</TableHead>
-                <TableHead>Event</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(logsQuery.data?.entries ?? []).map((entry, index) => (
-                <TableRow key={`${entry.timestamp ?? index}-${index}`} className="font-mono text-xs">
-                  <TableCell className="whitespace-nowrap">{entry.timestamp ?? "n/a"}</TableCell>
-                  <TableCell>
-                    <Badge variant={variant(entry.level)}>{entry.level ?? "raw"}</Badge>
-                  </TableCell>
-                  <TableCell>{entry.logger ?? ""}</TableCell>
-                  <TableCell className="break-all">{entry.event ?? entry.raw ?? ""}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <LogTable entries={logsQuery.data?.entries ?? []} />
         </CardContent>
       </Card>
     </div>

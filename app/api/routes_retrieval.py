@@ -49,9 +49,19 @@ class TraceRecord(BaseModel):
     corrective_retrieval: dict[str, Any] | None = None
 
 
+class InspectOverrides(BaseModel):
+    evidence_gate: Literal["min_chunks", "answerability", "crag"] | None = None
+    evidence_judge_model: str | None = None
+    corrective_retrieval_enabled: bool | None = None
+    query_decomposition_enabled: bool | None = None
+    query_planner_model: str | None = None
+    reranker_backend: Literal["minilm", "qwen3", "bedrock"] | None = None
+
+
 class InspectRequest(BaseModel):
     question: str
     strategy: Literal["default", "current_law"] | None = None
+    overrides: InspectOverrides | None = None
 
 
 class InspectResponse(BaseModel):
@@ -65,6 +75,11 @@ class InspectResponse(BaseModel):
 
 @router.post("/inspect", response_model=InspectResponse, summary="Run a query and inspect its trace")
 def inspect(request: InspectRequest) -> InspectResponse:
+    policy_overrides = (
+        {k: v for k, v in request.overrides.model_dump().items() if v is not None}
+        if request.overrides
+        else None
+    )
     try:
         response, trace_record = run_answer(
             request.question,
@@ -73,6 +88,7 @@ def inspect(request: InspectRequest) -> InspectResponse:
             trace=True,
             trace_label="lab",
             strategy_override=request.strategy,
+            policy_overrides=policy_overrides,
         )
     except Exception as e:
         return InspectResponse(

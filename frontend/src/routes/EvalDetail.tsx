@@ -1,18 +1,16 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getEvalDiff, getEvalRows, getEvalRun, listEvalRuns } from "@/api/client";
-import type { EvalDiff, EvalRow, EvalRunDetail } from "@/api/client";
+import { getEvalDiff, getEvalPolicy, getEvalRows, getEvalRun, listEvalRuns } from "@/api/client";
+import type { EvalDiff, EvalPolicy, EvalRow, EvalRunDetail } from "@/api/client";
 import {
   ABSTENTION_PLAIN,
+  DEFAULT_EVAL_POLICY,
   METRICS,
-  NOISE_FLOOR,
-  NOISE_FLOOR_FMT,
   NOISE_NOTE,
   cell,
   splitStyle,
   trend,
-  verdictChip,
   type MetricKey,
 } from "@/lib/evalBands";
 import { defaultRowFilters, filterRows, type RowFilters } from "@/lib/evalRows";
@@ -91,12 +89,19 @@ function RunConfig({ run }: { run: EvalRunDetail }) {
 
   if (!run.meta?.active_config) return null;
 
+  const overrides = (cfg.policy_overrides ?? {}) as Record<string, unknown>;
+  const evidenceJudge =
+    typeof overrides.evidence_judge_model === "string" && overrides.evidence_judge_model
+      ? overrides.evidence_judge_model
+      : str("evidence_judge_model");
+
   const rows: [string, string][] = [
     ["Profile", str("profile")],
     ["Generator model", str("llm_model")],
+    ["Embedding model", str("embedding_model")],
     ["Reranker", str("reranker_backend")],
     ["Evidence gate", str("evidence_gate")],
-    ["Evidence judge", str("evidence_judge_model")],
+    ["Evidence judge", evidenceJudge],
   ];
 
   return (
@@ -121,11 +126,11 @@ function RunConfig({ run }: { run: EvalRunDetail }) {
   );
 }
 
-function SummaryTiles({ run }: { run: EvalRunDetail }) {
+function SummaryTiles({ run, bands }: { run: EvalRunDetail; bands: EvalPolicy["quality_bands"] | undefined }) {
   const overall = run.summary?.overall;
   const abstention = run.summary?.abstention;
   const tiles = METRICS.map((m) => {
-    const c = cell(overall?.[m.key]);
+    const c = cell(overall?.[m.key], bands);
     return {
       metricKey: m.key as string,
       label: m.label,
@@ -136,7 +141,7 @@ function SummaryTiles({ run }: { run: EvalRunDetail }) {
       bandLabel: c.band,
     };
   });
-  const ac = cell(abstention?.accuracy ?? null);
+  const ac = cell(abstention?.accuracy ?? null, bands);
   tiles.push({
     metricKey: "abstention",
     label: "Abstention",
@@ -160,7 +165,7 @@ function SummaryTiles({ run }: { run: EvalRunDetail }) {
   );
 }
 
-function HowToRead() {
+function HowToRead({ noiseFloor }: { noiseFloor: number }) {
   return (
     <div
       className="flex gap-3 rounded-xl px-4 py-4"
@@ -172,14 +177,14 @@ function HowToRead() {
           How to read these scores
         </span>
         <p className="m-0 max-w-[900px] text-xs leading-relaxed" style={{ color: "oklch(0.78 0.02 245)" }}>
-          {NOISE_NOTE}
+          {NOISE_NOTE} Current noise floor: ±{noiseFloor.toFixed(2)}.
         </p>
       </div>
     </div>
   );
 }
 
-function ByCategory({ run }: { run: EvalRunDetail }) {
+function ByCategory({ run, bands }: { run: EvalRunDetail; bands: EvalPolicy["quality_bands"] | undefined }) {
   const categories = Object.entries(run.summary?.by_category ?? {}).sort(([a], [b]) => a.localeCompare(b));
   return (
     <Card>
@@ -210,7 +215,7 @@ function ByCategory({ run }: { run: EvalRunDetail }) {
                 <TableCell className="font-medium">{category}</TableCell>
                 <TableCell className="text-right font-mono text-muted-foreground">{metrics.n ?? "—"}</TableCell>
                 {METRICS.map((m) => {
-                  const c = cell(metrics[m.key]);
+                  const c = cell(metrics[m.key], bands);
                   return (
                     <TableCell key={m.key} className="text-right">
                       <MetricChip chip={c.chip}>{c.fmt}</MetricChip>
@@ -233,7 +238,15 @@ function ByCategory({ run }: { run: EvalRunDetail }) {
   );
 }
 
-function ComparePanel({ tag }: { tag: string }) {
+function ComparePanel({
+  tag,
+  bands,
+  noiseFloor,
+}: {
+  tag: string;
+  bands: EvalPolicy["quality_bands"] | undefined;
+  noiseFloor: number;
+}) {
   const [baseline, setBaseline] = useState<string | undefined>();
   const runsQuery = useQuery({ queryKey: ["evalRuns"], queryFn: listEvalRuns });
   const diffQuery = useQuery({
@@ -271,13 +284,21 @@ function ComparePanel({ tag }: { tag: string }) {
         )}
         {diffQuery.isLoading && <p>Loading comparison…</p>}
         {diffQuery.error && <p className="text-sm text-red-600">Failed to load comparison.</p>}
-        {diff && <DiffTables diff={diff} />}
+        {diff && <DiffTables diff={diff} bands={bands} noiseFloor={noiseFloor} />}
       </CardContent>
     </Card>
   );
 }
 
-function DiffTables({ diff }: { diff: EvalDiff }) {
+function DiffTables({
+  diff,
+  bands,
+  noiseFloor,
+}: {
+  diff: EvalDiff;
+  bands: EvalPolicy["quality_bands"] | undefined;
+  noiseFloor: number;
+}) {
   const cats = Object.entries(diff.by_category).sort(([a], [b]) => a.localeCompare(b));
   const overallRows = [
     ...METRICS.map((m) => ({
@@ -288,7 +309,7 @@ function DiffTables({ diff }: { diff: EvalDiff }) {
     { label: "Abstention", cand: diff.abstention.candidate, base: diff.abstention.baseline },
   ];
   const anyWithin = overallRows.some(
-    (r) => r.cand != null && r.base != null && Math.abs(r.cand - r.base) < NOISE_FLOOR,
+    (r) => r.cand != null && r.base != null && Math.abs(r.cand - r.base) < noiseFloor,
   );
 
   return (
@@ -305,9 +326,9 @@ function DiffTables({ diff }: { diff: EvalDiff }) {
           </TableHeader>
           <TableBody>
             {overallRows.map((row) => {
-              const c = cell(row.cand);
-              const b = cell(row.base);
-              const t = trend(row.cand, row.base);
+              const c = cell(row.cand, bands);
+              const b = cell(row.base, bands);
+              const t = trend(row.cand, row.base, noiseFloor);
               return (
                 <TableRow key={row.label}>
                   <TableCell>{row.label}</TableCell>
@@ -355,7 +376,7 @@ function DiffTables({ diff }: { diff: EvalDiff }) {
                   </Badge>
                 </TableCell>
                 {METRICS.map((m) => {
-                  const t = row.delta ? trend(row.candidate?.[m.key], row.baseline?.[m.key]) : null;
+                  const t = row.delta ? trend(row.candidate?.[m.key], row.baseline?.[m.key], noiseFloor) : null;
                   return (
                     <TableCell key={m.key} className="text-right">
                       {t?.show ? (
@@ -378,7 +399,7 @@ function DiffTables({ diff }: { diff: EvalDiff }) {
           className="m-0 rounded-lg border px-3 py-2 text-xs leading-relaxed"
           style={{ color: "oklch(0.5 0.03 60)", background: "oklch(0.965 0.02 85)", borderColor: "oklch(0.88 0.03 85)" }}
         >
-          ≈ Several gains fall within the judge&apos;s ±{NOISE_FLOOR_FMT} noise floor — confirm them with paired,
+          ≈ Several gains fall within the judge&apos;s ±{noiseFloor.toFixed(2)} noise floor — confirm them with paired,
           same-question deltas before calling them real.
         </p>
       )}
@@ -393,12 +414,8 @@ type RowSortKey =
   | "category"
   | "split"
   | "abstained"
-  | "evidence"
-  | "source_miss"
   | MetricKey
   | "elapsed_s";
-
-const evidenceRank: Record<string, number> = { sufficient: 2, partial: 1, insufficient: 0 };
 
 function compareRowsNullsLast(a: number | null | undefined, b: number | null | undefined, sign: number) {
   if (a == null && b == null) return 0;
@@ -407,7 +424,7 @@ function compareRowsNullsLast(a: number | null | undefined, b: number | null | u
   return (a - b) * sign;
 }
 
-function RowsTriage({ tag }: { tag: string }) {
+function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_bands"] | undefined }) {
   const [filters, setFilters] = useState<RowFilters>(defaultRowFilters);
   const [sortKey, setSortKey] = useState<RowSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -445,12 +462,6 @@ function RowsTriage({ tag }: { tag: string }) {
       if (sortKey === "category") return sign * (a.category ?? "").localeCompare(b.category ?? "");
       if (sortKey === "split") return sign * (a.split ?? "").localeCompare(b.split ?? "");
       if (sortKey === "abstained") return sign * (Number(a.abstained) - Number(b.abstained));
-      if (sortKey === "evidence") {
-        const av = a.evidence?.verdict ? (evidenceRank[a.evidence.verdict] ?? -1) : -1;
-        const bv = b.evidence?.verdict ? (evidenceRank[b.evidence.verdict] ?? -1) : -1;
-        return sign * (av - bv);
-      }
-      if (sortKey === "source_miss") return sign * (a.expected_missing.length - b.expected_missing.length);
       if (sortKey === "elapsed_s") return compareRowsNullsLast(a.elapsed_s, b.elapsed_s, sign);
       return compareRowsNullsLast(a[sortKey], b[sortKey], sign);
     });
@@ -497,87 +508,95 @@ function RowsTriage({ tag }: { tag: string }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-[20px]">Per-question rows</CardTitle>
+      <CardHeader className="flex-row items-baseline justify-between space-y-0">
+        <div className="flex items-baseline gap-3">
+          <CardTitle className="text-[20px]">Per-question rows</CardTitle>
+          <span className="text-[14px] text-muted-foreground">{tag}</span>
+        </div>
+        <span className="font-mono text-[14px] text-muted-foreground">
+          {visibleRows.length} of {rows.length} rows · click a column to sort
+        </span>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            placeholder="Search question / eval_id…"
-            value={filters.search}
-            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-            className="w-[220px] text-[17.5px]"
-          />
-          <Select
-            value={filters.category}
-            onValueChange={(v) => setFilters((f) => ({ ...f, category: v || "all" }))}
-          >
-            <SelectTrigger className="w-[160px] text-[17.5px]" aria-label="Category">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">all categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.split}
-            onValueChange={(v) => setFilters((f) => ({ ...f, split: v || "all" }))}
-          >
-            <SelectTrigger className="w-[140px] text-[17.5px]" aria-label="Split">
-              <SelectValue placeholder="Split" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">all splits</SelectItem>
-              {splits.map((split) => (
-                <SelectItem key={split} value={split}>
-                  {split}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.verdict}
-            onValueChange={(v) =>
-              setFilters((f) => ({ ...f, verdict: (v || "all") as RowFilters["verdict"] }))
-            }
-          >
-            <SelectTrigger className="w-[160px] text-[17.5px]" aria-label="Evidence verdict">
-              <SelectValue placeholder="Verdict" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">all verdicts</SelectItem>
-              <SelectItem value="sufficient">sufficient</SelectItem>
-              <SelectItem value="partial">partial</SelectItem>
-              <SelectItem value="insufficient">insufficient</SelectItem>
-              <SelectItem value="none">none</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            variant={filters.abstainedOnly ? "default" : "outline"}
-            aria-pressed={filters.abstainedOnly}
-            onClick={() => setFilters((f) => ({ ...f, abstainedOnly: !f.abstainedOnly }))}
-            className="text-[17.5px]"
-          >
-            Abstained
-          </Button>
-          <Button
-            type="button"
-            variant={filters.sourceMissOnly ? "default" : "outline"}
-            aria-pressed={filters.sourceMissOnly}
-            onClick={() => setFilters((f) => ({ ...f, sourceMissOnly: !f.sourceMissOnly }))}
-            className="text-[17.5px]"
-          >
-            Source miss
-          </Button>
-          <span className="text-[17.5px] text-muted-foreground">
-            {visibleRows.length} of {rows.length} rows · click a column to sort
-          </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <Input
+              placeholder="Search question or eval_id"
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              className="w-[320px] pl-9 text-[17.5px]"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[15px] text-muted-foreground">Category</span>
+            <Select
+              value={filters.category}
+              onValueChange={(v) => setFilters((f) => ({ ...f, category: v || "all" }))}
+            >
+              <SelectTrigger className="w-[140px] text-[17.5px]" aria-label="Category">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">all</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[15px] text-muted-foreground">Split</span>
+            <Select
+              value={filters.split}
+              onValueChange={(v) => setFilters((f) => ({ ...f, split: v || "all" }))}
+            >
+              <SelectTrigger className="w-[140px] text-[17.5px]" aria-label="Split">
+                <SelectValue placeholder="Split" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">all</SelectItem>
+                {splits.map((split) => (
+                  <SelectItem key={split} value={split}>
+                    {split}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              type="button"
+              variant={filters.abstainedOnly ? "default" : "outline"}
+              aria-pressed={filters.abstainedOnly}
+              onClick={() => setFilters((f) => ({ ...f, abstainedOnly: !f.abstainedOnly }))}
+              className="text-[17.5px]"
+            >
+              Abstained
+            </Button>
+            <Button
+              type="button"
+              variant={filters.sourceMissOnly ? "default" : "outline"}
+              aria-pressed={filters.sourceMissOnly}
+              onClick={() => setFilters((f) => ({ ...f, sourceMissOnly: !f.sourceMissOnly }))}
+              className="text-[17.5px]"
+            >
+              Source miss
+            </Button>
+          </div>
         </div>
 
         <div className="max-h-[70vh] overflow-auto [&_[data-slot=table-container]]:overflow-visible">
@@ -586,57 +605,52 @@ function RowsTriage({ tag }: { tag: string }) {
               <TableRow>
                 <SortableTableHead
                   label="eval_id"
-                  fontSize={17.5}
+                  fontSize={13.5}
+                  uppercase
                   active={sortKey === "eval_id"}
                   dir={sortDir}
                   onClick={() => toggleSort("eval_id")}
                 />
                 <TableHead
-                  className="sticky top-0 z-10 w-[300px] shadow-[inset_0_-1px_0_oklch(0.90_0.01_95)]"
-                  style={{ background: "oklch(0.975 0.006 95)", fontSize: "17.5px" }}
+                  className="sticky top-0 z-10 w-[300px] font-medium uppercase tracking-[0.08em] shadow-[inset_0_-1px_0_oklch(0.90_0.01_95)]"
+                  style={{
+                    background: "oklch(0.975 0.006 95)",
+                    color: "oklch(0.50 0.02 245)",
+                    fontSize: "13.5px",
+                  }}
                 >
                   Question
                 </TableHead>
                 <SortableTableHead
                   label="Category"
-                  fontSize={17.5}
+                  fontSize={13.5}
+                  uppercase
                   active={sortKey === "category"}
                   dir={sortDir}
                   onClick={() => toggleSort("category")}
                 />
                 <SortableTableHead
                   label="Split"
-                  fontSize={17.5}
+                  fontSize={13.5}
+                  uppercase
                   active={sortKey === "split"}
                   dir={sortDir}
                   onClick={() => toggleSort("split")}
                 />
                 <SortableTableHead
-                  label="Abstained"
-                  fontSize={17.5}
+                  label="Abst."
+                  fontSize={13.5}
+                  uppercase
                   active={sortKey === "abstained"}
                   dir={sortDir}
                   onClick={() => toggleSort("abstained")}
-                />
-                <SortableTableHead
-                  label="Evidence"
-                  fontSize={17.5}
-                  active={sortKey === "evidence"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("evidence")}
-                />
-                <SortableTableHead
-                  label="Source miss"
-                  fontSize={17.5}
-                  active={sortKey === "source_miss"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("source_miss")}
                 />
                 {METRICS.map((m) => (
                   <SortableTableHead
                     key={m.key}
                     label={m.short}
-                    fontSize={17.5}
+                    fontSize={13.5}
+                    uppercase
                     align="right"
                     active={sortKey === m.key}
                     dir={sortDir}
@@ -644,8 +658,9 @@ function RowsTriage({ tag }: { tag: string }) {
                   />
                 ))}
                 <SortableTableHead
-                  label="elapsed_s"
-                  fontSize={17.5}
+                  label="Elapsed"
+                  fontSize={13.5}
+                  uppercase
                   align="right"
                   active={sortKey === "elapsed_s"}
                   dir={sortDir}
@@ -654,69 +669,61 @@ function RowsTriage({ tag }: { tag: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleRows.map((row, index) => (
-                <TableRow
-                  key={row.eval_id ?? `${row.question}-${index}`}
-                  role="button"
-                  tabIndex={0}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedRow(row)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedRow(row);
-                    }
-                  }}
-                >
-                  <TableCell className="align-top font-mono text-[15px] text-muted-foreground">
-                    {row.eval_id ?? "—"}
-                  </TableCell>
-                  <TableCell className="w-[300px] max-w-[300px] align-top">
-                    <span className="line-clamp-2">{row.question}</span>
-                  </TableCell>
-                  <TableCell className="align-top">{row.category ?? "—"}</TableCell>
-                  <TableCell className="align-top">{row.split ?? "—"}</TableCell>
-                  <TableCell className="align-top">
-                    <Badge variant={row.abstained ? "secondary" : "outline"}>
-                      {row.abstained ? "yes" : "no"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="align-top">
-                    {row.evidence ? (
-                      <span
-                        className="rounded-full px-2.5 py-0.5 text-[14.375px] font-medium"
-                        style={{
-                          color: verdictChip(row.evidence.verdict).color,
-                          background: verdictChip(row.evidence.verdict).background,
-                          border: verdictChip(row.evidence.verdict).border,
-                        }}
-                      >
-                        {row.evidence.verdict ?? "—"}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    {row.expected_missing.length > 0 && (
-                      <Badge variant="destructive">miss: {row.expected_missing.join(", ")}</Badge>
-                    )}
-                  </TableCell>
-                  {rowMetricKeys.map((key) => {
-                    const c = cell(row[key]);
-                    return (
-                      <TableCell key={key} className="text-right align-top">
-                        <MetricChip chip={c.chip} fontSize={15.625}>
+              {visibleRows.map((row, index) => {
+                return (
+                  <TableRow
+                    key={row.eval_id ?? `${row.question}-${index}`}
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer"
+                    style={{ background: index % 2 === 1 ? "oklch(0.982 0.005 95)" : undefined }}
+                    onClick={() => setSelectedRow(row)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedRow(row);
+                      }
+                    }}
+                  >
+                    <TableCell className="align-top font-mono text-[15px] text-muted-foreground">
+                      {row.eval_id ?? "—"}
+                    </TableCell>
+                    <TableCell className="w-[300px] max-w-[300px] align-top">
+                      <span className="line-clamp-2">{row.question}</span>
+                    </TableCell>
+                    <TableCell className="align-top text-muted-foreground">
+                      {row.category ?? "—"}
+                    </TableCell>
+                    <TableCell className="align-top text-muted-foreground">
+                      {row.split ?? "—"}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      {row.abstained ? (
+                        <span className="font-medium" style={{ color: "oklch(0.48 0.10 78)" }}>
+                          yes
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
+                    </TableCell>
+                    {rowMetricKeys.map((key) => {
+                      const c = cell(row[key], bands);
+                      return (
+                        <TableCell
+                          key={key}
+                          className="text-right align-top font-mono text-[15px]"
+                          style={{ color: c.bandKey === "na" ? "oklch(0.60 0.02 245)" : c.color }}
+                        >
                           {c.fmt}
-                        </MetricChip>
-                      </TableCell>
-                    );
-                  })}
-                  <TableCell className="text-right align-top">
-                    {row.elapsed_s != null ? row.elapsed_s.toFixed(1) : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-right align-top font-mono text-[15px] text-muted-foreground">
+                      {row.elapsed_s != null ? `${row.elapsed_s.toFixed(1)}s` : "—"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {visibleRows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={10} className="text-muted-foreground">
@@ -742,6 +749,8 @@ export default function EvalDetail() {
     enabled,
     retry: false,
   });
+  const policyQuery = useQuery({ queryKey: ["evalPolicy"], queryFn: getEvalPolicy });
+  const policy = policyQuery.data ?? DEFAULT_EVAL_POLICY;
 
   if (!tag) return <p className="text-red-600">Eval run not found.</p>;
   if (query.isLoading) return <p>Loading…</p>;
@@ -781,12 +790,12 @@ export default function EvalDetail() {
         </div>
       </div>
 
-      <SummaryTiles run={run} />
-      <HowToRead />
-      <ByCategory run={run} />
+      <SummaryTiles run={run} bands={policy.quality_bands} />
+      <HowToRead noiseFloor={policy.noise_floor} />
+      <ByCategory run={run} bands={policy.quality_bands} />
       <RunConfig run={run} />
-      <ComparePanel tag={tag} />
-      <RowsTriage tag={tag} />
+      <ComparePanel tag={tag} bands={policy.quality_bands} noiseFloor={policy.noise_floor} />
+      <RowsTriage tag={tag} bands={policy.quality_bands} />
       <EvalRunLogs tag={tag} />
     </div>
   );

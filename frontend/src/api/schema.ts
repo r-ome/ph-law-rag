@@ -276,6 +276,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evals/runs/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Evaluation display policy */
+        get: operations["policy_evals_runs_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/evals/runs/{tag}": {
         parameters: {
             query?: never;
@@ -839,6 +856,29 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** EvalPolicyResponse */
+        EvalPolicyResponse: {
+            /** Noise Floor */
+            noise_floor: number;
+            /** Quality Bands */
+            quality_bands: components["schemas"]["EvalQualityBand"][];
+            /** Splits */
+            splits: components["schemas"]["EvalSplitPolicy"][];
+        };
+        /** EvalQualityBand */
+        EvalQualityBand: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "strong" | "fair" | "weak";
+            /** Label */
+            label: string;
+            /** Min */
+            min?: number | null;
+            /** Range */
+            range: string;
+        };
         /** EvalRow */
         EvalRow: {
             /** Eval Id */
@@ -1010,6 +1050,17 @@ export interface components {
             /** Context Recall */
             context_recall?: number | null;
         };
+        /** EvalSplitPolicy */
+        EvalSplitPolicy: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
+            /** Plain */
+            plain: string;
+        };
         /** EvalStage */
         EvalStage: {
             /** Name */
@@ -1055,12 +1106,28 @@ export interface components {
             /** Generator Backend */
             generator_backend: string;
         };
+        /** InspectOverrides */
+        InspectOverrides: {
+            /** Evidence Gate */
+            evidence_gate?: ("min_chunks" | "answerability" | "crag") | null;
+            /** Evidence Judge Model */
+            evidence_judge_model?: string | null;
+            /** Corrective Retrieval Enabled */
+            corrective_retrieval_enabled?: boolean | null;
+            /** Query Decomposition Enabled */
+            query_decomposition_enabled?: boolean | null;
+            /** Query Planner Model */
+            query_planner_model?: string | null;
+            /** Reranker Backend */
+            reranker_backend?: ("minilm" | "qwen3" | "bedrock") | null;
+        };
         /** InspectRequest */
         InspectRequest: {
             /** Question */
             question: string;
             /** Strategy */
             strategy?: ("default" | "current_law") | null;
+            overrides?: components["schemas"]["InspectOverrides"] | null;
         };
         /** InspectResponse */
         InspectResponse: {
@@ -1097,6 +1164,10 @@ export interface components {
             logger?: string | null;
             /** Raw */
             raw?: string | null;
+            /** Extra */
+            extra?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** LogResponse */
         LogResponse: {
@@ -1782,6 +1853,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalRunListResponse"];
+                };
+            };
+        };
+    };
+    policy_evals_runs_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalPolicyResponse"];
                 };
             };
         };

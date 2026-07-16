@@ -6,6 +6,7 @@ export function SortableTableHead({
   dir,
   align = "left",
   fontSize,
+  uppercase = false,
   onClick,
 }: {
   label: string;
@@ -14,6 +15,8 @@ export function SortableTableHead({
   align?: "left" | "right";
   /** Base font-size (px) for the label; the sort arrow scales relative to it. */
   fontSize?: number;
+  /** Uppercase, letter-spaced label style (per-question rows table). */
+  uppercase?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -27,12 +30,14 @@ export function SortableTableHead({
         aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
         className={`inline-flex cursor-pointer select-none items-center gap-1 font-medium ${
           align === "right" ? "flex-row-reverse" : ""
-        }`}
-        style={{ color: active ? "oklch(0.28 0.02 245)" : "inherit" }}
+        } ${uppercase ? "uppercase tracking-[0.08em]" : ""}`}
+        style={{
+          color: active ? "oklch(0.28 0.02 245)" : uppercase ? "oklch(0.50 0.02 245)" : "inherit",
+        }}
       >
         {label}
         <span style={{ opacity: active ? 1 : 0.35, fontSize: fontSize ? `${fontSize * 0.85}px` : undefined }}>
-          {active ? (dir === "asc" ? "▲" : "▼") : "▲"}
+          {active ? (dir === "asc" ? "▲" : "▼") : uppercase ? "↕" : "▲"}
         </span>
       </button>
     </TableHead>

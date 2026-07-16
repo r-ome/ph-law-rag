@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getEvalRun, listEvalRuns } from "@/api/client";
-import type { EvalRunSummary } from "@/api/client";
+import { getEvalPolicy, getEvalRun, listEvalRuns } from "@/api/client";
+import type { EvalPolicy, EvalRunSummary } from "@/api/client";
 import {
   ABSTENTION_PLAIN,
+  DEFAULT_EVAL_POLICY,
   METRICS,
-  QUALITY_BANDS,
-  SPLITS,
   cell,
+  qualityBands,
   splitStyle,
   trend,
   type Chip,
@@ -24,7 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-function QualityBandsLegend() {
+function QualityBandsLegend({ bands }: { bands: EvalPolicy["quality_bands"] | undefined }) {
+  const items = qualityBands(bands);
   return (
     <div
       className="flex flex-wrap items-center gap-2.5 rounded-xl border px-4 py-3"
@@ -36,7 +37,7 @@ function QualityBandsLegend() {
       >
         Quality bands
       </span>
-      {QUALITY_BANDS.map((b) => (
+      {items.map((b) => (
         <span
           key={b.label}
           className="inline-flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[15.625px] font-medium"
@@ -112,6 +113,7 @@ function HeroCard({ latest, tag }: { latest: ReturnType<typeof buildDetailSummar
 function buildDetailSummary(
   run: NonNullable<Awaited<ReturnType<typeof getEvalRun>>> | undefined,
   tag: string | undefined,
+  bands: EvalPolicy["quality_bands"] | undefined,
 ) {
   if (!run || !tag) return null;
   const overall = run.summary?.overall;
@@ -125,7 +127,7 @@ function buildDetailSummary(
     chip: Chip;
     bandLabel: string;
   }[] = METRICS.map((m) => {
-    const c = cell(overall?.[m.key]);
+    const c = cell(overall?.[m.key], bands);
     return {
       metricKey: m.key,
       label: m.label,
@@ -137,7 +139,7 @@ function buildDetailSummary(
     };
   });
   const abstAccuracy = abstention?.accuracy ?? null;
-  const ac = cell(abstAccuracy);
+  const ac = cell(abstAccuracy, bands);
   tiles.push({
     metricKey: "abstention",
     label: "Abstention",
@@ -162,7 +164,15 @@ function buildDetailSummary(
 
 type AllRunsSortKey = "run" | "split" | MetricKey | "abstention";
 
-function AllRunsTable({ runs, onOpen }: { runs: EvalRunSummary[]; onOpen: (tag: string) => void }) {
+function AllRunsTable({
+  runs,
+  bands,
+  noiseFloor,
+}: {
+  runs: EvalRunSummary[];
+  bands: EvalPolicy["quality_bands"] | undefined;
+  noiseFloor: number;
+}) {
   const [sortKey, setSortKey] = useState<AllRunsSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -260,23 +270,14 @@ function AllRunsTable({ runs, onOpen }: { runs: EvalRunSummary[]; onOpen: (tag: 
             {sortedRuns.map((run) => {
               const prev = prevOf(run);
               const ss = splitStyle(run.holdout);
-              const abstC = cell(run.abstention_accuracy);
+              const abstC = cell(run.abstention_accuracy, bands);
               return (
-                <TableRow
-                  key={run.tag}
-                  role="button"
-                  tabIndex={0}
-                  className="cursor-pointer"
-                  onClick={() => onOpen(run.tag)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onOpen(run.tag);
-                    }
-                  }}
-                >
+                <TableRow key={run.tag}>
                   <TableCell className="align-top">
-                    <div className="flex flex-col gap-0.5">
+                    <Link
+                      to={`/evals/${encodeURIComponent(run.tag)}`}
+                      className="flex flex-col gap-0.5 text-inherit no-underline hover:underline"
+                    >
                       <div className="flex items-center gap-1.5">
                         <span className="text-[16.875px] font-semibold">{run.label || run.tag}</span>
                         {run.tag === latestNonHoldout?.tag && (
@@ -296,7 +297,7 @@ function AllRunsTable({ runs, onOpen }: { runs: EvalRunSummary[]; onOpen: (tag: 
                       <span className="font-mono text-[13.75px]" style={{ color: "oklch(0.55 0.02 245)" }}>
                         {run.date ?? "—"} · {run.git_sha ?? "—"}
                       </span>
-                    </div>
+                    </Link>
                   </TableCell>
                   <TableCell className="align-top">
                     <span
@@ -307,8 +308,8 @@ function AllRunsTable({ runs, onOpen }: { runs: EvalRunSummary[]; onOpen: (tag: 
                     </span>
                   </TableCell>
                   {METRICS.map((m) => {
-                    const c = cell(run[m.key]);
-                    const t = trend(run[m.key], prev ? prev[m.key] : null);
+                    const c = cell(run[m.key], bands);
+                    const t = trend(run[m.key], prev ? prev[m.key] : null, noiseFloor);
                     return (
                       <TableCell key={m.key} className="text-right align-top">
                         <span className="inline-flex items-center justify-end gap-1.5">
@@ -352,10 +353,10 @@ function AllRunsTable({ runs, onOpen }: { runs: EvalRunSummary[]; onOpen: (tag: 
   );
 }
 
-function SplitsExplainer() {
+function SplitsExplainer({ splits }: { splits: EvalPolicy["splits"] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      {SPLITS.map((sp) => (
+      {splits.map((sp) => (
         <div
           key={sp.key}
           className="flex flex-col gap-1.5 rounded-xl bg-card p-4"
@@ -380,8 +381,9 @@ function SplitsExplainer() {
 }
 
 export default function Evals() {
-  const navigate = useNavigate();
   const runsQuery = useQuery({ queryKey: ["evalRuns"], queryFn: listEvalRuns });
+  const policyQuery = useQuery({ queryKey: ["evalPolicy"], queryFn: getEvalPolicy });
+  const policy = policyQuery.data ?? DEFAULT_EVAL_POLICY;
   const runs = runsQuery.data?.runs ?? [];
   const latestTag = useMemo(() => runs.find((r) => !r.holdout)?.tag, [runs]);
   const latestRunQuery = useQuery({
@@ -389,7 +391,7 @@ export default function Evals() {
     queryFn: () => getEvalRun(latestTag!),
     enabled: Boolean(latestTag),
   });
-  const heroSummary = buildDetailSummary(latestRunQuery.data, latestTag);
+  const heroSummary = buildDetailSummary(latestRunQuery.data, latestTag, policy.quality_bands);
 
   if (runsQuery.isLoading) return <p>Loading…</p>;
   if (runsQuery.error) return <p className="text-red-600">Failed to load eval runs.</p>;
@@ -404,13 +406,13 @@ export default function Evals() {
         </p>
       </div>
 
-      <QualityBandsLegend />
+      <QualityBandsLegend bands={policy.quality_bands} />
 
       {latestTag && <HeroCard latest={heroSummary} tag={latestTag} />}
 
-      <AllRunsTable runs={runs} onOpen={(tag) => navigate(`/evals/${encodeURIComponent(tag)}`)} />
+      <AllRunsTable runs={runs} bands={policy.quality_bands} noiseFloor={policy.noise_floor} />
 
-      <SplitsExplainer />
+      <SplitsExplainer splits={policy.splits} />
     </div>
   );
 }

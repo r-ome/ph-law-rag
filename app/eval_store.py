@@ -1,11 +1,76 @@
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from app.config import settings
 from app.evals import artifacts
 
 _METRIC_KEYS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
 _RAW_PRECISION = "llm_context_precision_with_reference"
+_EVAL_NOISE_FLOOR = 0.05
+_QUALITY_BANDS = [
+    {"key": "strong", "label": "Strong", "min": 0.85, "range": ">= 0.85"},
+    {"key": "fair", "label": "Fair", "min": 0.70, "range": "0.70 - 0.85"},
+    {"key": "weak", "label": "Weak", "min": None, "range": "< 0.70"},
+]
+_SPLIT_COPY = [
+    {
+        "key": "regression",
+        "name": "Regression",
+        "plain": (
+            "Frozen benchmark - hash-locked so nobody edits questions quietly. "
+            "The standing scoreboard used to compare runs over time."
+        ),
+    },
+    {
+        "key": "dev",
+        "name": "Dev",
+        "plain": "Practice set we study and tune against, so scores here run a little flattering.",
+    },
+    {
+        "key": "holdout",
+        "name": "Holdout",
+        "plain": (
+            "Sealed final exam. Only the total is ever read; inspecting one row burns it. "
+            "The one honest test of generalization."
+        ),
+    },
+]
+
+
+def _split_counts(path: str | Path) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    dataset_path = Path(path)
+    if not dataset_path.exists():
+        return counts
+    with dataset_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row: Any = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict) and isinstance(row.get("split"), str):
+                counts[row["split"]] += 1
+    return counts
+
+
+def eval_policy() -> dict:
+    counts = _split_counts(settings.eval_dataset_path)
+    return {
+        "noise_floor": _EVAL_NOISE_FLOOR,
+        "quality_bands": _QUALITY_BANDS,
+        "splits": [
+            {
+                **split,
+                "count": counts.get(split["key"], 0),
+            }
+            for split in _SPLIT_COPY
+        ],
+    }
 
 
 def _parse_manifest() -> list[dict]:

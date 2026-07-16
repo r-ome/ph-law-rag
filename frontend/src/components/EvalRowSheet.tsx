@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/table";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
+const CHUNK_LOOKUP_LIMIT = 64;
+
 function SourceChips({
   sources,
   missing,
@@ -96,23 +98,27 @@ function PipelineStages({ row }: { row: EvalRow }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {row.debug_stages.map((stage, index) => (
-              <TableRow key={`${stage.name}-${index}`}>
-                <TableCell>{stage.name}</TableCell>
-                <TableCell>
-                  {stage.in_n ?? "—"} → {stage.out_n ?? "—"}
-                </TableCell>
-                <TableCell className="text-right">
-                  {stage.ms != null ? stage.ms.toFixed(1) : "—"}
-                </TableCell>
-                <TableCell>{stage.fired === true ? "✓" : stage.fired === false ? "✗" : "—"}</TableCell>
-                <TableCell>
-                  {stage.model ?? stage.prompt_length != null
-                    ? `${stage.model ?? "—"}${stage.prompt_length != null ? ` (${stage.prompt_length})` : ""}`
-                    : "—"}
-                </TableCell>
-              </TableRow>
-            ))}
+            {row.debug_stages.map((stage, index) => {
+              const hasModelOrPrompt = stage.model != null || stage.prompt_length != null;
+              const model = stage.model?.trim() ? stage.model : "—";
+              return (
+                <TableRow key={`${stage.name}-${index}`}>
+                  <TableCell>{stage.name}</TableCell>
+                  <TableCell>
+                    {stage.in_n ?? "—"} → {stage.out_n ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {stage.ms != null ? stage.ms.toFixed(1) : "—"}
+                  </TableCell>
+                  <TableCell>{stage.fired === true ? "✓" : stage.fired === false ? "✗" : "—"}</TableCell>
+                  <TableCell>
+                    {hasModelOrPrompt
+                      ? `${model}${stage.prompt_length != null ? ` (${stage.prompt_length})` : ""}`
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -122,10 +128,11 @@ function PipelineStages({ row }: { row: EvalRow }) {
 
 function SelectedChunks({ row, open }: { row: EvalRow; open: boolean }) {
   const chunkIds = row.selected_chunk_ids;
+  const lookupChunkIds = chunkIds.slice(0, CHUNK_LOOKUP_LIMIT);
   const chunkQuery = useQuery({
-    queryKey: ["chunkLookup", row.eval_id, chunkIds],
-    queryFn: () => lookupChunks(chunkIds),
-    enabled: open && chunkIds.length > 0,
+    queryKey: ["chunkLookup", row.eval_id, lookupChunkIds],
+    queryFn: () => lookupChunks(lookupChunkIds),
+    enabled: open && lookupChunkIds.length > 0,
   });
 
   if (chunkIds.length === 0) return null;
@@ -133,6 +140,11 @@ function SelectedChunks({ row, open }: { row: EvalRow; open: boolean }) {
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-semibold">Selected chunks</h3>
+      {chunkIds.length > lookupChunkIds.length && (
+        <p className="text-sm text-muted-foreground">
+          Showing first {lookupChunkIds.length} of {chunkIds.length} selected chunks.
+        </p>
+      )}
       {chunkQuery.isLoading && <p className="text-sm text-muted-foreground">Loading chunks…</p>}
       {chunkQuery.error && <p className="text-sm text-red-600">Failed to load chunks.</p>}
       {chunkQuery.data && (
