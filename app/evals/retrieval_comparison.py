@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from app.evals.integrity import (
     file_sha256,
     paths_for,
     schema_version,
+    sha256,
     validate_schema,
     validate_sealed_bundle,
 )
@@ -46,6 +48,13 @@ _SELECTION_KEYS = (
     "subquery_packaging_enabled",
     "subquery_reserve_n",
 )
+_QUERY_SEPARATION_ARMS = {"original_only", "original_plus_rewrite"}
+_LEGACY_SIBLING_DEFAULTS = {
+    "sibling_expansion_enabled": False,
+    "sibling_expansion_radius": 1,
+    "sibling_expansion_max_chars": 3000,
+    "sibling_expansion_max_tokens": 750,
+}
 
 
 def _without_arm(value: dict[str, Any]) -> dict[str, Any]:
@@ -54,6 +63,125 @@ def _without_arm(value: dict[str, Any]) -> dict[str, Any]:
 
 def _subset(value: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
     return {key: value.get(key) for key in keys}
+
+
+def _normalize_expected_arm_pair(value: tuple[str, str]) -> tuple[str, str]:
+    if not isinstance(value, tuple) or len(value) != 2:
+        raise ValueError("expected_arm_pair must contain baseline and candidate arms")
+    if any(arm not in _QUERY_SEPARATION_ARMS for arm in value):
+        raise ValueError("expected_arm_pair contains an unsupported arm")
+    return value
+
+
+def _normalize_expected_knob_diff(
+    value: dict[str, tuple[Any, Any]] | None,
+) -> dict[str, tuple[Any, Any]]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("expected_knob_diff must be a mapping")
+    normalized = {}
+    for name, endpoints in value.items():
+        if name not in _SELECTION_KEYS:
+            raise ValueError(f"unknown retrieval selection knob {name!r}")
+        if not isinstance(endpoints, (list, tuple)) or len(endpoints) != 2:
+            raise ValueError(
+                f"expected knob diff for {name!r} must contain two endpoints"
+            )
+        normalized[name] = (endpoints[0], endpoints[1])
+    return normalized
+
+
+def _comparable_shared_values(
+    shared_values: dict[str, Any],
+) -> tuple[dict[str, Any], Any]:
+    comparable = deepcopy(shared_values)
+    profile = comparable.pop("profile", None)
+    defaults = comparable.setdefault("retrieval_defaults", {})
+    if not isinstance(defaults, dict):
+        raise ValueError("retrieval_defaults identity is invalid")
+    for name, default in _LEGACY_SIBLING_DEFAULTS.items():
+        defaults.setdefault(name, default)
+    return comparable, profile
+
+
+def _selection_diff(
+    baseline_shared: dict[str, Any],
+    candidate_shared: dict[str, Any],
+) -> dict[str, tuple[Any, Any]]:
+    baseline = _subset(baseline_shared["retrieval_defaults"], _SELECTION_KEYS)
+    candidate = _subset(candidate_shared["retrieval_defaults"], _SELECTION_KEYS)
+    return {
+        name: (baseline[name], candidate[name])
+        for name in _SELECTION_KEYS
+        if baseline[name] != candidate[name]
+    }
+
+
+def _require_expected_knob_diff(
+    observed: dict[str, tuple[Any, Any]],
+    declared: dict[str, tuple[Any, Any]],
+) -> None:
+    undeclared = sorted(set(observed) - set(declared))
+    unobserved = sorted(set(declared) - set(observed))
+    wrong_endpoints = sorted(
+        name
+        for name in set(observed) & set(declared)
+        if observed[name] != declared[name]
+    )
+    if undeclared or unobserved or wrong_endpoints:
+        details = []
+        if undeclared:
+            details.append("undeclared=" + ",".join(undeclared))
+        if unobserved:
+            details.append("unobserved=" + ",".join(unobserved))
+        if wrong_endpoints:
+            details.append("wrong_endpoints=" + ",".join(wrong_endpoints))
+        raise ValueError(
+            "retrieval comparison expected knob diff mismatch: " + "; ".join(details)
+        )
+
+
+def _without_declared_knobs(
+    shared_values: dict[str, Any],
+    declared: dict[str, tuple[Any, Any]],
+) -> dict[str, Any]:
+    comparable = deepcopy(shared_values)
+    defaults = comparable["retrieval_defaults"]
+    for name in declared:
+        defaults.pop(name, None)
+    return comparable
+
+
+def _different_paths(
+    baseline: Any,
+    candidate: Any,
+    *,
+    path: str = "shared_values",
+) -> list[str]:
+    if isinstance(baseline, dict) and isinstance(candidate, dict):
+        differences = []
+        for key in sorted(set(baseline) | set(candidate)):
+            child = f"{path}.{key}"
+            if key not in baseline or key not in candidate:
+                differences.append(child)
+            else:
+                differences.extend(
+                    _different_paths(baseline[key], candidate[key], path=child)
+                )
+        return differences
+    if baseline != candidate:
+        return [path]
+    return []
+
+
+def _report_knob_diff(
+    value: dict[str, tuple[Any, Any]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        name: {"baseline": endpoints[0], "candidate": endpoints[1]}
+        for name, endpoints in value.items()
+    }
 
 
 def _identity_parts(
@@ -130,8 +258,16 @@ def compare_retrieval_bundles(
     candidate_tag: str,
     *,
     tag: str,
+    expected_arm_pair: tuple[str, str] = (
+        "original_only",
+        "original_plus_rewrite",
+    ),
+    expected_knob_diff: dict[str, tuple[Any, Any]] | None = None,
 ) -> Path:
     """Validate, compare, and durably publish a per-row retrieval report."""
+    expected_arm_pair = _normalize_expected_arm_pair(expected_arm_pair)
+    declared_knob_diff = _normalize_expected_knob_diff(expected_knob_diff)
+
     # Validate both sources completely before considering any output write.
     baseline_rows, baseline_meta, baseline_config = _validated_source(baseline_tag)
     candidate_rows, candidate_meta, candidate_config = _validated_source(candidate_tag)
@@ -143,21 +279,50 @@ def compare_retrieval_bundles(
 
     baseline_arm = baseline_config["query_separation"].get("arm")
     candidate_arm = candidate_config["query_separation"].get("arm")
-    if baseline_arm != "original_only":
-        raise ValueError("retrieval comparison baseline arm must be original_only")
-    if candidate_arm != "original_plus_rewrite":
+    if (baseline_arm, candidate_arm) != expected_arm_pair:
         raise ValueError(
-            "retrieval comparison candidate arm must be original_plus_rewrite"
+            "retrieval comparison arm pair mismatch: "
+            f"expected {expected_arm_pair!r}, "
+            f"observed {(baseline_arm, candidate_arm)!r}"
         )
-    if baseline_config["shared_hash"] != candidate_config["shared_hash"]:
-        raise ValueError("retrieval comparison shared_hash mismatch")
     if _without_arm(baseline_config["query_separation"]) != _without_arm(
         candidate_config["query_separation"]
     ):
         raise ValueError("retrieval comparison query-separation config mismatch")
 
-    baseline_parts = _identity_parts(baseline_meta, baseline_config)
-    candidate_parts = _identity_parts(candidate_meta, candidate_config)
+    baseline_shared, baseline_profile = _comparable_shared_values(
+        baseline_config["shared_values"]
+    )
+    candidate_shared, candidate_profile = _comparable_shared_values(
+        candidate_config["shared_values"]
+    )
+    observed_knob_diff = _selection_diff(baseline_shared, candidate_shared)
+    _require_expected_knob_diff(observed_knob_diff, declared_knob_diff)
+    baseline_comparable = _without_declared_knobs(
+        baseline_shared, declared_knob_diff
+    )
+    candidate_comparable = _without_declared_knobs(
+        candidate_shared, declared_knob_diff
+    )
+    shared_value_mismatches = _different_paths(
+        baseline_comparable, candidate_comparable
+    )
+    if shared_value_mismatches:
+        raise ValueError(
+            "retrieval comparison shared values mismatch: "
+            + ", ".join(shared_value_mismatches)
+        )
+    baseline_comparable_hash = sha256(baseline_comparable)
+    candidate_comparable_hash = sha256(candidate_comparable)
+    if baseline_comparable_hash != candidate_comparable_hash:
+        raise ValueError("retrieval comparison comparable_shared_hash mismatch")
+
+    baseline_parts = _identity_parts(
+        baseline_meta, {"shared_values": baseline_comparable}
+    )
+    candidate_parts = _identity_parts(
+        candidate_meta, {"shared_values": candidate_comparable}
+    )
     identity_checks = {
         name: {
             "matched": baseline_parts[name] == candidate_parts[name],
@@ -219,7 +384,28 @@ def compare_retrieval_bundles(
         "candidate_tag": candidate_tag,
         "baseline_arm": baseline_arm,
         "candidate_arm": candidate_arm,
+        "expected_arm_pair": {
+            "baseline": expected_arm_pair[0],
+            "candidate": expected_arm_pair[1],
+        },
+        "declared_knob_diff": _report_knob_diff(declared_knob_diff),
+        "observed_knob_diff": _report_knob_diff(observed_knob_diff),
         "shared_hash": baseline_config["shared_hash"],
+        "shared_hash_alias": "baseline_raw_shared_hash",
+        "baseline_raw_shared_hash": baseline_config["shared_hash"],
+        "candidate_raw_shared_hash": candidate_config["shared_hash"],
+        "comparable_shared_hash": baseline_comparable_hash,
+        "profile_labels": {
+            "baseline": baseline_profile,
+            "candidate": candidate_profile,
+            "matched": baseline_profile == candidate_profile,
+            "severity": (
+                "matched"
+                if baseline_profile == candidate_profile
+                else "informational"
+            ),
+            "affects_pass_fail": False,
+        },
         "query_separation_config": _without_arm(
             baseline_config["query_separation"]
         ),
@@ -237,9 +423,10 @@ def compare_retrieval_bundles(
     }
 
     # Publish into the dated run layout only after every rejection gate above.
-    desired_root = paths_for(tag, started, create=False).root
-    if desired_root.exists():
+    existing_root = paths_for(tag).root
+    if existing_root.exists():
         raise FileExistsError(f"retrieval comparison tag already exists: {tag}")
+    desired_root = paths_for(tag, started, create=False).root
     partial_root = desired_root.with_name(
         f".{desired_root.name}.{uuid4().hex}.partial"
     )

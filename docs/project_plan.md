@@ -72,6 +72,15 @@ targets, corpus, index, embeddings, reranker, cutoffs, and pre-rerank pools
 matched the frozen `phase2-original-minilm` baseline; sibling expansion was the
 only selection delta. All 131 pre-rerank pool hashes matched.
 
+The generalized retrieval comparator durably published this comparison as
+`phase3-sibling-aware-minilm-comparison`. Its declared contract uses the
+`original_only` arm on both sides and permits exactly one semantic selection
+delta: `sibling_expansion_enabled=false→true`. Comparator-local frozen
+backfill makes the three sibling limit knobs equal for the pre-sibling baseline;
+the raw `eval→local` profile-label difference is recorded as informational.
+The artifact contains 131 rows, zero changed pre-rerank pools, and 64 changed
+selected contexts.
+
 Sibling expansion fired on 64 rows and added 167 selected chunks. All 64 changed
 contexts were additive: no baseline selected chunk or source, provision, or leaf
 target was lost. The only target gain was `eval_053`, where Article 1403(2)(e)
@@ -317,13 +326,19 @@ while schema 1.0 metadata adapts its former retrieval hash as the shared identit
 with an implicit original-only arm.
 
 `raglab eval-retrieval-compare BASELINE_TAG CANDIDATE_TAG --tag REPORT_TAG`
-validates two sealed non-holdout bundles before creating output, enforces matched
-dataset/target/corpus/index/embedding/reranker/cutoff/selection/evidence identity,
-requires original-only versus original-plus-rewrite arms, and atomically publishes
-a dated per-row pool/context-change report. The comparator imports no retrieval,
-generation, embedding, reranker, Anthropic, or Haiku implementation. This
-checkpoint establishes experiment plumbing only; legal rewriting, two-lane
-retrieval, experiment execution, and graduation remain pending.
+validates two sealed non-holdout bundles before creating output. Its default
+contract retains the original-only versus original-plus-rewrite Phase 2 arm
+pair and permits no selection delta. Callers may instead declare an expected
+arm pair and exact selection-knob endpoint delta; any undeclared shared-value
+difference remains a hard failure. Each bundle's raw shared hash is validated,
+then deep-copied shared values receive frozen legacy sibling defaults, shed the
+informational profile label and declared paths, and must match recursively plus
+by a canonical comparable hash. Dataset, targets, corpus, index, query
+separation, eval order, and the grouped retrieval identities remain strict.
+The artifact records the complete declared/observed contract and profile-label
+comparison, publishes atomically, and rejects tag reuse across every dated run
+directory. The comparator imports no retrieval, generation, embedding,
+reranker, Anthropic, or Haiku implementation.
 
 ## Phase 1: Reproducible Retrieval Harness (implemented 2026-07-14)
 

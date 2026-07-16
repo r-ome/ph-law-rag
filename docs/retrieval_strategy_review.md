@@ -376,12 +376,22 @@ generation A/B a required next gate. No serving default, router mapping, ADR,
 generation run, external model call, or holdout access followed from this
 result.
 
-The existing `eval-retrieval-compare` publisher remains specific to Phase 2's
-original-versus-rewrite arm contract, so it was not used for this two-original-
-query selection comparison. The two sealed bundles were integrity-validated
-and compared directly by identity, row hashes, target sets, and summaries; a
-general selection-arm comparison artifact remains tooling follow-up rather than
-a Phase 3 retrieval result dependency.
+The `eval-retrieval-compare` publisher was subsequently generalized from its
+Phase 2-only arm contract to an explicit expected arm pair plus an exact
+declared selection-knob delta. It validates both raw shared hashes, applies
+frozen comparator-only defaults for sibling knobs absent from the pre-feature
+baseline, treats profile labels as informational, and recursively rejects every
+remaining shared-value difference before recording a canonical comparable
+hash. It also rejects output-tag reuse across dated run directories.
+
+The two sealed bundles were then durably compared under
+`phase3-sibling-aware-minilm-comparison`: both arms were `original_only`, the
+sole semantic delta was `sibling_expansion_enabled=false→true`, and the three
+sibling limit knobs matched after frozen backfill. The artifact confirms 131
+rows in identical order, zero changed pre-rerank pools, 64 changed selected
+contexts, and the label-only `eval→local` difference as informational. Its
+report SHA-256 is
+`2025c19873954668e6a470634935f8cf16a32d4218be67f0f6f61209450615c6`.
 
 No holdout, paid Bedrock run, ADR, automatic router mapping, or serving-default
 change is part of Phase 3. A matched generation A/B follows only after the

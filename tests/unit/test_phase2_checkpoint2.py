@@ -513,6 +513,107 @@ def test_comparator_accepts_legacy_baseline_and_reports_row_changes(tmp_path, mo
     assert meta["report_hash"] == file_sha256(report_path)
 
 
+def test_comparator_accepts_declared_sibling_delta_and_profile_label_difference(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
+    _write_bundle("sibling-baseline", minor=1)
+    candidate_shared = _shared_values()
+    candidate_shared["profile"] = "local"
+    candidate_shared["retrieval_defaults"].update(
+        {
+            "sibling_expansion_enabled": True,
+            "sibling_expansion_radius": 1,
+            "sibling_expansion_max_chars": 3000,
+            "sibling_expansion_max_tokens": 750,
+        }
+    )
+    _write_bundle(
+        "sibling-candidate",
+        minor=1,
+        retrieval_config=retrieval_config_identity(
+            candidate_shared, arm="original_only"
+        ),
+        selected_text="selected law with sibling",
+    )
+
+    report_path = compare_retrieval_bundles(
+        "sibling-baseline",
+        "sibling-candidate",
+        tag="sibling-comparison",
+        expected_arm_pair=("original_only", "original_only"),
+        expected_knob_diff={"sibling_expansion_enabled": (False, True)},
+    )
+    report = json.loads(report_path.read_text())
+
+    expected_delta = {
+        "sibling_expansion_enabled": {"baseline": False, "candidate": True}
+    }
+    assert report["expected_arm_pair"] == {
+        "baseline": "original_only",
+        "candidate": "original_only",
+    }
+    assert report["declared_knob_diff"] == expected_delta
+    assert report["observed_knob_diff"] == expected_delta
+    assert report["baseline_raw_shared_hash"] != report["candidate_raw_shared_hash"]
+    assert report["shared_hash"] == report["baseline_raw_shared_hash"]
+    assert report["shared_hash_alias"] == "baseline_raw_shared_hash"
+    assert report["comparable_shared_hash"]
+    assert report["profile_labels"] == {
+        "baseline": "eval",
+        "candidate": "local",
+        "matched": False,
+        "severity": "informational",
+        "affects_pass_fail": False,
+    }
+    assert report["summary"]["selected_context_changed"] == 1
+
+
+def test_comparator_rejects_undeclared_wrong_unobserved_and_unknown_knob_deltas(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
+    _write_bundle("delta-baseline", minor=1)
+    candidate_shared = _shared_values()
+    candidate_shared["retrieval_defaults"]["sibling_expansion_enabled"] = True
+    _write_bundle(
+        "delta-candidate",
+        minor=1,
+        retrieval_config=retrieval_config_identity(
+            candidate_shared, arm="original_only"
+        ),
+    )
+
+    kwargs = {
+        "baseline_tag": "delta-baseline",
+        "candidate_tag": "delta-candidate",
+        "expected_arm_pair": ("original_only", "original_only"),
+    }
+    with pytest.raises(ValueError, match="undeclared=sibling_expansion_enabled"):
+        compare_retrieval_bundles(**kwargs, tag="undeclared")
+    with pytest.raises(ValueError, match="wrong_endpoints=sibling_expansion_enabled"):
+        compare_retrieval_bundles(
+            **kwargs,
+            tag="wrong-endpoints",
+            expected_knob_diff={"sibling_expansion_enabled": (True, False)},
+        )
+    with pytest.raises(ValueError, match="unobserved=sibling_expansion_radius"):
+        compare_retrieval_bundles(
+            **kwargs,
+            tag="unobserved",
+            expected_knob_diff={
+                "sibling_expansion_enabled": (False, True),
+                "sibling_expansion_radius": (1, 2),
+            },
+        )
+    with pytest.raises(ValueError, match="unknown retrieval selection knob"):
+        compare_retrieval_bundles(
+            **kwargs,
+            tag="unknown",
+            expected_knob_diff={"not_a_knob": (False, True)},
+        )
+
+
 def test_comparator_rejects_shared_query_and_corpus_drift(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
     _write_bundle("baseline", minor=0)
@@ -526,7 +627,7 @@ def test_comparator_rejects_shared_query_and_corpus_drift(tmp_path, monkeypatch)
             changed_shared, arm="original_plus_rewrite"
         ),
     )
-    with pytest.raises(ValueError, match="shared_hash mismatch"):
+    with pytest.raises(ValueError, match="shared values mismatch"):
         compare_retrieval_bundles("baseline", "shared-drift", tag="no-shared")
 
     query_drift = retrieval_config_identity(
@@ -614,11 +715,49 @@ def test_comparator_rejects_row_level_holdout_metadata(tmp_path, monkeypatch):
     assert not list(tmp_path.rglob("forbidden-row-report"))
 
 
+def test_comparator_rejects_existing_tag_from_another_date(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
+    _write_bundle("baseline", minor=0)
+    _write_bundle("candidate", minor=1, arm="original_plus_rewrite")
+    historical = tmp_path / "runs" / "2000-01-01" / "global-tag"
+    historical.mkdir(parents=True)
+
+    with pytest.raises(FileExistsError, match="tag already exists"):
+        compare_retrieval_bundles("baseline", "candidate", tag="global-tag")
+    assert list(tmp_path.rglob("global-tag")) == [historical]
+
+
+def test_comparator_cli_rejects_unknown_knob(monkeypatch):
+    monkeypatch.setattr("app.cli.main.configure_logging", lambda: None)
+    result = CliRunner().invoke(
+        app,
+        [
+            "eval-retrieval-compare",
+            "baseline",
+            "candidate",
+            "--tag",
+            "unknown",
+            "--expected-knob-diff",
+            "not_a_knob=[false,true]",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "unknown retrieval selection knob" in result.output
+
+
 def test_comparator_cli_and_import_isolation(tmp_path, monkeypatch):
     output = tmp_path / "report.json"
+    captured = {}
+
+    def fake_compare(baseline, candidate, **kwargs):
+        captured.update(
+            {"baseline": baseline, "candidate": candidate, **kwargs}
+        )
+        return output
+
     monkeypatch.setattr(
         "app.evals.retrieval_comparison.compare_retrieval_bundles",
-        lambda baseline, candidate, tag: output,
+        fake_compare,
     )
     monkeypatch.setattr("app.cli.main.configure_logging", lambda: None)
     result = CliRunner().invoke(
@@ -629,10 +768,23 @@ def test_comparator_cli_and_import_isolation(tmp_path, monkeypatch):
             "candidate",
             "--tag",
             "report",
+            "--expected-baseline-arm",
+            "original_only",
+            "--expected-candidate-arm",
+            "original_only",
+            "--expected-knob-diff",
+            "sibling_expansion_enabled=[false,true]",
         ],
     )
     assert result.exit_code == 0, result.output
     assert str(output) in result.output
+    assert captured == {
+        "baseline": "baseline",
+        "candidate": "candidate",
+        "tag": "report",
+        "expected_arm_pair": ("original_only", "original_only"),
+        "expected_knob_diff": {"sibling_expansion_enabled": (False, True)},
+    }
 
     code = (
         "import sys; import app.evals.retrieval_comparison; "

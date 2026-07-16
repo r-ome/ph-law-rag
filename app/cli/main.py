@@ -142,10 +142,57 @@ def eval_retrieval_compare(
 	baseline_tag: str,
 	candidate_tag: str,
 	tag: str = typer.Option(..., "--tag"),
+	expected_baseline_arm: str = typer.Option(
+		"original_only", "--expected-baseline-arm"
+	),
+	expected_candidate_arm: str = typer.Option(
+		"original_plus_rewrite", "--expected-candidate-arm"
+	),
+	expected_knob_diff: list[str] = typer.Option(
+		[],
+		"--expected-knob-diff",
+		help="repeatable declaration: name=[baseline,candidate]",
+	),
 ):
 	from app.evals.retrieval_comparison import compare_retrieval_bundles
 
-	path = compare_retrieval_bundles(baseline_tag, candidate_tag, tag=tag)
+	parsed_knob_diff = {}
+	for declaration in expected_knob_diff:
+		name, separator, payload = declaration.partition("=")
+		if not separator or not name:
+			raise typer.BadParameter(
+				"expected knob diff must use name=[baseline,candidate]",
+				param_hint="--expected-knob-diff",
+			)
+		if name in parsed_knob_diff:
+			raise typer.BadParameter(
+				f"duplicate expected knob diff for {name!r}",
+				param_hint="--expected-knob-diff",
+			)
+		try:
+			endpoints = json.loads(payload)
+		except json.JSONDecodeError as exc:
+			raise typer.BadParameter(
+				f"invalid JSON endpoints for {name!r}: {exc.msg}",
+				param_hint="--expected-knob-diff",
+			) from exc
+		if not isinstance(endpoints, list) or len(endpoints) != 2:
+			raise typer.BadParameter(
+				f"expected knob diff for {name!r} must be a two-item JSON list",
+				param_hint="--expected-knob-diff",
+			)
+		parsed_knob_diff[name] = (endpoints[0], endpoints[1])
+
+	try:
+		path = compare_retrieval_bundles(
+			baseline_tag,
+			candidate_tag,
+			tag=tag,
+			expected_arm_pair=(expected_baseline_arm, expected_candidate_arm),
+			expected_knob_diff=parsed_knob_diff or None,
+		)
+	except ValueError as exc:
+		raise typer.BadParameter(str(exc)) from exc
 	typer.echo(f"Retrieval comparison written to {path}")
 
 @app.command("eval-sibling-census")
