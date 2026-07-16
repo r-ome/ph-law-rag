@@ -65,6 +65,11 @@ class Settings(BaseSettings):
 	parent_expansion_enabled: bool = True   # default-on 2026-06-18: clean per-changed-row win (see NOTE below)
 	parent_expansion_min_children: int = 2
 	parent_expansion_max_chars: int = 8000
+	# Experimental, explicit-only recovery of adjacent enumeration leaves after parent expansion.
+	sibling_expansion_enabled: bool = False
+	sibling_expansion_radius: int = 1
+	sibling_expansion_max_chars: int = 3000
+	sibling_expansion_max_tokens: int = 750
 	# Operative-law preference: post-rerank, downrank a superseded provision below its operative
 	# (amending) replacement when BOTH are retrieved. Query-time only, reorder-only (no drop, no
 	# re-index). Map is provision-level retrieval policy, loaded from provision_supersession_path.

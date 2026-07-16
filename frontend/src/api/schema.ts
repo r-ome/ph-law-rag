@@ -545,6 +545,18 @@ export interface components {
              */
             expanded_from_parent: boolean;
             /**
+             * Expanded From Sibling
+             * @default false
+             */
+            expanded_from_sibling: boolean;
+            /**
+             * Sibling Seed Chunk Id
+             * @default
+             */
+            sibling_seed_chunk_id: string;
+            /** Sibling Offset */
+            sibling_offset?: number | null;
+            /**
              * Consolidated
              * @default
              */
@@ -1126,7 +1138,7 @@ export interface components {
             /** Question */
             question: string;
             /** Strategy */
-            strategy?: ("default" | "current_law") | null;
+            strategy?: ("default" | "current_law" | "sibling_aware") | null;
             overrides?: components["schemas"]["InspectOverrides"] | null;
         };
         /** InspectResponse */

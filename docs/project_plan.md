@@ -8,6 +8,54 @@ This is the project reference document for `ph-law-rag`.
 
 See also: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-devlog.md`
 
+## Retrieval Strategy Phase 3: Sibling-Aware Expansion (experimental 2026-07-16)
+
+The retrieval pipeline now supports an explicit-only `sibling_aware` strategy.
+It keeps the frozen MiniLM baseline selection settings and enables one new
+post-rerank structural step: after parent expansion, a surviving structured
+leaf may recover adjacent leaves from the same `parent_key`. Eligibility comes
+from result metadata; family text and ordering are loaded from SQLite
+`chunks.metadata_json` and `chunk_index`, so no migration or reindex is needed.
+
+Sibling identity is `(parent_key, unit_label)`. All size-split chunks in that
+identity are admitted atomically. Seeds run in rank order, then distance order,
+with preceding before following; admitted siblings render in document order
+around their seed. Existing survivors and leaves already admitted through
+another seed are not moved, duplicated, or charged twice. The initial global
+query limits are radius 1, 3,000 added characters, and 750 estimated tokens.
+Explicitly hidden leaves remain suppressed under operative-only retrieval, while
+missing operability metadata is fail-open.
+
+The serving pipeline order is now:
+
+```text
+rerank -> edge expansion -> operative preference -> parent expansion
+       -> sibling expansion -> expanded trace -> consolidated dedup -> selected trace
+```
+
+Sibling additions are structural rather than reranked and carry their seed score
+only for display, plus `expanded_from_sibling`, `sibling_seed_chunk_id`, and
+`sibling_offset` provenance. Consolidated dedup preserves these results as
+separate leaf identities. The four sibling knobs participate in Settings,
+answer-policy behavior identity, retrieval traces, and sealed-bundle comparison.
+The Retrieval Lab may select `sibling_aware` explicitly; no intent mapping,
+ordinary query default, or automatic serving activation was added.
+
+Retrieval summaries attribute target recovery at the pre-dedup `expanded`
+snapshot and verify that recovered leaves remain in `selected`. A read-only
+`raglab eval-sibling-census` command joins an existing non-holdout candidate
+trace to local SQLite to count radius-eligible exact-leaf misses. If fewer than
+six rows are eligible, the planned 80% recovery threshold is descriptive rather
+than binding. The sealed `phase2-original-minilm` census found seven rerank-stage
+exact-leaf misses and one radius-1-eligible row (`eval_053`), so Phase 3 is in
+that descriptive regime. No holdout, paid model call, generation A/B, ADR, or graduation is
+part of this implementation checkpoint; those remain gated by the retrieval
+experiment documented in `docs/retrieval_strategy_review.md`.
+
+The retrieval-only A/B entry point is
+`raglab eval-retrieve --strategy sibling_aware`; without `--strategy`, capture
+continues to use the resolved profile default.
+
 ## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
 
 The retrieval experiment now has an explicit `original_only` versus

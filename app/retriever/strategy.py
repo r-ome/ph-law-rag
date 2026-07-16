@@ -31,6 +31,10 @@ class RetrievalKnobs:
     reranker_backend: str | None = None
     subquery_packaging_enabled: bool = False
     subquery_reserve_n: int = 2
+    sibling_expansion_enabled: bool = False
+    sibling_expansion_radius: int = 1
+    sibling_expansion_max_chars: int = 3000
+    sibling_expansion_max_tokens: int = 750
 
     @classmethod
     def from_settings(cls, settings_obj=settings) -> "RetrievalKnobs":
@@ -52,6 +56,10 @@ class RetrievalKnobs:
             prefer_operative_enabled=settings_obj.prefer_operative_enabled,
             retrieval_operative_only=settings_obj.retrieval_operative_only,
             consolidated_dedup_enabled=settings_obj.consolidated_dedup_enabled,
+            sibling_expansion_enabled=settings_obj.sibling_expansion_enabled,
+            sibling_expansion_radius=settings_obj.sibling_expansion_radius,
+            sibling_expansion_max_chars=settings_obj.sibling_expansion_max_chars,
+            sibling_expansion_max_tokens=settings_obj.sibling_expansion_max_tokens,
             subquery_packaging_enabled=settings_obj.subquery_packaging_enabled,
             subquery_reserve_n=settings_obj.subquery_reserve_n,
         )
@@ -68,6 +76,10 @@ class RetrievalKnobs:
                 "prefer_operative_enabled",
                 "retrieval_operative_only",
                 "consolidated_dedup_enabled",
+                "sibling_expansion_enabled",
+                "sibling_expansion_radius",
+                "sibling_expansion_max_chars",
+                "sibling_expansion_max_tokens",
             )
         }
 
@@ -127,6 +139,30 @@ _PRESET_KNOBS: dict[str, RetrievalKnobs | None] = {
         subquery_packaging_enabled=False,
         subquery_reserve_n=2,
     ),
+    "sibling_aware": RetrievalKnobs(
+        dense_top_k=30,
+        sparse_top_k=10,
+        sparse_overfetch_k=100,
+        rerank_top_n=8,
+        rerank_score_margin=6.0,
+        max_distance=0.5,
+        edge_expansion_enabled=True,
+        edge_hop_top_k=3,
+        parent_expansion_enabled=True,
+        parent_expansion_min_children=2,
+        parent_expansion_max_chars=8000,
+        sibling_expansion_enabled=True,
+        sibling_expansion_radius=1,
+        sibling_expansion_max_chars=3000,
+        sibling_expansion_max_tokens=750,
+        query_planner_model="mistral",
+        query_planner_max_subqueries=3,
+        prefer_operative_enabled=False,
+        retrieval_operative_only=True,
+        consolidated_dedup_enabled=True,
+        subquery_packaging_enabled=False,
+        subquery_reserve_n=2,
+    ),
 }
 
 # Candidate stubs kept out of STRATEGIES until R3 trace checks justify a real knob diff.
@@ -135,6 +171,7 @@ CANDIDATE_PRESET_STUBS: tuple[str, ...] = ()
 STRATEGIES: dict[str, Strategy] = {
     "default": StrategyPreset("default"),
     "current_law": StrategyPreset("current_law"),
+    "sibling_aware": StrategyPreset("sibling_aware"),
 }
 
 

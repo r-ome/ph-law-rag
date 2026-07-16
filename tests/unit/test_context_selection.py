@@ -1,5 +1,6 @@
 import pytest
 
+from app.observability.context import TraceCollector, trace_context
 from app.retriever.context_selection import select_context
 from app.retriever.types import RetrievalResult
 
@@ -67,3 +68,46 @@ def test_select_context_preserves_retrieved_scores_before_in_place_rerank(monkey
 		("high", 0.0328),
 	]
 	assert [(r.chunk_id, r.score) for r in selection.pre_expansion] == [("low", 5.0)]
+
+
+def test_sibling_expansion_runs_after_parent_and_before_expanded_snapshot(monkeypatch):
+	from app.retriever.strategy import RetrievalKnobs
+
+	knobs = RetrievalKnobs(
+		dense_top_k=3,
+		sparse_top_k=3,
+		rerank_top_n=2,
+		parent_expansion_enabled=True,
+		prefer_operative_enabled=False,
+		retrieval_operative_only=True,
+		consolidated_dedup_enabled=True,
+		edge_expansion_enabled=False,
+		sibling_expansion_enabled=True,
+	)
+	seed = _r("seed", parent_key="p", unit_label="B")
+	parent_output = [_r("parent-output", parent_key="p", unit_label="B")]
+	sibling = _r(
+		"sibling",
+		parent_key="p",
+		unit_label="C",
+		expanded_from_sibling=True,
+		token_estimate=1,
+	)
+	monkeypatch.setattr("app.retriever.context_selection.hybrid_retriever", lambda *args, **kwargs: [seed])
+	monkeypatch.setattr("app.retriever.context_selection.rerank", lambda *args, **kwargs: [seed])
+	monkeypatch.setattr("app.retriever.parent_expansion.expand_parents", lambda results, knobs=None: parent_output)
+	monkeypatch.setattr("app.retriever.sibling_expansion.expand_siblings", lambda results, knobs=None: [*results, sibling])
+	monkeypatch.setattr("app.retriever.dedup.dedup_results", lambda results: results)
+	collector = TraceCollector(capture_candidate_stages=True)
+
+	with trace_context(trace_id="test", collector=collector):
+		selection = select_context("question", knobs=knobs)
+
+	expanded = next(item for item in collector.candidate_stages if item["stage"] == "expanded")
+	assert [item["chunk_id"] for item in expanded["candidates"]] == ["parent-output", "sibling"]
+	assert [stage["name"] for stage in collector.stages if stage["name"] in {"parent_expansion", "sibling_expansion", "dedup"}] == [
+		"parent_expansion",
+		"sibling_expansion",
+		"dedup",
+	]
+	assert selection.selected == [parent_output[0], sibling]

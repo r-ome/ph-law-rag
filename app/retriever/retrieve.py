@@ -30,14 +30,15 @@ def retrieve(query_text: str) -> str:
     selection = select_context(query_text)
     top = selection.selected
     expanded = len(top) != len(selection.pre_expansion) or any(
-        r.metadata.get("expanded_from_parent") for r in top
+        r.metadata.get("expanded_from_parent") or r.metadata.get("expanded_from_sibling")
+        for r in top
     )
 
     lines = [
         f"Query: {query_text}",
         f"Retrieved: {len(selection.retrieved)}",
         f"Pre-expansion: {len(selection.pre_expansion)}",
-        f"Selected: {len(top)}" + (" (parent-expanded/deduped)" if expanded else ""),
+        f"Selected: {len(top)}" + (" (structurally expanded/deduped)" if expanded else ""),
     ]
 
     if not top:

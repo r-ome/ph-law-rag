@@ -111,6 +111,36 @@ def select_context(
             stage["out_n"] = len(selected)
             stage["fields"] = {"fired": [r.chunk_id for r in selected] != before_ids}
 
+    sibling_expansion_enabled = (
+        knobs.sibling_expansion_enabled if knobs else settings.sibling_expansion_enabled
+    )
+    if sibling_expansion_enabled:
+        from app.retriever.sibling_expansion import expand_siblings
+
+        before_ids = {result.chunk_id for result in selected}
+        with stage_timer("sibling_expansion", in_n=len(selected)) as stage:
+            selected = expand_siblings(selected, knobs=knobs)
+            additions = [result for result in selected if result.chunk_id not in before_ids]
+            stage["out_n"] = len(selected)
+            stage["fields"] = {
+                "fired": bool(additions),
+                "chunks_added": len(additions),
+                "leaf_groups_added": len(
+                    {
+                        (
+                            result.metadata.get("parent_key"),
+                            result.metadata.get("unit_label"),
+                        )
+                        for result in additions
+                    }
+                ),
+                "added_chars": sum(len(result.text) for result in additions),
+                "added_tokens": sum(
+                    int(result.metadata.get("token_estimate", 0))
+                    for result in additions
+                ),
+            }
+
     capture_candidates(
         "expanded",
         selected,

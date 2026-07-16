@@ -72,6 +72,42 @@ def test_current_law_registered_from_r3_trace():
     )
 
 
+def test_sibling_aware_is_explicit_pinned_experimental_preset():
+    knobs = resolve_knobs("sibling_aware")
+
+    assert "sibling_aware" in strategy.STRATEGIES
+    assert knobs.sibling_expansion_enabled is True
+    assert knobs.sibling_expansion_radius == 1
+    assert knobs.sibling_expansion_max_chars == 3000
+    assert knobs.sibling_expansion_max_tokens == 750
+    assert knobs.prefer_operative_enabled is False
+    assert resolve_knobs("default").sibling_expansion_enabled is False
+
+
+def test_sibling_knobs_are_in_trace_identity():
+    trace_knobs = _knobs(
+        sibling_expansion_enabled=True,
+        sibling_expansion_radius=2,
+        sibling_expansion_max_chars=111,
+        sibling_expansion_max_tokens=22,
+    ).as_trace_dict()
+
+    assert {
+        key: trace_knobs[key]
+        for key in (
+            "sibling_expansion_enabled",
+            "sibling_expansion_radius",
+            "sibling_expansion_max_chars",
+            "sibling_expansion_max_tokens",
+        )
+    } == {
+        "sibling_expansion_enabled": True,
+        "sibling_expansion_radius": 2,
+        "sibling_expansion_max_chars": 111,
+        "sibling_expansion_max_tokens": 22,
+    }
+
+
 def test_current_law_preset_does_not_read_behavior_settings(monkeypatch):
     monkeypatch.setattr(settings, "sparse_overfetch_k", 999)
     monkeypatch.setattr(settings, "rerank_score_margin", 99.0)

@@ -19,6 +19,7 @@ _SELECTION_TIMER_STAGES = {
     "edge_expansion",
     "prefer_operative",
     "parent_expansion",
+    "sibling_expansion",
     "dedup",
 }
 
@@ -51,7 +52,13 @@ def _retrieval_stage_timings_ms(collector: TraceCollector | None) -> dict[str, f
         "sparse": {"sparse_retriever"},
         "fusion": {"fusion"},
         "reranked": {"rerank_scoring"},
-        "expanded": {"edge_expansion", "prefer_operative", "parent_expansion"},
+        "expanded": {
+            "edge_expansion",
+            "prefer_operative",
+            "parent_expansion",
+            "sibling_expansion",
+        },
+        "sibling_expansion": {"sibling_expansion"},
         "selected": {"dedup"},
         "corrective": {"corrective_retrieval"},
     }
@@ -74,6 +81,7 @@ def _feature_flags(policy: AnswerPolicy) -> dict:
         "debug": settings.debug,
         "trace_logging_enabled": settings.trace_logging_enabled,
         "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
+        "sibling_expansion_enabled": policy.retrieval_defaults.sibling_expansion_enabled,
         "answerability_gate_enabled": policy.evidence_gate == "answerability",
         "evidence_gate": policy.evidence_gate,
         "evidence_judge_model": policy.evidence_judge_model,

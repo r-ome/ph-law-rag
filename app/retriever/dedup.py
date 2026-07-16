@@ -40,9 +40,9 @@ def _merge_bucket(bucket: list[RetrievalResult]) -> RetrievalResult:
 def dedup_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
     """Conservative same-provision dedup for final context only.
 
-    This runs after parent expansion. It never drops parent-expanded results and
-    only collapses same-provision duplicates when consolidation metadata or strong
-    text similarity makes the duplication explicit.
+    This runs after structural expansion. It never drops parent- or sibling-expanded
+    results and only collapses same-provision duplicates when consolidation metadata
+    or strong text similarity makes the duplication explicit.
     """
     by_pid: dict[str, list[RetrievalResult]] = {}
     for result in results:
@@ -60,7 +60,9 @@ def dedup_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
         if consolidated:
             buckets: dict[tuple[str | None, str | None], list[RetrievalResult]] = {}
             for result in consolidated:
-                if result.metadata.get("expanded_from_parent"):
+                if result.metadata.get("expanded_from_parent") or result.metadata.get(
+                    "expanded_from_sibling"
+                ):
                     continue
                 key = (result.metadata.get("source_id"), result.metadata.get("provision_id"))
                 buckets.setdefault(key, []).append(result)
@@ -70,20 +72,37 @@ def dedup_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
                 replacements[bucket[0].chunk_id] = _merge_bucket(bucket)
                 drop_ids.update(result.chunk_id for result in bucket[1:])
 
-            consolidated_sources = {r.metadata.get("source_id") for r in consolidated}
+            # Sibling additions retain exact leaf identity and cannot participate
+            # in dropping an original survivor. Parent additions keep their prior
+            # comparator behavior so consolidated law still suppresses duplicate
+            # amendment text.
+            comparators = [
+                result
+                for result in consolidated
+                if not result.metadata.get("expanded_from_sibling")
+            ]
+            if not comparators:
+                continue
+            consolidated_sources = {
+                result.metadata.get("source_id") for result in comparators
+            }
             for result in group:
-                if result.metadata.get("expanded_from_parent"):
+                if result.metadata.get("expanded_from_parent") or result.metadata.get(
+                    "expanded_from_sibling"
+                ):
                     continue
                 if _is_consolidated(result):
                     continue
                 if result.metadata.get("source_id") not in consolidated_sources or any(
-                    _near_duplicate(result.text, kept.text) for kept in consolidated
+                    _near_duplicate(result.text, kept.text) for kept in comparators
                 ):
                     drop_ids.add(result.chunk_id)
             continue
 
         kept: list[RetrievalResult] = []
         for result in group:
+            if result.metadata.get("expanded_from_sibling"):
+                continue
             if result.metadata.get("expanded_from_parent"):
                 kept.append(result)
                 continue

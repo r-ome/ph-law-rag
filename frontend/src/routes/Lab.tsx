@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-type Strategy = "auto" | "default" | "current_law";
+type Strategy = "auto" | "default" | "current_law" | "sibling_aware";
 
 const EVIDENCE_JUDGE_MODELS = [
   "gemma4:e4b",
@@ -293,6 +293,7 @@ export default function Lab() {
                   <SelectItem value="auto">Auto (router)</SelectItem>
                   <SelectItem value="default">default</SelectItem>
                   <SelectItem value="current_law">current_law</SelectItem>
+                  <SelectItem value="sibling_aware">sibling_aware (experimental)</SelectItem>
                 </SelectContent>
               </Select>
               <Button disabled={mutation.isPending || !question.trim()} onClick={run}>

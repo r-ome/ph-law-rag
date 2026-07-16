@@ -20,6 +20,8 @@ const trace: TraceRecord = {
       unit_label: "Article 309",
       provision_id: "rpc:309",
       expanded_from_parent: true,
+      expanded_from_sibling: false,
+      sibling_seed_chunk_id: "",
       consolidated: "",
       dedup_merged_chunk_ids: ["c1a"],
       preview: "Theft is punished by...",
@@ -32,6 +34,9 @@ const trace: TraceRecord = {
       unit_label: "Article 308",
       provision_id: "rpc:308",
       expanded_from_parent: false,
+      expanded_from_sibling: true,
+      sibling_seed_chunk_id: "c1",
+      sibling_offset: 1,
       consolidated: "",
       dedup_merged_chunk_ids: [],
       preview: "Who are liable for theft...",
@@ -47,6 +52,8 @@ const trace: TraceRecord = {
       unit_label: "Article 309",
       provision_id: "rpc:309",
       expanded_from_parent: true,
+      expanded_from_sibling: false,
+      sibling_seed_chunk_id: "",
       consolidated: "",
       dedup_merged_chunk_ids: ["c1a"],
       preview: "Theft is punished by...",
@@ -74,6 +81,8 @@ test("renders trace columns, scores, source ids, and expansion badges", () => {
   expect(screen.getAllByText("0.9123").length).toBeGreaterThan(0);
   expect(screen.getAllByText("rpc_1930").length).toBeGreaterThan(0);
   expect(screen.getAllByText("expanded_from_parent").length).toBeGreaterThan(0);
+  expect(screen.getByText("expanded_from_sibling (1)")).toBeInTheDocument();
+  expect(screen.getByText("seed c1")).toBeInTheDocument();
 });
 
 test("expands a chunk card to show the full retrieved text", async () => {

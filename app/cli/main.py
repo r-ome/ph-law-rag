@@ -112,6 +112,7 @@ def eval_retrieve(
 		False,
 		"--legal-query-separation/--original-only",
 	),
+	strategy: str = typer.Option(None, "--strategy", help="explicit retrieval strategy override"),
 ):
 	if "holdout" in splits:
 		raise typer.BadParameter("holdout is sealed and unavailable to eval-retrieve")
@@ -123,7 +124,7 @@ def eval_retrieve(
 	)
 	typer.echo(
 		"Retrieval bundle written to "
-		f"{retrieve_rows(rows, tag=tag, resume=resume, keep_retrieval_models=keep_retrieval_models, query_separation_arm=query_separation_arm)}"
+		f"{retrieve_rows(rows, tag=tag, resume=resume, keep_retrieval_models=keep_retrieval_models, query_separation_arm=query_separation_arm, strategy_override=strategy)}"
 	)
 
 @app.command("eval-generate")
@@ -146,6 +147,22 @@ def eval_retrieval_compare(
 
 	path = compare_retrieval_bundles(baseline_tag, candidate_tag, tag=tag)
 	typer.echo(f"Retrieval comparison written to {path}")
+
+@app.command("eval-sibling-census")
+def eval_sibling_census(
+	trace_path: str,
+	radius: int = typer.Option(1, "--radius", min=1),
+	db_path: str = typer.Option(None, "--db-path"),
+):
+	"""Inspect radius-eligible exact-leaf misses without running retrieval."""
+	from app.evals.sibling_census import build_sibling_eligibility_census
+
+	payload = build_sibling_eligibility_census(
+		trace_path,
+		db_path=db_path or settings.db_path,
+		radius=radius,
+	)
+	typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
 
 @app.command("eval-repeatability")
 def eval_repeatability(

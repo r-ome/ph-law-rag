@@ -71,6 +71,15 @@ def test_settings_field_ownership_is_exhaustive():
     assert set(Settings.model_fields) - BEHAVIOR_FIELDS - INFRA_FIELDS == {"raglab_profile"}
 
 
+def test_sibling_knobs_are_behavior_fields():
+    assert {
+        "sibling_expansion_enabled",
+        "sibling_expansion_radius",
+        "sibling_expansion_max_chars",
+        "sibling_expansion_max_tokens",
+    } <= BEHAVIOR_FIELDS
+
+
 def test_eval_profile_does_not_turn_on_router(monkeypatch):
     monkeypatch.setattr(settings, "raglab_profile", "eval")
     monkeypatch.setattr(settings, "router_enabled", True)

@@ -29,6 +29,14 @@ function ChunkCard({ chunk }: { chunk: ChunkTrace }) {
         <span className="font-medium">{chunk.source_id || "unknown"}</span>
         {chunk.unit_label && <span className="text-muted-foreground">{chunk.unit_label}</span>}
         {chunk.expanded_from_parent && <Badge>expanded_from_parent</Badge>}
+        {chunk.expanded_from_sibling && (
+          <Badge>
+            expanded_from_sibling {chunk.sibling_offset != null ? `(${chunk.sibling_offset})` : ""}
+          </Badge>
+        )}
+        {chunk.sibling_seed_chunk_id && (
+          <Badge variant="outline">seed {chunk.sibling_seed_chunk_id}</Badge>
+        )}
         {chunk.dedup_merged_chunk_ids.length > 0 && (
           <Badge variant="outline">dedup {chunk.dedup_merged_chunk_ids.length}</Badge>
         )}

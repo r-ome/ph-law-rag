@@ -104,6 +104,13 @@ def candidate_lines(
                     "provision_id": provision_id,
                     "parent_id": parent_id,
                     "unit_label": unit_label,
+                    "expanded_from_sibling": bool(
+                        metadata.get("expanded_from_sibling")
+                    ),
+                    "sibling_seed_chunk_id": str(
+                        metadata.get("sibling_seed_chunk_id", "")
+                    ),
+                    "sibling_offset": metadata.get("sibling_offset"),
                     "text": text,
                     "char_count": len(text),
                     "token_estimate": math.ceil(len(text) / 4),

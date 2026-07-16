@@ -265,6 +265,64 @@ def test_holdout_summary_contains_operational_metrics_only(tmp_path):
     assert "overall" not in summary
 
 
+def test_summary_attributes_sibling_leaf_recovery_before_and_after_dedup(tmp_path):
+    path = tmp_path / "retrieval_trace.jsonl"
+    records = [
+        {
+            "record_type": "candidate",
+            "eval_id": "eval_sibling",
+            "stage": "reranked",
+            "snapshot_ordinal": 1,
+            "rank": 1,
+            "chunk_id": "seed",
+            "survived": True,
+            "matched_leaf_targets": [],
+        },
+        {
+            "record_type": "candidate",
+            "eval_id": "eval_sibling",
+            "stage": "expanded",
+            "snapshot_ordinal": 2,
+            "rank": 2,
+            "chunk_id": "target",
+            "text": "target leaf",
+            "expanded_from_sibling": True,
+            "expected_leaf_match": True,
+            "matched_leaf_targets": ["law|law:section:1|Section 1(b)"],
+        },
+        {
+            "record_type": "candidate",
+            "eval_id": "eval_sibling",
+            "stage": "selected",
+            "snapshot_ordinal": 3,
+            "rank": 2,
+            "chunk_id": "target",
+            "text": "target leaf",
+            "matched_leaf_targets": ["law|law:section:1|Section 1(b)"],
+        },
+        {
+            "record_type": "row_complete",
+            "eval_id": "eval_sibling",
+            "target_source_count": 1,
+            "target_provision_count": 1,
+            "target_leaf_count": 1,
+            "stage_candidate_counts": {"reranked": 1, "expanded": 1, "selected": 1},
+            "stage_timings_ms": {"sibling_expansion": 0.5},
+        },
+    ]
+    path.write_text("".join(json.dumps(record) + "\n" for record in records))
+
+    sibling = build_retrieval_summary(path)["overall"]["sibling_expansion"]
+
+    assert sibling["rows_fired"] == 1
+    assert sibling["chunks_added_total"] == 1
+    assert sibling["target_bearing_additions"] == 1
+    assert sibling["leaf_rows_missed_after_rerank"] == 1
+    assert sibling["leaf_rows_recovered_at_expanded"] == 1
+    assert sibling["leaf_rows_recovered_at_selected"] == 1
+    assert sibling["missed_leaf_recovery_rate"] == 1.0
+
+
 def test_candidate_capture_forces_internal_trace_when_debug_and_logging_are_off(monkeypatch):
     from app.pipeline import runner
 

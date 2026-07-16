@@ -12,6 +12,7 @@ from app.evals.retrieval_trace import completed_sentinels, read_completed_trace
 
 KS = (1, 3, 5, 8, 10, 30)
 QUALITY_STAGES = ("dense", "sparse", "fused", "reranked", "expanded", "selected", "corrective")
+TIMING_STAGES = (*QUALITY_STAGES, "sibling_expansion")
 LANE_STAGES = ("dense", "sparse", "fused")
 BASE_QUERY_VARIANTS = ("original", "legal_rewrite")
 
@@ -207,6 +208,14 @@ def _quality_summary(
     corrective_irrelevant: list[float] = []
     final_chars: list[float] = []
     final_tokens: list[float] = []
+    sibling_fired_rows = 0
+    sibling_chunks_added: list[float] = []
+    sibling_chunks_added_all: list[float] = []
+    sibling_target_additions = 0
+    sibling_total_additions = 0
+    leaf_rows_missed_after_rerank = 0
+    leaf_rows_recovered_expanded = 0
+    leaf_rows_recovered_selected = 0
 
     for eval_id, sentinel in sentinel_by_id.items():
         row_records = by_eval.get(eval_id, [])
@@ -304,6 +313,32 @@ def _quality_summary(
             before_snapshot=boundary,
         )
         reranked_ids = {record["chunk_id"] for record in reranked_survivors}
+        sibling_additions = [
+            record
+            for record in pools["expanded"]
+            if record.get("expanded_from_sibling")
+        ]
+        sibling_chunks_added_all.append(float(len(sibling_additions)))
+        if sibling_additions:
+            sibling_fired_rows += 1
+            sibling_chunks_added.append(float(len(sibling_additions)))
+            sibling_total_additions += len(sibling_additions)
+            sibling_target_additions += sum(
+                bool(record.get("expected_leaf_match"))
+                for record in sibling_additions
+            )
+        if int(sentinel.get("target_leaf_count", 0)):
+            reranked_leaf_targets = _target_keys(
+                reranked_survivors, "matched_leaf_targets"
+            )
+            if not reranked_leaf_targets:
+                leaf_rows_missed_after_rerank += 1
+                if _target_keys(sibling_additions, "matched_leaf_targets"):
+                    leaf_rows_recovered_expanded += 1
+                    if _target_keys(
+                        pools["selected"], "matched_leaf_targets"
+                    ):
+                        leaf_rows_recovered_selected += 1
         expansion_irrelevant.append(
             float(
                 sum(
@@ -363,6 +398,29 @@ def _quality_summary(
             "characters_mean": _mean(final_chars),
             "token_estimate_mean": _mean(final_tokens),
         },
+        "sibling_expansion": {
+            "rows_fired": sibling_fired_rows,
+            "chunks_added_total": sibling_total_additions,
+            "chunks_added_mean": _mean(sibling_chunks_added_all),
+            "chunks_added_mean_when_fired": _mean(sibling_chunks_added),
+            "target_bearing_additions": sibling_target_additions,
+            "target_bearing_addition_ratio": (
+                round(sibling_target_additions / sibling_total_additions, 4)
+                if sibling_total_additions
+                else None
+            ),
+            "leaf_rows_missed_after_rerank": leaf_rows_missed_after_rerank,
+            "leaf_rows_recovered_at_expanded": leaf_rows_recovered_expanded,
+            "leaf_rows_recovered_at_selected": leaf_rows_recovered_selected,
+            "missed_leaf_recovery_rate": (
+                round(
+                    leaf_rows_recovered_expanded / leaf_rows_missed_after_rerank,
+                    4,
+                )
+                if leaf_rows_missed_after_rerank
+                else None
+            ),
+        },
         "retrieval_latency_ms_mean": _mean(
             [float(row.get("retrieval_latency_ms", 0.0)) for row in sentinels]
         ),
@@ -374,7 +432,7 @@ def _quality_summary(
                     if stage in row.get("stage_timings_ms", {})
                 ]
             )
-            for stage in QUALITY_STAGES
+            for stage in TIMING_STAGES
             if any(stage in row.get("stage_timings_ms", {}) for row in sentinels)
         },
     }
@@ -395,7 +453,7 @@ def build_retrieval_summary(
                 if stage in row.get("stage_timings_ms", {})
             ]
         )
-        for stage in QUALITY_STAGES
+        for stage in TIMING_STAGES
         if any(stage in row.get("stage_timings_ms", {}) for row in sentinels)
     }
     operational = {

@@ -271,23 +271,88 @@ out-of-scope behavior.
 
 ## Sibling-Aware Expansion
 
-This is a new mechanism and should be planned in the next session. It is not the
-same as current parent expansion.
+Phase 3 is an approved, opt-in experiment. It is not the same as current parent
+expansion and it does not change the serving default or any intent-router
+mapping.
 
-The intended behavior is: when a high-ranked child of a structured legal
-provision survives, recover bounded adjacent siblings that complete the same
-enumeration, exception set, or operative rule. For example, selecting Article
-1403(2)(d) should make Article 1403(2)(e) eligible even when only one child of
-the parent survived reranking.
+The experiment runs after parent expansion and before the `expanded` candidate
+snapshot and final deduplication:
 
-The phase plan must define:
+```text
+rerank -> edge expansion -> prefer operative -> parent expansion
+       -> sibling expansion -> expanded snapshot -> dedup -> selected snapshot
+```
 
-- sibling identity and ordering from chunk metadata;
-- when one surviving child is enough to expand;
-- adjacency, character, and token caps;
-- whether siblings are reranked or structurally retained;
-- exact-leaf and sibling-coverage metrics;
-- safeguards against expanding a very large article or section.
+Eligibility is determined from each retrieval result's metadata. A seed must
+have `parent_key` and `unit_label`, and must not already be an
+`expanded_from_parent` result. SQLite is used only to load the seed's family:
+rows whose `metadata_json.parent_key` matches, ordered by `chunks.chunk_index`.
+No schema migration or reindex is required.
+
+A sibling leaf is the atomic group `(parent_key, unit_label)`. This preserves
+all size-split parts of a leaf. Seeds are processed in fixed rerank order; for
+each distance from 1 through the configured radius, the preceding leaf is
+considered before the following leaf. An admitted leaf is inserted in document
+order around its seed. An existing survivor or a leaf already admitted through
+another seed is neither re-admitted nor charged to the budget twice. A leaf is
+admitted whole or skipped whole.
+
+The initial experimental settings are radius 1, 3,000 added characters, and
+750 estimated tokens, with character and token budgets global to the query.
+Admission uses deterministic first-fit budgeting: an over-budget leaf is
+skipped, but a later smaller leaf may still be admitted. The eligibility census
+is deliberately structural and does not apply these budgets, so any future
+binding census must separately confirm that denominator leaves fit the declared
+limits.
+Sibling results are structurally retained without another reranker call. They
+inherit the seed score for display only and carry `expanded_from_sibling`,
+`sibling_seed_chunk_id`, and `sibling_offset` provenance. When operative-only
+retrieval is enabled, an explicit `operability_action=hide` excludes a row;
+missing operability metadata remains fail-open.
+
+Sibling-expanded results are exempt from consolidated same-provision merging
+and dropping, matching the protection already applied to parent-expanded
+results. Recovery is attributed at the pre-dedup `expanded` snapshot and
+checked again at `selected` so downstream loss is visible.
+The current row-level selected-retention summary asks whether any target leaf
+remains; for a future multi-target sibling-recovery row, inspect the candidate
+trace to verify retention of the specific recovered leaf. Sibling-expansion
+latency is reported both on its own and inside the aggregate `expanded` timing,
+so stage timings are diagnostic categories and must not be summed.
+
+The four behavior knobs are `sibling_expansion_enabled`,
+`sibling_expansion_radius`, `sibling_expansion_max_chars`, and
+`sibling_expansion_max_tokens`. They participate in Settings, policy behavior
+identity, `RetrievalKnobs`, traces, and sealed-bundle selection comparison. The
+pinned `sibling_aware` strategy is available only through explicit eval and
+Retrieval Lab override surfaces.
+
+Retrieval-only capture selects the arm explicitly with
+`raglab eval-retrieve --strategy sibling_aware`; omitting the option preserves
+the frozen default arm.
+
+Evaluation first performs a read-only radius-1 eligibility census over sealed
+non-holdout traces joined to local SQLite ordering. The binding retrieval gates
+are aggregate recovery of leaves missed after reranking, survival through final
+selection, no loss in selected exact-leaf coverage or source/provision recall,
+and bounded context/latency growth. The target is at least 80% recovery of
+radius-1-eligible misses subject to the query budget. If the census finds fewer
+than six eligible rows, that percentage is descriptive rather than binding and
+the decision rests on no-regression gates plus row-level inspection.
+`eval_053` remains a named MiniLM smoke check only: Article 1403(2)(e) should be
+recovered when its Article 1403(2)(d) seed survives reranking.
+
+The implementation-time read-only census of the sealed
+`phase2-original-minilm` non-holdout trace found seven exact-leaf rows missed
+after reranking, but only one radius-1-eligible row: `eval_053`. The Phase 3
+percentage gate is therefore descriptive for this experiment; the binding
+decision uses the no-regression gates and row-level inspection. This census did
+not run retrieval, generation, a model, or the holdout.
+
+No holdout, paid Bedrock run, ADR, automatic router mapping, or serving-default
+change is part of Phase 3. A matched generation A/B follows only after the
+retrieval gates pass and must inspect evidence-gate effects from the additional
+selected chunks.
 
 ## Adaptive Final Context
 

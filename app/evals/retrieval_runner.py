@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 import time
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -174,6 +175,7 @@ def _code_identity() -> dict[str, Any]:
         "app/retriever/legal_query_rewriter.py",
         "app/retriever/reranker.py",
         "app/retriever/context_selection.py",
+        "app/retriever/sibling_expansion.py",
         "app/retriever/context_builder.py",
         "app/retriever/prompts.py",
     ]
@@ -263,6 +265,7 @@ def retrieve_rows(
     resume: bool = False,
     keep_retrieval_models: bool = False,
     query_separation_arm: LegalQuerySeparationArm = "original_only",
+    strategy_override: str | None = None,
 ) -> Path:
     if any(row.get("split") == "holdout" for row in rows):
         raise ValueError("holdout is sealed and unavailable to eval-retrieve")
@@ -272,6 +275,13 @@ def retrieve_rows(
         raise ValueError(f"unsupported query-separation arm {query_separation_arm!r}")
 
     policy = resolve_policy().policy
+    if strategy_override is not None:
+        from app.retriever.strategy import resolve_knobs
+
+        policy = replace(
+            policy,
+            retrieval_defaults=resolve_knobs(strategy_override),
+        )
     if policy.retrieval_defaults.subquery_packaging_enabled:
         raise ValueError(
             "schema 1.1 eval-retrieve requires subquery packaging to be disabled "
@@ -285,6 +295,7 @@ def retrieve_rows(
             resume=resume,
             keep_retrieval_models=keep_retrieval_models,
             query_separation_arm=query_separation_arm,
+            strategy_override=strategy_override,
             policy=policy,
         )
 
@@ -301,6 +312,7 @@ def retrieve_rows(
             resume=resume,
             keep_retrieval_models=keep_retrieval_models,
             query_separation_arm=query_separation_arm,
+            strategy_override=strategy_override,
             policy=policy,
         )
 
@@ -312,6 +324,7 @@ def _retrieve_rows_capture(
     resume: bool,
     keep_retrieval_models: bool,
     query_separation_arm: LegalQuerySeparationArm,
+    strategy_override: str | None,
     policy: AnswerPolicy,
 ) -> Path:
     from app.evals.retrieval_targets import load_retrieval_targets
@@ -419,10 +432,12 @@ def _retrieve_rows_capture(
             trace_id = new_trace_id()
             row_started = time.perf_counter()
             with trace_context(trace_id=trace_id, collector=collector):
-                prepare_answer_state(
-                    state,
-                    query_separation_arm=query_separation_arm,
-                )
+                prepare_kwargs: dict[str, Any] = {
+                    "query_separation_arm": query_separation_arm,
+                }
+                if strategy_override is not None:
+                    prepare_kwargs["strategy_override"] = strategy_override
+                prepare_answer_state(state, **prepare_kwargs)
                 if state.response is None:
                     from app.pipeline import stages
 

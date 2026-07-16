@@ -16,6 +16,9 @@ class ChunkTrace(BaseModel):
     unit_label: str = ""
     provision_id: str = ""
     expanded_from_parent: bool = False
+    expanded_from_sibling: bool = False
+    sibling_seed_chunk_id: str = ""
+    sibling_offset: int | None = None
     consolidated: str = ""
     dedup_merged_chunk_ids: list[str] = []
     preview: str = ""
@@ -60,7 +63,7 @@ class InspectOverrides(BaseModel):
 
 class InspectRequest(BaseModel):
     question: str
-    strategy: Literal["default", "current_law"] | None = None
+    strategy: Literal["default", "current_law", "sibling_aware"] | None = None
     overrides: InspectOverrides | None = None
 
 
