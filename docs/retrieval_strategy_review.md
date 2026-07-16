@@ -388,6 +388,43 @@ change is part of Phase 3. A matched generation A/B follows only after the
 retrieval gates pass and must inspect evidence-gate effects from the additional
 selected chunks.
 
+### Checkpoint 8 generation A/B result and graduation (2026-07-16)
+
+Both frozen bundles were replayed through the same pinned `gemma4:e4b`
+generator (`phase3-gen-baseline-gemma4`, `phase3-gen-sibling-gemma4`, 131 rows
+each) and RAGAS-scored with the standing Haiku judge. Replay determinism held:
+zero answer changes across the 67 unchanged-context rows, so every observed
+difference traces to the 64 sibling-changed contexts.
+
+Aggregates (baseline → sibling): context recall 0.833 → 0.857, context
+precision flat at 0.687, faithfulness 0.900 → 0.894 (noise-sized), answer
+relevancy 0.771 → 0.767. Abstention: answered 113 → 115, false abstentions
+7 → 5 — `eval_056` and `eval_057`, both documented false-abstention failure
+rows, flipped abstain → answer (faithfulness 1.00 and 0.86). No new false
+abstentions; the out-of-scope moat is unchanged (11/12 correct abstentions,
+the single answer leak pre-exists in both arms). `eval_053` is fixed
+end-to-end: context recall 0 → 1.0, faithfulness 0.8 → 1.0, and the answer
+cites Article 1403(2)(e) directly.
+
+Changed-row inspection (per the locked judge-noise method): six rows improved
+faithfulness by ≥0.15 (`eval_122`, `eval_039`, `eval_024`, `eval_105`,
+`eval_001`, `eval_053`); two declined beyond noise. `eval_045` (1.00 → 0.33)
+reads as a judge-method artifact — the sibling-arm answer is shorter and
+correct, grounded in Art. III §17 which is in context. `eval_129`
+(0.83 → 0.42) is the one genuine mechanism cost: the generator drifted onto
+sibling-added ADR §11 exception subsections (its context recall rose
+0.5 → 0.8). `eval_129` is the standing watch row.
+
+**Verdict: GRADUATED.** Despite 166/167 additions being non-target-bearing,
+precision held exactly flat and the faithfulness delta is inside judge noise,
+while recall, abstention behavior, and the named failure rows all improved.
+`sibling_expansion_enabled` defaults to `true` (ADR-026). The `sibling_aware`
+preset stays registered for matched comparisons; `current_law` keeps its
+pinned knobs; no intent mapping was added. Rollback is the single flag —
+additive-only was verified per row. Artifacts:
+`data/eval_results/runs/2026-07-16/phase3-gen-{baseline,sibling}-gemma4`,
+`data/eval_results/diffs/diff_phase3-gen-sibling-gemma4.md`.
+
 ## Adaptive Final Context
 
 Do not use one absolute score threshold across MiniLM, Qwen3, and Bedrock. Their

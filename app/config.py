@@ -65,8 +65,10 @@ class Settings(BaseSettings):
 	parent_expansion_enabled: bool = True   # default-on 2026-06-18: clean per-changed-row win (see NOTE below)
 	parent_expansion_min_children: int = 2
 	parent_expansion_max_chars: int = 8000
-	# Experimental, explicit-only recovery of adjacent enumeration leaves after parent expansion.
-	sibling_expansion_enabled: bool = False
+	# Recovery of adjacent enumeration leaves after parent expansion. Default-on 2026-07-16
+	# (ADR-026): matched A/B on 131 rows — exact-leaf coverage .577→.615, context recall +.024,
+	# precision flat, faithfulness delta noise-sized, false abstentions 7→5, additive-only.
+	sibling_expansion_enabled: bool = True
 	sibling_expansion_radius: int = 1
 	sibling_expansion_max_chars: int = 3000
 	sibling_expansion_max_tokens: int = 750

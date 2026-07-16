@@ -8,9 +8,17 @@ This is the project reference document for `ph-law-rag`.
 
 See also: `/Users/jeromeagapay/Documents/Personal/muming/03_Outputs/ph-law-rag-devlog.md`
 
-## Retrieval Strategy Phase 3: Sibling-Aware Expansion (experimental 2026-07-16)
+## Retrieval Strategy Phase 3: Sibling-Aware Expansion (GRADUATED default-on 2026-07-16, ADR-026)
 
-The retrieval pipeline now supports an explicit-only `sibling_aware` strategy.
+Sibling expansion graduated to the serving default (`sibling_expansion_enabled=true`)
+after the matched generation A/B: context recall 0.833→0.857, precision flat,
+faithfulness delta noise-sized, false abstentions 7→5, eval_053 fixed
+end-to-end. The `sibling_aware` preset remains registered for matched
+comparisons; `current_law` keeps its pinned knobs unchanged. Watch row:
+eval_129 (generator drift onto sibling-added exception text). Rollback is the
+single flag. The section below documents the mechanism as designed.
+
+The retrieval pipeline supports the `sibling_aware` strategy.
 It keeps the frozen MiniLM baseline selection settings and enables one new
 post-rerank structural step: after parent expansion, a surviving structured
 leaf may recover adjacent leaves from the same `parent_key`. Eligibility comes
