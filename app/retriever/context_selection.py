@@ -171,6 +171,135 @@ def select_context(
         selected_ids={result.chunk_id for result in selected},
     )
 
+    from app.retriever.adaptive_context import (
+        ADAPTIVE_CONTEXT_CONTRACT_VERSION,
+        ADAPTIVE_CONTEXT_TOKEN_ESTIMATOR,
+        estimate_rendered_tokens,
+        infer_structural_signals,
+        packaging_pool_full_hash,
+        packaging_pool_semantic_hash,
+        select_adaptive_context,
+    )
+
+    adaptive_context_enabled = (
+        knobs.adaptive_context_enabled if knobs else settings.adaptive_context_enabled
+    )
+    packaging_semantic_hash = packaging_pool_semantic_hash(selected)
+    packaging_full_hash = packaging_pool_full_hash(selected)
+    accepted_legal_rewrite = legal_query is not None
+    signals = infer_structural_signals(
+        selected,
+        accepted_legal_rewrite=accepted_legal_rewrite,
+        synthesis_detected=False,
+    )
+    if adaptive_context_enabled:
+        if (
+            (knobs.adaptive_context_contract_version if knobs else settings.adaptive_context_contract_version)
+            != ADAPTIVE_CONTEXT_CONTRACT_VERSION
+        ):
+            raise ValueError("unsupported adaptive context contract version")
+        if (
+            (knobs.adaptive_context_token_estimator if knobs else settings.adaptive_context_token_estimator)
+            != ADAPTIVE_CONTEXT_TOKEN_ESTIMATOR
+        ):
+            raise ValueError("unsupported adaptive context token estimator")
+        before = len(selected)
+        with stage_timer(
+            "adaptive_context",
+            in_n=before,
+            packaging_pool_semantic_hash=packaging_semantic_hash,
+            packaging_pool_full_hash=packaging_full_hash,
+        ) as stage:
+            selected, diagnostics = select_adaptive_context(
+                selected,
+                signals=signals,
+                floor=knobs.adaptive_context_floor if knobs else settings.adaptive_context_floor,
+                base_cap=(
+                    knobs.adaptive_context_base_cap
+                    if knobs
+                    else settings.adaptive_context_base_cap
+                ),
+                uncertain_cap=(
+                    knobs.adaptive_context_uncertain_cap
+                    if knobs
+                    else settings.adaptive_context_uncertain_cap
+                ),
+                multifacet_cap=(
+                    knobs.adaptive_context_multifacet_cap
+                    if knobs
+                    else settings.adaptive_context_multifacet_cap
+                ),
+                stabilization_patience=(
+                    knobs.adaptive_context_stabilization_patience
+                    if knobs
+                    else settings.adaptive_context_stabilization_patience
+                ),
+                token_target=(
+                    knobs.adaptive_context_token_target
+                    if knobs
+                    else settings.adaptive_context_token_target
+                ),
+            )
+            stage["out_n"] = len(selected)
+            stage["fields"] = {
+                "enabled": True,
+                **diagnostics.as_dict(),
+            }
+        capture_candidates(
+            "adaptive_selected",
+            selected,
+            query_variant="original",
+            query_text=question,
+            query_ordinal=0,
+            selected_ids={result.chunk_id for result in selected},
+        )
+    else:
+        rendered_tokens = estimate_rendered_tokens(selected)
+        with stage_timer(
+            "adaptive_context",
+            in_n=len(selected),
+            packaging_pool_semantic_hash=packaging_semantic_hash,
+            packaging_pool_full_hash=packaging_full_hash,
+        ) as stage:
+            stage["out_n"] = len(selected)
+            stage["fields"] = {
+                "enabled": False,
+                "contract_version": ADAPTIVE_CONTEXT_CONTRACT_VERSION,
+                "token_estimator": ADAPTIVE_CONTEXT_TOKEN_ESTIMATOR,
+                "input_count": len(selected),
+                "deduplicated_count": len(selected),
+                "selected_count": len(selected),
+                "cap": None,
+                "rendered_tokens": rendered_tokens,
+                "token_target": (
+                    knobs.adaptive_context_token_target
+                    if knobs
+                    else settings.adaptive_context_token_target
+                ),
+                "token_overflow": max(
+                    0,
+                    rendered_tokens
+                    - (
+                        knobs.adaptive_context_token_target
+                        if knobs
+                        else settings.adaptive_context_token_target
+                    ),
+                ),
+                "chunk_cap_overflow": 0,
+                "duplicate_chunk_ids_removed": 0,
+                "represented_chunks_removed": 0,
+                "duplicate_texts_removed": 0,
+                "bundles_considered": 0,
+                "bundles_selected": 0,
+                "non_novel_bundles": 0,
+                "stop_reason": "fixed_control",
+                "signals": {
+                    "accepted_legal_rewrite": signals.accepted_legal_rewrite,
+                    "synthesis_detected": signals.synthesis_detected,
+                    "coverage_uncertain": signals.coverage_uncertain,
+                },
+            }
+
     return SelectionResult(
         retrieved=retrieved_trace,
         pre_expansion=pre_expansion,

@@ -63,6 +63,17 @@ def _active_config() -> dict:
         "faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
         "later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
         "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
+        "adaptive_context_enabled": policy.retrieval_defaults.adaptive_context_enabled,
+        "adaptive_context_contract_version": policy.retrieval_defaults.adaptive_context_contract_version,
+        "adaptive_context_floor": policy.retrieval_defaults.adaptive_context_floor,
+        "adaptive_context_base_cap": policy.retrieval_defaults.adaptive_context_base_cap,
+        "adaptive_context_uncertain_cap": policy.retrieval_defaults.adaptive_context_uncertain_cap,
+        "adaptive_context_multifacet_cap": policy.retrieval_defaults.adaptive_context_multifacet_cap,
+        "adaptive_context_stabilization_patience": (
+            policy.retrieval_defaults.adaptive_context_stabilization_patience
+        ),
+        "adaptive_context_token_target": policy.retrieval_defaults.adaptive_context_token_target,
+        "adaptive_context_token_estimator": policy.retrieval_defaults.adaptive_context_token_estimator,
     }
 
 
@@ -74,6 +85,7 @@ def run_rows(
     strategy_override: str | None = None,
     trace_label: str | None = "eval",
     holdout: bool = False,
+    policy_overrides: dict | None = None,
 ) -> list[dict]:
     from app.evals.retrieval_metrics import save_retrieval_summary
     from app.evals.retrieval_targets import load_retrieval_targets
@@ -99,13 +111,15 @@ def run_rows(
 
     for i, item in enumerate(rows, start=1):
         start = time.perf_counter()
-        resp, trace_record = run_answer(
-            item["question"],
-            debug=debug,
-            trace_label=trace_label,
-            strategy_override=strategy_override,
-            capture_candidate_stages=True,
-        )
+        answer_kwargs = {
+            "debug": debug,
+            "trace_label": trace_label,
+            "strategy_override": strategy_override,
+            "capture_candidate_stages": True,
+        }
+        if policy_overrides is not None:
+            answer_kwargs["policy_overrides"] = policy_overrides
+        resp, trace_record = run_answer(item["question"], **answer_kwargs)
         if trace_record is None:
             raise RuntimeError("candidate capture did not produce an internal trace")
         elapsed = time.perf_counter() - start
@@ -122,7 +136,7 @@ def run_rows(
             else "expected_provision_match"
         )
         retrieval_target_present = any(
-            line.get("stage") in {"selected", "corrective"}
+            line.get("stage") in {"selected", "adaptive_selected", "corrective"}
             and line.get(target_match_field) is True
             for line in trace_lines
         )
@@ -244,20 +258,48 @@ def run_rows(
     return results
 
 
-def run_eval_set(splits: tuple[str, ...] = ("regression", "dev")) -> tuple[list[dict], Path, str]:
+def run_eval_set(
+    splits: tuple[str, ...] = ("regression", "dev"),
+    *,
+    policy_overrides: dict | None = None,
+    run_label: str | None = None,
+) -> tuple[list[dict], Path, str]:
     from app.observability.logger import configure_logging
 
     configure_logging()
 
     from app.evals.dataset import load_eval_dataset
+    from app.evals.integrity import file_sha256
+    from app.evals.retrieval_runner import _capture_consistency, _storage_identities
 
     dataset = load_eval_dataset(settings.eval_dataset_path, splits=splits)
     holdout = "holdout" in splits
-    policy = resolve_policy().policy
+    policy_resolution = resolve_policy()
+    policy = policy_resolution.policy
+    if policy_overrides:
+        from dataclasses import fields as dataclass_fields, replace
+
+        from app.pipeline.policy import AnswerPolicy
+
+        policy_field_names = {f.name for f in dataclass_fields(AnswerPolicy)}
+        knob_field_names = {f.name for f in dataclass_fields(type(policy.retrieval_defaults))}
+        direct = {k: v for k, v in policy_overrides.items() if k in policy_field_names}
+        knobs = {
+            k: v
+            for k, v in policy_overrides.items()
+            if k in knob_field_names and k not in policy_field_names
+        }
+        if direct:
+            policy = replace(policy, **direct)
+        if knobs:
+            policy = replace(
+                policy, retrieval_defaults=replace(policy.retrieval_defaults, **knobs)
+            )
 
     started_at = datetime.now().astimezone()
     model_slug = policy.generator_model.replace(":", "-").replace("/", "-")
-    run_tag = artifacts.make_run_tag(model_slug, settings.eval_run_label, started_at)
+    label = settings.eval_run_label if run_label is None else run_label
+    run_tag = artifacts.make_run_tag(model_slug, label, started_at)
     paths = artifacts.create_run_paths(run_tag, started_at)
     out_path = paths.run
 
@@ -265,11 +307,23 @@ def run_eval_set(splits: tuple[str, ...] = ("regression", "dev")) -> tuple[list[
     # (a remote backend spends money on it), and a stale .env has silently confounded a
     # run before (dense_top_k=10 during the Haiku A/B). Eyeball this, then let it spend.
     print("Active config:")
-    print(json.dumps(_active_config(), indent=2), flush=True)
+    active_config = _active_config()
+    if policy_overrides:
+        active_config["policy_overrides_applied"] = policy_overrides
+        active_config.update(policy.retrieval_defaults.as_trace_dict())
+        active_config["llm_model"] = policy.generator_model
+    print(json.dumps(active_config, indent=2), flush=True)
 
     run_answer("warmup", trace=False)  # prime reranker + Ollama so row 1 isn't cold-start inflated
 
-    results = run_rows(dataset, out_path, holdout=holdout)
+    start_storage = _storage_identities()
+    results = run_rows(
+        dataset,
+        out_path,
+        holdout=holdout,
+        policy_overrides=policy_overrides,
+    )
+    end_storage = _storage_identities()
 
     times = [r["elapsed_s"] for r in results]
     print(f"\nTiming — median {statistics.median(times):.2f}s | mean {statistics.mean(times):.2f}s | "
@@ -290,13 +344,21 @@ def run_eval_set(splits: tuple[str, ...] = ("regression", "dev")) -> tuple[list[
         "model": policy.generator_model,
         "generator_model": policy.generator_model,
         "model_slug": model_slug,
-        "label": settings.eval_run_label,
+        "label": label,
         "question_count": len(results),
         "scored_count": None,
         "git_sha": _git_sha(),
-        "active_config": _active_config(),
+        "active_config": active_config,
         "splits": list(splits),
         "holdout": holdout,
+        "dataset_identity": {
+            "path": settings.eval_dataset_path,
+            "sha256": file_sha256(Path(settings.eval_dataset_path)),
+            "row_count": len(dataset),
+            "splits": list(splits),
+        },
+        **start_storage,
+        "storage_consistency": _capture_consistency(start_storage, end_storage),
     }
     artifacts.save_meta(run_tag, meta)
     artifacts.update_manifest(run_tag, meta=meta)

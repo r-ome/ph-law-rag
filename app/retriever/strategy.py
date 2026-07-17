@@ -35,6 +35,15 @@ class RetrievalKnobs:
     sibling_expansion_radius: int = 1
     sibling_expansion_max_chars: int = 3000
     sibling_expansion_max_tokens: int = 750
+    adaptive_context_enabled: bool = True
+    adaptive_context_contract_version: int = 2
+    adaptive_context_floor: int = 4
+    adaptive_context_base_cap: int = 7
+    adaptive_context_uncertain_cap: int = 11
+    adaptive_context_multifacet_cap: int = 11
+    adaptive_context_stabilization_patience: int = 2
+    adaptive_context_token_target: int = 2400
+    adaptive_context_token_estimator: str = "rendered_chars_div4_v1"
 
     @classmethod
     def from_settings(cls, settings_obj=settings) -> "RetrievalKnobs":
@@ -60,6 +69,17 @@ class RetrievalKnobs:
             sibling_expansion_radius=settings_obj.sibling_expansion_radius,
             sibling_expansion_max_chars=settings_obj.sibling_expansion_max_chars,
             sibling_expansion_max_tokens=settings_obj.sibling_expansion_max_tokens,
+            adaptive_context_enabled=settings_obj.adaptive_context_enabled,
+            adaptive_context_contract_version=settings_obj.adaptive_context_contract_version,
+            adaptive_context_floor=settings_obj.adaptive_context_floor,
+            adaptive_context_base_cap=settings_obj.adaptive_context_base_cap,
+            adaptive_context_uncertain_cap=settings_obj.adaptive_context_uncertain_cap,
+            adaptive_context_multifacet_cap=settings_obj.adaptive_context_multifacet_cap,
+            adaptive_context_stabilization_patience=(
+                settings_obj.adaptive_context_stabilization_patience
+            ),
+            adaptive_context_token_target=settings_obj.adaptive_context_token_target,
+            adaptive_context_token_estimator=settings_obj.adaptive_context_token_estimator,
             subquery_packaging_enabled=settings_obj.subquery_packaging_enabled,
             subquery_reserve_n=settings_obj.subquery_reserve_n,
         )
@@ -80,6 +100,15 @@ class RetrievalKnobs:
                 "sibling_expansion_radius",
                 "sibling_expansion_max_chars",
                 "sibling_expansion_max_tokens",
+                "adaptive_context_enabled",
+                "adaptive_context_contract_version",
+                "adaptive_context_floor",
+                "adaptive_context_base_cap",
+                "adaptive_context_uncertain_cap",
+                "adaptive_context_multifacet_cap",
+                "adaptive_context_stabilization_patience",
+                "adaptive_context_token_target",
+                "adaptive_context_token_estimator",
             )
         }
 

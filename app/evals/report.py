@@ -153,6 +153,15 @@ def save_scored(results: list[dict], scored, run_tag: str | None = None) -> None
     if meta is not None:
         meta["scored_count"] = len(scorable)
         meta["scored_at"] = datetime.now().astimezone().isoformat()
+        try:
+            from app.evals.ragas_scorer import scoring_identity
+
+            meta["scoring_identity"] = scoring_identity(
+                generator_model=meta.get("generator_model") or meta.get("model"),
+                use_cache=True,
+            )
+        except Exception:
+            pass
         artifacts.save_meta(tag, meta)
 
     artifacts.update_manifest(tag, meta=meta, summary=summary)

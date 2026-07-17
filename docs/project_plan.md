@@ -98,6 +98,79 @@ quality effects before any serving-default or router graduation. The
 retrieval-only gate passes in the predeclared descriptive regime; generation
 and serving graduation remain pending.
 
+## Retrieval Strategy Phase 4: Adaptive Final Context (offline experiment only, 2026-07-16)
+
+Phase 4 has an opt-in schema-1.1 replay implementation. It consumes the complete
+post-expansion/post-dedup `selected_results` pool from a sealed non-holdout
+retrieval bundle and republishes a fixed or adaptive derived bundle. The
+adaptive arm uses score-free evidence novelty, seed-centered atomic sibling
+groups, deterministic rendered-context token estimation, contract-v2 soft
+7/11/11 caps, a 2,400-token target, a four-chunk floor, and stabilization after
+two consecutive non-novel groups.
+
+This is evaluation infrastructure only. It does not change the live retrieval
+pipeline, Settings, API/frontend adapters, database schema, policy defaults, or
+serving behavior. Schema 1.2 and a live pre-selector `packaging_pool` snapshot
+are intentionally deferred until the mechanism graduates. Graduation still
+requires a matched non-holdout replay, coverage and named-row review
+(`eval_053` and `eval_129`), bounded context reduction, optional matched
+generation evidence, and a separate architecture/default decision. The holdout
+remains sealed.
+
+Checkpoint 3 completed as a sealed negative result. The adaptive arm changed 95
+of 131 selected contexts with zero pre-rerank-pool drift and reduced mean rendered
+context 31.84%, below the 35% halt ceiling. It preserved all source targets, all
+exact-leaf targets, evidence/abstention behavior, OOS source breadth, and the full
+`eval_053` Article 1403(2)(c)-(e) bundle. It nevertheless removed eight expected
+provisions across `eval_037`, `eval_039`, `eval_044`, `eval_074`, `eval_106`,
+`eval_109`, `eval_124`, and `eval_129`; selected parent-provision coverage fell
+0.7385→0.6961. The binding retrieval gate therefore fails. No generation replay,
+holdout access, ADR, live seam, or default change follows. Any revision requires
+a separately approved cap/widening plan and a new write-once replay tag; full
+results are in `docs/retrieval_strategy_review.md`.
+
+Checkpoint 4 completed with a new write-once contract-v2 replay after attributing
+the eight checkpoint-3 losses to seven cap stops and one token stop. The revised
+arm changed 66 of 131 contexts with zero pre-rerank drift, restored selected
+parent-provision coverage to 0.7385 and target survival to 0.8529 with no source
+or exact-leaf losses, and retained the full `eval_053` Article 1403(2)(c)-(e)
+bundle. Mean rendered context fell 11.65%, p95 fell 2,649→2,372 tokens, and the
+maximum fell 3,274→2,696. The retrieval-only gate passes. No generation,
+holdout access, schema/live wiring, ADR, or serving-default change has followed;
+those remain separately gated.
+
+The contract-v2 policy was explicitly in-sample tuned: its caps and token target
+were chosen from the eight failures on the same regression/dev bundle, and six
+recovered rows had zero chunk slack after their required target. That risk was
+tested by the separately authorized 30-row holdout release gate on 2026-07-17.
+The holdout Stage B aggregate passed all predeclared hard gates: faithfulness Δ
++0.022550629444827552, context-recall Δ -0.005747126437931072, false
+abstentions 1→1, and rendered-token reduction 0.1376842483117582. ADR-027
+therefore graduates adaptive final-context packaging and flips
+`adaptive_context_enabled` to default-on, with single-flag rollback by setting
+it to `false`.
+
+Checkpoint 5 completed as a matched non-holdout generation A/B. The existing
+Phase 3 sibling generation bundle is the fixed-context baseline; the v2 arm
+sealed as `phase4-gen-adaptive-v2-gemma4` using the same `gemma4:e4b` model.
+All 65 unchanged-context rows reproduce byte-identical outputs. On 115 common
+answered rows, faithfulness changes -0.0083 and recall +0.0029; on 98 common
+target-present rows, faithfulness changes -0.0032 and recall +0.0068. Correct
+abstention decisions improve 125→126 with no new OOS leak. The development-set
+generation gate passes, but `eval_124` is a genuine watch regression: Section
+145 remains in context while the model incorrectly reports that trademark
+duration is unavailable. `eval_037` remains a directness watch. That result
+unblocked the separately authorized holdout release gate but did not by itself
+flip a serving default.
+
+The holdout-validation executor used a single retrieval pass per row and an
+aggregate-only paired comparison. Adaptive packaging is wired through retrieval
+config identity and trace diagnostics after post-expansion dedup, and records
+score-free semantic pool hashes plus diagnostic full hashes. The Stage B holdout
+run read the sealed holdout once, aggregate-only, and logged one metric-read
+ledger entry. No schema-1.2 or explicit packaging-pool publication is included
+in ADR-027; that remains follow-up scope.
+
 ## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
 
 The retrieval experiment now has an explicit `original_only` versus

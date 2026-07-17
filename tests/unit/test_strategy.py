@@ -44,9 +44,10 @@ def test_default_resolves_to_current_effective_settings(monkeypatch):
         prefer_operative_enabled=True,
         retrieval_operative_only=False,
         consolidated_dedup_enabled=False,
-        # graduated default-on 2026-07-16 (ADR-026); dataclass default stays False
-        # so pinned presets (current_law) are unaffected
+        # graduated default-on 2026-07-16 (ADR-026)
         sibling_expansion_enabled=True,
+        # graduated default-on 2026-07-17 (ADR-027)
+        adaptive_context_enabled=True,
     )
 
 
@@ -73,6 +74,7 @@ def test_current_law_registered_from_r3_trace():
         retrieval_operative_only=True,
         consolidated_dedup_enabled=True,
     )
+    assert knobs.adaptive_context_enabled is True
 
 
 def test_sibling_aware_preset_stays_pinned_for_matched_comparisons():
@@ -84,8 +86,11 @@ def test_sibling_aware_preset_stays_pinned_for_matched_comparisons():
     assert knobs.sibling_expansion_max_chars == 3000
     assert knobs.sibling_expansion_max_tokens == 750
     assert knobs.prefer_operative_enabled is False
+    assert knobs.adaptive_context_enabled is True
     # Graduated default-on 2026-07-16 (ADR-026).
     assert resolve_knobs("default").sibling_expansion_enabled is True
+    # Graduated default-on 2026-07-17 (ADR-027).
+    assert resolve_knobs("default").adaptive_context_enabled is True
 
 
 def test_sibling_knobs_are_in_trace_identity():

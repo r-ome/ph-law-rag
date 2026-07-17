@@ -101,6 +101,104 @@ def eval(
 	print_report(results, scored)
 	save_scored(results, scored, run_tag=run_tag)
 
+@app.command("eval-phase4-paired")
+def eval_phase4_paired(
+	baseline_tag: str,
+	candidate_tag: str,
+	tag: str = typer.Option(None, "--tag"),
+	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
+):
+	"""Aggregate-only paired Phase 4 comparison for dev or holdout live runs."""
+	from app.evals.paired_aggregate import build_paired_aggregate, printable_summary
+
+	try:
+		artifact = build_paired_aggregate(
+			baseline_tag,
+			candidate_tag,
+			tag=tag,
+			use_cache=use_cache,
+		)
+	except (ValueError, FileExistsError, AssertionError) as exc:
+		raise typer.BadParameter(str(exc)) from exc
+	typer.echo(json.dumps(printable_summary(artifact), indent=2, ensure_ascii=False))
+
+@app.command("eval-phase4-cp-a0")
+def eval_phase4_cp_a0(
+	frozen_tag: str = typer.Option("phase3-sibling-aware-minilm", "--frozen-tag"),
+	record: bool = typer.Option(False, "--record/--no-record", help="append the aggregate probe result to docs/retrieval_strategy_review.md"),
+):
+	"""Run the locked non-holdout Phase 4 live-retrieval reproducibility probe."""
+	from app.evals.phase4_validation import append_cp_a0_result_to_review, run_cp_a0_probe
+
+	result = run_cp_a0_probe(frozen_tag=frozen_tag)
+	if record:
+		append_cp_a0_result_to_review(
+			result,
+			path="docs/retrieval_strategy_review.md",
+		)
+	typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+@app.command("eval-phase4-cp-a2c")
+def eval_phase4_cp_a2c(
+	frozen_tag: str = typer.Option("phase4-adaptive-context-v2-minilm", "--frozen-tag"),
+):
+	"""Run non-holdout live-on CP-A2.c at selector-semantic granularity."""
+	from app.evals.phase4_validation import run_cp_a2c_semantic_probe
+
+	result = run_cp_a2c_semantic_probe(frozen_tag=frozen_tag)
+	typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+@app.command("eval-phase4-holdout")
+def eval_phase4_holdout(
+	tag: str = typer.Option(..., "--tag", help="label prefix for the paired holdout run"),
+	holdout_release_run: bool = typer.Option(False, "--holdout-release-run", help="required acknowledgement before running holdout"),
+	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
+):
+	"""Run the single-retrieval-pass Phase 4 holdout A/B and emit one aggregate verdict."""
+	if not holdout_release_run:
+		raise typer.BadParameter(
+			"holdout is release-only; add --holdout-release-run to acknowledge aggregate-only reporting",
+			param_hint="--holdout-release-run",
+		)
+	from app.evals.paired_aggregate import printable_summary
+	from app.evals.phase4_single_pass import run_phase4_single_pass
+
+	try:
+		artifact = run_phase4_single_pass(
+			tag=tag,
+			splits=("holdout",),
+			use_cache=use_cache,
+		)
+	except (ValueError, FileExistsError, AssertionError) as exc:
+		raise typer.BadParameter(str(exc)) from exc
+	typer.echo(json.dumps(printable_summary(artifact), indent=2, ensure_ascii=False))
+
+@app.command("eval-phase4-single-pass")
+def eval_phase4_single_pass(
+	tag: str = typer.Option(..., "--tag"),
+	splits: list[str] = typer.Option(["regression", "dev"], "--split", help="dataset split; repeatable"),
+	holdout_release_run: bool = typer.Option(False, "--holdout-release-run", help="required acknowledgement before running holdout"),
+	use_cache: bool = typer.Option(True, "--cache/--no-cache", help="reuse cached RAGAS row scores"),
+):
+	"""Run Phase 4 paired A/B from one retrieval pass per row."""
+	if "holdout" in splits and not holdout_release_run:
+		raise typer.BadParameter(
+			"holdout is release-only; add --holdout-release-run to acknowledge aggregate-only reporting",
+			param_hint="--holdout-release-run",
+		)
+	from app.evals.paired_aggregate import printable_summary
+	from app.evals.phase4_single_pass import run_phase4_single_pass
+
+	try:
+		artifact = run_phase4_single_pass(
+			tag=tag,
+			splits=tuple(splits),
+			use_cache=use_cache,
+		)
+	except (ValueError, FileExistsError, AssertionError) as exc:
+		raise typer.BadParameter(str(exc)) from exc
+	typer.echo(json.dumps(printable_summary(artifact), indent=2, ensure_ascii=False))
+
 @app.command("eval-retrieve")
 def eval_retrieve(
 	splits: list[str] = typer.Option(["regression", "dev"], "--split", help="dataset split; repeatable"),
@@ -194,6 +292,25 @@ def eval_retrieval_compare(
 	except ValueError as exc:
 		raise typer.BadParameter(str(exc)) from exc
 	typer.echo(f"Retrieval comparison written to {path}")
+
+@app.command("eval-context-replay")
+def eval_context_replay(
+	source_tag: str,
+	tag: str = typer.Option(..., "--tag"),
+	selector: str = typer.Option("adaptive", "--selector", help="fixed or adaptive"),
+):
+	"""Replay final-context packaging from a sealed non-holdout bundle."""
+	if selector not in {"fixed", "adaptive"}:
+		raise typer.BadParameter(
+			"selector must be fixed or adaptive", param_hint="--selector"
+		)
+	from app.evals.context_selection_replay import replay_context_selection
+
+	try:
+		path = replay_context_selection(source_tag, tag=tag, selector=selector)
+	except (ValueError, FileExistsError) as exc:
+		raise typer.BadParameter(str(exc)) from exc
+	typer.echo(f"Context-selection bundle written to {path}")
 
 @app.command("eval-sibling-census")
 def eval_sibling_census(

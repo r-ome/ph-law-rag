@@ -29,6 +29,38 @@ def judge_model() -> str:
     return settings.ragas_llm_model
 
 
+def scoring_identity(*, generator_model: str | None = None, use_cache: bool = True) -> dict:
+    import ragas
+
+    model = generator_model or settings.llm_model
+    if model.startswith("claude"):
+        generation_settings = {
+            "provider": "anthropic",
+            "temperature": 0,
+            "max_tokens": 2048,
+        }
+    else:
+        generation_settings = {
+            "provider": "ollama",
+            "temperature": 0,
+            "seed": 42,
+            "think": False,
+        }
+    return {
+        "judge_backend": settings.ragas_judge_backend,
+        "judge_model": judge_model(),
+        "ragas_metric_implementation": {
+            "module": "app.evals.ragas_scorer",
+            "metrics": list(ragas_cache.METRIC_NAMES),
+        },
+        "ragas_version": getattr(ragas, "__version__", "unknown"),
+        "ragas_embedding_model": settings.ragas_embedding_model,
+        "ragas_cache_policy": "enabled" if use_cache else "disabled",
+        "generator_model": model,
+        "deterministic_generation": generation_settings,
+    }
+
+
 class _FixedTempLLMWrapper(LangchainLLMWrapper):
     """RAGAS passes per-metric temperatures (0.01/0.3); GPT-5 reasoning models only
     accept the default (1). Force temperature=1.0 on every judge call so scoring runs."""

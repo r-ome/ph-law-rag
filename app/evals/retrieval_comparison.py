@@ -47,6 +47,21 @@ _SELECTION_KEYS = (
     "query_planner_max_subqueries",
     "subquery_packaging_enabled",
     "subquery_reserve_n",
+    "adaptive_context_enabled",
+    "adaptive_context_contract_version",
+    "adaptive_context_floor",
+    "adaptive_context_base_cap",
+    "adaptive_context_uncertain_cap",
+    "adaptive_context_multifacet_cap",
+    "adaptive_context_stabilization_patience",
+    "adaptive_context_token_target",
+    "adaptive_context_token_estimator",
+)
+_ADAPTIVE_CONTEXT_INERT_KEYS = tuple(
+    name
+    for name in _SELECTION_KEYS
+    if name.startswith("adaptive_context_")
+    and name != "adaptive_context_enabled"
 )
 _QUERY_SEPARATION_ARMS = {"original_only", "original_plus_rewrite"}
 _LEGACY_SIBLING_DEFAULTS = {
@@ -54,6 +69,17 @@ _LEGACY_SIBLING_DEFAULTS = {
     "sibling_expansion_radius": 1,
     "sibling_expansion_max_chars": 3000,
     "sibling_expansion_max_tokens": 750,
+}
+_LEGACY_ADAPTIVE_DEFAULTS = {
+    "adaptive_context_enabled": False,
+    "adaptive_context_contract_version": 2,
+    "adaptive_context_floor": 4,
+    "adaptive_context_base_cap": 7,
+    "adaptive_context_uncertain_cap": 11,
+    "adaptive_context_multifacet_cap": 11,
+    "adaptive_context_stabilization_patience": 2,
+    "adaptive_context_token_target": 2400,
+    "adaptive_context_token_estimator": "rendered_chars_div4_v1",
 }
 
 
@@ -102,7 +128,37 @@ def _comparable_shared_values(
         raise ValueError("retrieval_defaults identity is invalid")
     for name, default in _LEGACY_SIBLING_DEFAULTS.items():
         defaults.setdefault(name, default)
+    for name, default in _LEGACY_ADAPTIVE_DEFAULTS.items():
+        defaults.setdefault(name, default)
     return comparable, profile
+
+
+def _align_inactive_adaptive_context(
+    baseline_shared: dict[str, Any],
+    candidate_shared: dict[str, Any],
+) -> None:
+    """Canonicalize adaptive knobs that cannot affect a disabled arm.
+
+    When exactly one arm enables adaptive packaging, its contract defines the
+    comparison and the disabled arm inherits those inert values. When both arms
+    are disabled, subordinate adaptive knobs are omitted from the comparison.
+    With both enabled, every adaptive knob remains identity-bearing and strict.
+    """
+    baseline = baseline_shared["retrieval_defaults"]
+    candidate = candidate_shared["retrieval_defaults"]
+    baseline_enabled = bool(baseline.get("adaptive_context_enabled"))
+    candidate_enabled = bool(candidate.get("adaptive_context_enabled"))
+    if baseline_enabled and candidate_enabled:
+        return
+    if baseline_enabled != candidate_enabled:
+        active = baseline if baseline_enabled else candidate
+        inactive = candidate if baseline_enabled else baseline
+        for name in _ADAPTIVE_CONTEXT_INERT_KEYS:
+            inactive[name] = active.get(name)
+        return
+    for name in _ADAPTIVE_CONTEXT_INERT_KEYS:
+        baseline.pop(name, None)
+        candidate.pop(name, None)
 
 
 def _selection_diff(
@@ -296,6 +352,7 @@ def compare_retrieval_bundles(
     candidate_shared, candidate_profile = _comparable_shared_values(
         candidate_config["shared_values"]
     )
+    _align_inactive_adaptive_context(baseline_shared, candidate_shared)
     observed_knob_diff = _selection_diff(baseline_shared, candidate_shared)
     _require_expected_knob_diff(observed_knob_diff, declared_knob_diff)
     baseline_comparable = _without_declared_knobs(

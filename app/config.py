@@ -142,6 +142,19 @@ class Settings(BaseSettings):
 	query_planner_max_subqueries: int = 3
 	subquery_packaging_enabled: bool = False  # per-subquery rerank + reserved slots (isolates the rerank-neck bug)
 	subquery_reserve_n: int = 2  # top chunks reserved per subquery before round-robin merge
+	# Phase 4 adaptive final-context packaging. Default-on after the 30-row
+	# holdout release gate passed on 2026-07-17 (ADR-027); roll back by setting
+	# adaptive_context_enabled=false. Subordinate defaults mirror
+	# ADAPTIVE_CONTEXT_DEFAULTS.
+	adaptive_context_enabled: bool = True
+	adaptive_context_contract_version: int = 2
+	adaptive_context_floor: int = 4
+	adaptive_context_base_cap: int = 7
+	adaptive_context_uncertain_cap: int = 11
+	adaptive_context_multifacet_cap: int = 11
+	adaptive_context_stabilization_patience: int = 2
+	adaptive_context_token_target: int = 2400
+	adaptive_context_token_estimator: str = "rendered_chars_div4_v1"
 	# Conversation context (M8): follow-ups are rewritten to standalone queries before retrieval.
 	max_conversation_turns: int = 5       # history window passed to the rewriter
 	enable_query_rewriting: bool = True   # toggle rewriting off for debugging
@@ -315,6 +328,15 @@ def config_view() -> dict:
 		"enable_query_rewriting": policy.query_rewriting_enabled,
 		"faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
 		"later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
+		"adaptive_context_enabled": policy.retrieval_defaults.adaptive_context_enabled,
+		"adaptive_context_contract_version": policy.retrieval_defaults.adaptive_context_contract_version,
+		"adaptive_context_floor": policy.retrieval_defaults.adaptive_context_floor,
+		"adaptive_context_base_cap": policy.retrieval_defaults.adaptive_context_base_cap,
+		"adaptive_context_uncertain_cap": policy.retrieval_defaults.adaptive_context_uncertain_cap,
+		"adaptive_context_multifacet_cap": policy.retrieval_defaults.adaptive_context_multifacet_cap,
+		"adaptive_context_stabilization_patience": policy.retrieval_defaults.adaptive_context_stabilization_patience,
+		"adaptive_context_token_target": policy.retrieval_defaults.adaptive_context_token_target,
+		"adaptive_context_token_estimator": policy.retrieval_defaults.adaptive_context_token_estimator,
 		"aws_region": settings.aws_region,
 	}
 	

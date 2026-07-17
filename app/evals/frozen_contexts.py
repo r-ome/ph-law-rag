@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.evals.integrity import (
     FrozenPaths,
@@ -17,9 +17,10 @@ from app.evals.integrity import (
     sha256,
     text_sha256,
 )
-from app.pipeline.frozen_generation import prepare_prompts
-from app.pipeline.state import AnswerState
 from app.retriever.types import RetrievalResult
+
+if TYPE_CHECKING:
+    from app.pipeline.state import AnswerState
 
 
 def _result(result: RetrievalResult) -> dict[str, Any]:
@@ -143,6 +144,10 @@ def make_record(state: AnswerState, trace_record: dict[str, Any]) -> dict[str, A
         "policy": policy.as_trace_dict() if policy else {},
     }
     if terminal_response is None:
+        # Keep retrieval-only artifact publication import-isolated from the
+        # generator client. Context-selection replay uses ``seal`` directly.
+        from app.pipeline.frozen_generation import prepare_prompts
+
         results = [
             RetrievalResult(
                 chunk_id=item["chunk_id"],

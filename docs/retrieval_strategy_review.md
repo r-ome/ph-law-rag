@@ -466,6 +466,204 @@ labels.
 This can first be evaluated by replaying stored reranked candidates. No model
 calls are needed once candidate traces exist.
 
+### Phase 4 offline mechanism implemented (2026-07-16; not graduated)
+
+The opt-in experiment is implemented as a schema-1.1 replay only. The sealed
+`phase3-sibling-aware-minilm` bundle's `selected_results` is the experiment's
+full post-expansion, post-dedup packaging pool: the current serving pipeline has
+no truncation or budget stage after dedup. Replaying that field is therefore
+equivalent to placing the proposed selector immediately after dedup. It can
+shrink the available pool but never fetch or widen retrieval.
+
+`raglab eval-context-replay SOURCE_TAG --tag OUTPUT_TAG --selector
+fixed|adaptive` validates and derives a new sealed non-holdout bundle without
+calling retrieval, SQLite, rerankers, rewrite services, or generators. The
+selector is score-agnostic. Contract v2 uses a four-chunk floor, ordinary/
+uncertain/multi-facet soft caps of 7/11/11, two-bundle stabilization patience,
+and a soft 2,400-token target. Its uniform estimator is
+`ceil(len(build_context(results)[0]) / 4)`; stored chunk estimates are ignored.
+
+Sibling additions are seed-centered atomic bundles. A bundle includes the seed
+and every surviving result whose `sibling_seed_chunk_id` points to it, fires at
+its first surviving pool position, preserves member order, and may cross both
+the chunk cap and token target. Dangling seed IDs remain valid grouping keys.
+This keeps the `eval_053` Article 1403(2)(c)-(e) group whole. Defensive dedup is
+limited to duplicate chunk IDs, explicitly represented merged chunks, and exact
+normalized text; provision identity never collapses distinct sibling leaves.
+
+Replay republishes the terminal selected stage, context/source/prompt identities,
+deterministic evidence detail, target presence, trace, summary, record hashes,
+and publication hashes while asserting that `pre_expansion`, pre-rerank pool
+hashes, evidence verdicts, and corrective behavior do not change. Comparator
+identity includes the complete adaptive contract, with legacy bundles normalized
+to the same defaults; matched arms may differ only on
+`adaptive_context_enabled`.
+
+This is an experiment mechanism, not a serving change. Schema 1.2, a live
+`packaging_pool` capture, Settings/policy wiring, serving defaults, and an ADR
+remain deferred until matched retrieval replay and optional generation A/B pass
+their gates. The 35% mean rendered-token reduction ceiling is a halt/watch
+condition, not a prediction or selector rule. There is no minimum required
+reduction, but an inert selector cannot graduate. The holdout remains sealed.
+
+### Phase 4 checkpoint 3 retrieval replay result (2026-07-16)
+
+The adaptive replay sealed all 131 non-holdout rows as
+`phase4-adaptive-context-minilm`; its matched comparison against
+`phase3-sibling-aware-minilm` published as
+`phase4-adaptive-context-minilm-comparison`. Dataset, targets, corpus, index,
+embeddings, MiniLM reranker, cutoffs, evidence policy, and pre-rerank pools all
+matched. The comparator recorded zero changed pre-rerank pools, 95 changed
+selected contexts, and exactly one declared semantic delta:
+`adaptive_context_enabled=false→true`. The comparison report SHA-256 is
+`8786471ce5e2b48415480cf9410dacb2c36009db4fec2d5fab3c92848469ffd2`.
+
+Packaging stayed inside the predeclared reduction watch: mean rendered context
+fell 31.84% (1,552.9→1,058.5 estimated tokens), p95 fell 2,649→2,151, and the
+maximum fell 3,274→2,563. Mean selected candidates fell 7.60→4.92. The selector
+used cap 4 on 91 rows, cap 6 on 12, and cap 8 on 28; 21 rows crossed a numeric
+cap only through atomic sibling bundles, and seven crossed the soft token target.
+No selector input hash, evidence verdict, hard-abstention flag, or source breadth
+increased or changed unexpectedly. The structural synthesis signal was broad:
+only five of the 28 cap-8 rows had the offline Synthesis label, so its activation
+distribution remains a redesign input rather than evidence of semantic facet
+detection.
+
+The binding target-preservation gate failed. Source-target coverage and exact-
+leaf coverage were unchanged, and `eval_053` retained the complete Article
+1403(2)(c)-(e) seed bundle. However, eight expected provisions were removed:
+`eval_037` Article 282, `eval_039` Section 11, `eval_044` Article 1157,
+`eval_074` Section 4, `eval_106` Section 4, `eval_109` Section 37,
+`eval_124` Section 145, and `eval_129` Section 11. Aggregate selected parent-
+provision coverage fell 0.7385→0.6961 and target survival 0.8529→0.8071. The
+category provision-coverage changes were Factual 0.7868→0.7684, Paraphrase
+0.6267→0.5333, and Synthesis 0.6471→0.5686; Ambiguous remained 0.9167.
+`eval_129` lost the same Section 11 exception family implicated in the Phase 3
+generation drift, which could be beneficial for generation, but it is still a
+declared retrieval-target loss and cannot be waived post hoc.
+
+**Verdict: HALT before generation.** The mechanism is operationally sound and
+passes its context-size, source, leaf, OOS-breadth, evidence, integrity, and named
+`eval_053` checks, but it fails the binding no-provision-loss gate. Do not run a
+generation replay, access holdout, add an ADR, wire a live selector, or change a
+default. A follow-up plan must revise the cap/widening policy without tuning on
+hidden eval labels, then publish a new write-once replay tag.
+
+### Phase 4 checkpoint 4 contract-v2 replay result (2026-07-16)
+
+The eight checkpoint-3 losses were attributed before changing the selector.
+Seven were caused by the cap check firing before a later novel-provision bundle;
+`eval_109` was caused by the 2,048-token stop. None was caused by defensive
+dedup, atomic sibling grouping, or the two-bundle stabilization rule. The
+smallest per-row cap requirements ranged from 5 to 11, while `eval_109` required
+a token target of at least 2,394 to reach Section 37. On that evidence, contract
+v2 keeps the four-chunk floor and patience of two, raises the ordinary/
+uncertain/multi-facet caps to 7/11/11, and rounds the token target to 2,400. It
+does not add a hidden-label or provision-target-aware signal.
+
+The new adaptive replay sealed all 131 rows as
+`phase4-adaptive-context-v2-minilm`; its matched comparison against the same
+`phase3-sibling-aware-minilm` control published as
+`phase4-adaptive-context-v2-minilm-comparison`. The comparator again recorded
+zero changed pre-rerank pools and exactly one declared semantic delta,
+`adaptive_context_enabled=false→true`; 66 selected contexts changed. The
+comparison report SHA-256 is
+`19bd5a4ef4e5ba7a21007a49ec02340c7fc3a3aacc5ff8076173c90249ac19bc`.
+
+The binding retrieval gate now passes. All 117 expected provision targets that
+were present in the fixed packaging pool remain present: selected parent-
+provision coverage is restored to 0.7385, selected target survival to 0.8529,
+and exact-leaf coverage remains 0.6154. No source target, evidence verdict, or
+hard-abstention flag changed. `eval_053` still retains the complete Article
+1403(2)(c)-(e) atomic bundle, and the revised arm is a strict row-wise superset
+of the checkpoint-3 adaptive arm.
+
+Context reduction remains useful and bounded. Mean rendered context falls
+11.65% (1,552.9→1,372.1 estimated tokens), p95 falls 2,649→2,372, maximum falls
+3,274→2,696, and mean selected candidates falls 7.60→6.66. Cap 7 applies to 91
+rows and cap 11 to 40; stop reasons are cap on 41 rows, exhausted on 80,
+stabilized on five, and token target on five. Five rows cross the soft token
+target only at an admitted atomic boundary. The selector is non-inert and stays
+well below the 35% reduction halt ceiling.
+
+**Verdict: PASS the retrieval-only Phase 4 gate.** No generation, holdout
+access, ADR, schema 1.2 work, live seam, or serving-default change was performed.
+The contract-v2 bundle is eligible for a separately authorized matched
+generation review; serving graduation remains pending that evidence and a
+separate architecture/default decision.
+
+This is a development-set gate, not out-of-sample evidence. The 7/11/11 caps
+and 2,400-token target were selected after inspecting the eight losses on these
+same 131 regression/dev rows; six recovered rows retain their last required
+target with zero chunk slack, including cap-bound `eval_039` and `eval_129`,
+while `eval_109` relies on the documented soft token overflow. Runtime selection
+remains label-free, but the numeric policy is in-sample tuned. The sealed
+30-row holdout remains untouched and is required as an explicit release gate
+before any serving-default or ADR decision.
+
+Comparator identity now treats subordinate adaptive knobs conditionally. When
+one arm enables adaptive packaging, its active contract is copied onto the
+disabled arm for comparison; when both arms are disabled, cap/token/contract
+knobs are inert and omitted; when both are enabled, they remain strict. This
+restores regeneration of both the sealed contract-v1 and contract-v2 comparisons
+without changing either artifact.
+
+### Phase 4 checkpoint 5 matched generation A/B (2026-07-17)
+
+The contract-v2 retrieval bundle was replayed through the same pinned local
+`gemma4:e4b` generator as the existing Phase 3 sibling-context baseline. The
+candidate sealed as `phase4-gen-adaptive-v2-gemma4` with 131 regression/dev
+rows; no holdout row was read. Reusing the already sealed
+`phase3-gen-sibling-gemma4` baseline avoided redundant generation and is
+empirically matched: all 65 rows with byte-identical selected context reproduced
+byte-identical answers and abstention decisions. Of the 66 context-changed rows,
+43 changed their generated answer.
+
+RAGAS used the standing `claude-haiku-4-5-20251001` judge: 54 of 116 candidate
+answer rows were cache hits and 62 were newly judged. Aggregate baseline→v2
+scores are faithfulness 0.8939→0.8838, answer relevancy 0.7667→0.7523,
+context precision 0.6867→0.6743, and context recall 0.8572→0.8549. The candidate
+has one extra answered row, so the matched 115-row comparison is the cleaner
+effect estimate: faithfulness -0.0083, relevancy -0.0143, precision -0.0109,
+and recall +0.0029. On the 98 common answered rows with a present retrieval
+target, faithfulness changes -0.0032 and recall +0.0068; both satisfy the
+standing no-greater-than-0.01 target-slice regression gate. Target-slice
+precision changes -0.0128 and relevancy -0.0084.
+
+Abstention improves: correct decisions rise 125→126, false abstentions fall
+5→4, and the one pre-existing out-of-scope answer leak is unchanged. The sole
+flip is `eval_112`, which changes from abstention to a supported partial answer
+that correctly states DSWD applies RA 9344 disciplinary measures when a minor
+commits the Safe Spaces Act offense. There are no generation errors, invalid
+scores, or new warning classes.
+
+Manual review covered all 54 target-present rows whose context changed (35
+changed answers and 19 byte-identical answers). Most answer changes are
+paraphrase/length effects, and several large judge movements occur on
+substantively equivalent or byte-identical answers. One clear new mechanism
+cost remains: `eval_124` retains IP Code Section 145 in the selected context,
+but the v2 generator overlooks it, says trademark duration is unavailable, and
+shifts to special copyright-duration rules; its context-recall score falls
+0.25. `eval_037` is a secondary directness watch: the candidate retains Article
+282 but adds that the context does not establish whether stealing is an
+enumerated termination ground. `eval_129` is byte-identical to the Phase 3
+baseline because contract v2 retains its complete seven-chunk context, so the
+known Section 11 generation drift is neither fixed nor worsened.
+
+**Verdict: PASS the matched development-set generation gate; HOLD serving
+graduation.** The predeclared leakage, abstention, target-slice faithfulness,
+and target-slice recall gates pass, with `eval_124` and `eval_037` carried as
+explicit watch rows. This does not cure the in-sample cap tuning described
+above. No holdout access, ADR, schema/live seam, or serving-default change
+follows. The sealed holdout remains a mandatory separately authorized release
+gate.
+
+Artifacts: `data/eval_results/runs/2026-07-17/phase4-gen-adaptive-v2-gemma4`
+(generation bundle SHA-256
+`7558be0779fcc793d641298f89953e9ab3e8836e58d87ca948c1b416a5934691`)
+and `data/eval_results/diffs/diff_phase4-gen-adaptive-v2-gemma4.md` (SHA-256
+`8e75b93ba2c0bd99f1ba751c5fdf5ce47565b7d6a41cfb7c9124bb3a35be09bb`).
+
 ## Corrective Retrieval With Global Reranking
 
 The current corrective implementation reranks additions against the question
@@ -2151,6 +2349,45 @@ separate approval.
 No new dependency is expected. No database, API, frontend, `eval_store`, or ADR
 change is authorized.
 
+## Phase 4 holdout validation executor implementation (2026-07-17)
+
+The Phase 4 holdout-validation executor is implemented behind default-off
+adaptive context packaging. No holdout row was accessed for this implementation
+pass, and no serving default, ADR, or schema 1.2 change was made.
+
+Implemented surfaces:
+
+- live adaptive seam after post-expansion dedup, default off, wired through
+  Settings → RetrievalKnobs → policy/config identity → active config → trace
+  diagnostics;
+- selector-consumed semantic pool hash and diagnostic full pool hash over the
+  pre-adaptive, post-dedup packaging pool;
+- non-holdout CP-A0 command with the locked five sentinel rows
+  (`eval_075`, `eval_129`, `eval_053`, `eval_039`, `eval_055`) and aggregate
+  bridge selection only;
+- aggregate-only paired Phase 4 comparator that scores both arms quietly, joins
+  internally, validates identities and per-row semantic pool invariants, emits
+  only aggregate gates/distributions, and logs exactly one holdout metric read
+  when used on holdout tags;
+- non-disclosure unit coverage asserting no eval ID, question, category, answer,
+  context, or row metric appears in paired stdout/artifacts/ledger extras.
+
+Locked holdout gates remain:
+
+- common-answered faithfulness Δ and context-recall Δ each pass at ≥ -0.01;
+  -0.02 ≤ Δ < -0.01 is inconclusive and does not graduate;
+- false abstentions must not increase;
+- all-row rendered-token reduction must be ≥ 0.05;
+- empty cohort, missing metric, identity drift, per-row semantic pool mismatch,
+  or unapproved config difference fails closed.
+
+CP-A0, CP-A2, CP-A3 dev validation, and Stage B holdout execution are still
+separate operational steps. CP-A0 must be recorded here with its actual bridge
+selection before any holdout access. Stage B uses a single retrieval pass per row
+and derives both fixed and adaptive contexts from that same post-dedup pool,
+eliminating cross-run retrieval score jitter as a possible holdout blocker while
+preserving the same aggregate-only comparator and single holdout metric read.
+
 ## Checkpoint 2 implementation results (2026-07-15)
 
 Checkpoint 2 is implemented and stops before legal rewriting or two-lane
@@ -2169,3 +2406,99 @@ changes; import-isolation tests confirm it does not load retrieval, generation,
 embedding, reranker, Anthropic, or Haiku modules. Focused tests passed without
 live retrieval, generation, paid calls, or holdout access. No experiment has run
 and no mechanism has graduated.
+
+
+### Phase 4 Holdout Validation CP-A0
+
+- Sentinel count: 5
+- Matched count: 5
+- Mismatched count: 0
+- Binding bridge: full-path
+- Locked gates: faithfulness/context-recall Δ ≥ -0.01; false abstentions must not increase; rendered-token reduction ≥ 0.05.
+
+### Phase 4 Holdout Validation CP-A2
+
+- CP-A2.b selector-logic equivalence: passed, 131/131 non-holdout rows matched
+  `phase4-adaptive-context-v2-minilm` selected results and required diagnostics
+  (`signals`, `cap`, `stop_reason`, `rendered_tokens`).
+- CP-A2.c live-on semantic equivalence: re-stated at selector-semantic
+  granularity after diagnosing the score-inclusive artifact hash. The
+  `raglab eval-phase4-cp-a2c` run at `2026-07-17T09:30:53.895050+08:00`
+  passed with 131/131 semantic matches and 0 semantic failures against
+  `phase4-adaptive-context-v2-minilm`. The score-inclusive full hash is retained
+  as a diagnostic only; this run reported 0 score-inclusive mismatches.
+- Diagnostic limitation: CP-A0 matched the five locked sentinels and selected the
+  full-path bridge, but `eval_001` demonstrates that live retrieval metadata can
+  drift at `_retrieval_scores.dense_score` without changing selector-consumed
+  content. The load-bearing guarantee for Stage B is therefore the semantic pool
+  invariant, not score-inclusive full-hash reproduction.
+- Stage B design decision before holdout access: use the single-retrieval-pass
+  Phase 4 runner. For each row, retrieve once with adaptive off, freeze the
+  pre-adaptive post-dedup pool, derive the baseline as the full pool, derive the
+  candidate through `select_adaptive_context`, generate both arms, score quietly,
+  and pass both arms to the same CP-A3 aggregate comparator. This makes the
+  cross-arm `packaging_pool_semantic_hash` invariant hold by construction and
+  avoids spending the holdout read on two independent live retrieval passes.
+- Implementation hardening before CP-A3: the single-pass runner passes
+  `floor`, `base_cap`, `uncertain_cap`, `multifacet_cap`,
+  `stabilization_patience`, and `token_target` explicitly from
+  `policy.retrieval_defaults` into `select_adaptive_context`, so Stage B
+  validates the same active retrieval knobs the live seam would use.
+- CP-A3 dev aggregate: after confirming local Ollama `0.32.1` and installed
+  `gemma4:e4b` (`c6eb396dbd59`), the non-holdout single-pass run completed as
+  `phase4-single-pass-dev-cp-a3-20260717-1010`. The paired comparator exercised
+  its identity, scoring-identity, storage-consistency, semantic-invariant, and
+  non-disclosure checks and published aggregate artifact
+  `data/eval_results/phase4_paired/phase4-single-pass-dev-cp-a3-20260717-1010.json`.
+  Row count was 131 and common-answered `n` was 115.
+- Non-disclosure guard hardening: category disclosure is now checked by exact
+  emitted scalar value instead of substring, while eval IDs, questions, answers,
+  ground truth, and contexts remain substring-checked. This avoids false
+  positives from required aggregate names such as `synthesis_detected` while
+  still failing closed if a category value itself is emitted.
+- CP-A3 gates all passed on dev: faithfulness Δ = -0.008280970238260799
+  (`pass`), context-recall Δ = 0.002898550725217386 (`pass`), false abstentions
+  improved 5→4 (`pass`), and rendered-token reduction was
+  0.1164511165838384 (`pass`). Changed-context count was 66; candidate caps were
+  91 rows at cap 7 and 40 rows at cap 11; candidate stop distribution was
+  cap=41, exhausted=80, stabilized=5, token_target=5.
+- Stage B single holdout read completed as
+  `phase4-single-pass-holdout-stage-b-20260717-1200` with aggregate artifact
+  `data/eval_results/phase4_paired/phase4-single-pass-holdout-stage-b-20260717-1200.json`.
+  The holdout ledger contains exactly one aggregate metric-read entry for this
+  run. No holdout row content was inspected or disclosed.
+- Stage B hard gates all passed on the 30-row sealed holdout: common-answered
+  `n` was 29; faithfulness Δ = 0.022550629444827552 (`pass`); context-recall
+  Δ = -0.005747126437931072 (`pass`); false abstentions did not increase
+  (1→1, `pass`); rendered-token reduction was 0.1376842483117582 (`pass`).
+  The final verdict is `eligible_for_release_decision`.
+- Stage B execution aggregates: changed-context count 10; candidate caps were
+  22 rows at cap 7 and 8 rows at cap 11; candidate stop distribution was
+  cap=2, exhausted=21, stabilized=5, token_target=2. Signal activations were
+  coverage_uncertain=3 and synthesis_detected=5 in both arms; labeled synthesis
+  evidence remains n=4.
+
+### Phase 4 graduation decision (2026-07-17)
+
+ADR-027 accepts adaptive final-context packaging as the retrieval default.
+`adaptive_context_enabled` now defaults to `true`; rollback is one flag,
+`adaptive_context_enabled=false`.
+
+The release decision rests on the full equivalence and validation chain:
+
+- CP-A0 locked sentinel bridge: 5/5 matched.
+- CP-A2.b pure selector logic: 131/131 non-holdout rows matched.
+- CP-A2.c live-on semantic selection: 131/131 non-holdout rows matched.
+- CP-A3 non-holdout single-pass aggregate: all hard gates passed and reproduced
+  the offline v2 evidence.
+- Stage B holdout: single aggregate read, all hard gates passed, verdict
+  `eligible_for_release_decision`.
+
+Known caveats are carried into ADR-027 and remain operational watch points:
+small holdout N, context-recall dipped by -0.005747126437931072 while staying
+inside the locked band, the OOS moat was not re-tested by holdout, labeled
+synthesis evidence is n=4, and the mechanism changed 10/30 holdout contexts.
+
+No schema-1.2 or explicit `packaging_pool` publication is included in this
+graduation. Those are follow-up packaging/provenance work, not prerequisites for
+the default flip.

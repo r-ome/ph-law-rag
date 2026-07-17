@@ -111,3 +111,56 @@ def test_sibling_expansion_runs_after_parent_and_before_expanded_snapshot(monkey
 		"dedup",
 	]
 	assert selection.selected == [parent_output[0], sibling]
+
+
+def test_adaptive_context_live_seam_is_default_off_and_records_hashes(monkeypatch):
+	from app.retriever.strategy import RetrievalKnobs
+
+	results = [
+		_r(
+			str(index),
+			source_id="civil_code",
+			doc_id="civil",
+			title="Civil Code",
+			url="https://example.test/civil",
+			provision_id="same",
+			unit_label="same",
+		)
+		for index in range(5)
+	]
+	monkeypatch.setattr("app.retriever.context_selection.hybrid_retriever", lambda *args, **kwargs: results)
+	monkeypatch.setattr("app.retriever.context_selection.rerank", lambda *args, **kwargs: results)
+
+	off_knobs = RetrievalKnobs(
+		dense_top_k=5,
+		sparse_top_k=5,
+		rerank_top_n=5,
+		parent_expansion_enabled=False,
+		prefer_operative_enabled=False,
+		retrieval_operative_only=True,
+		consolidated_dedup_enabled=False,
+		edge_expansion_enabled=False,
+		adaptive_context_enabled=False,
+	)
+	on_knobs = RetrievalKnobs(
+		**{**off_knobs.__dict__, "adaptive_context_enabled": True}
+	)
+
+	off_collector = TraceCollector(capture_candidate_stages=True)
+	with trace_context(trace_id="off", collector=off_collector):
+		off = select_context("question", knobs=off_knobs)
+	assert [result.chunk_id for result in off.selected] == ["0", "1", "2", "3", "4"]
+	off_stage = next(stage for stage in off_collector.stages if stage["name"] == "adaptive_context")
+	assert off_stage["enabled"] is False
+	assert off_stage["packaging_pool_semantic_hash"]
+	assert off_stage["packaging_pool_full_hash"]
+
+	on_collector = TraceCollector(capture_candidate_stages=True)
+	with trace_context(trace_id="on", collector=on_collector):
+		on = select_context("question", knobs=on_knobs)
+	assert [result.chunk_id for result in on.selected] == ["0", "1", "2", "3"]
+	on_stage = next(stage for stage in on_collector.stages if stage["name"] == "adaptive_context")
+	assert on_stage["enabled"] is True
+	assert on_stage["stop_reason"] == "exhausted"
+	assert on_stage["packaging_pool_semantic_hash"] == off_stage["packaging_pool_semantic_hash"]
+	assert any(snapshot["stage"] == "adaptive_selected" for snapshot in on_collector.candidate_stages)

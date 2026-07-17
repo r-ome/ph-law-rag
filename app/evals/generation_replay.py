@@ -69,6 +69,23 @@ def _eval_row(
         else model_choice.get("model")
     )
     selected = frozen["selected_results"]
+    debug_stages = list(frozen.get("retrieval_trace", {}).get("stages", []))
+    if frozen.get("adaptive_context"):
+        adaptive = {
+            key: value
+            for key, value in frozen["adaptive_context"].items()
+            if key
+            not in {
+                "selector",
+                "source_rendered_tokens",
+                "source_selected_context_hash",
+            }
+        }
+        adaptive.setdefault("name", "adaptive_context")
+        debug_stages = [
+            *[stage for stage in debug_stages if stage.get("name") != "adaptive_context"],
+            adaptive,
+        ]
     return {
         "schema": schema_version(),
         "eval_id": frozen["eval_id"],
@@ -76,7 +93,7 @@ def _eval_row(
         "answer": result["answer"],
         "contexts": result.get("contexts", [item["text"] for item in selected]),
         "selected_chunk_ids": [item["chunk_id"] for item in selected],
-        "debug_stages": frozen.get("retrieval_trace", {}).get("stages", []),
+        "debug_stages": debug_stages,
         "ground_truth": frozen.get("ground_truth", ""),
         "expected_sources": frozen.get("expected_sources", []),
         "category": frozen.get("category", ""),

@@ -41,6 +41,15 @@ BEHAVIOR_FIELDS: frozenset[str] = frozenset(
         "query_planner_max_subqueries",
         "subquery_packaging_enabled",
         "subquery_reserve_n",
+        "adaptive_context_enabled",
+        "adaptive_context_contract_version",
+        "adaptive_context_floor",
+        "adaptive_context_base_cap",
+        "adaptive_context_uncertain_cap",
+        "adaptive_context_multifacet_cap",
+        "adaptive_context_stabilization_patience",
+        "adaptive_context_token_target",
+        "adaptive_context_token_estimator",
         "enable_query_rewriting",
     }
 )

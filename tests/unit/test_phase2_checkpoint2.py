@@ -229,6 +229,7 @@ def test_original_only_1_1_pool_order_selection_and_hash_match_1_0(monkeypatch):
         retrieval_operative_only=True,
         consolidated_dedup_enabled=False,
         edge_expansion_enabled=False,
+        adaptive_context_enabled=False,
     )
 
     legacy_selection = select_context("q", knobs=knobs)

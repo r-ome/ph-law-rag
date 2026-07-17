@@ -398,6 +398,7 @@ def test_capture_preserves_context_order_and_emits_all_baseline_stages(monkeypat
         retrieval_operative_only=False,
         consolidated_dedup_enabled=False,
         edge_expansion_enabled=False,
+        adaptive_context_enabled=False,
     )
 
     without_capture = select_context("q", knobs=knobs)

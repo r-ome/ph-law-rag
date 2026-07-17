@@ -55,6 +55,7 @@ def _knobs(**updates) -> RetrievalKnobs:
         "consolidated_dedup_enabled": False,
         "query_decomposition_enabled": False,
         "subquery_packaging_enabled": False,
+        "adaptive_context_enabled": False,
     }
     values.update(updates)
     return replace(base, **values)

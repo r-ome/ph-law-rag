@@ -80,6 +80,26 @@ def test_sibling_knobs_are_behavior_fields():
     } <= BEHAVIOR_FIELDS
 
 
+def test_adaptive_context_default_on_with_single_flag_rollback(tmp_path, monkeypatch):
+    empty_env = tmp_path / "empty.env"
+    empty_env.write_text("", encoding="utf-8")
+    monkeypatch.delenv("ADAPTIVE_CONTEXT_ENABLED", raising=False)
+
+    default_settings = Settings(_env_file=empty_env)
+    assert default_settings.adaptive_context_enabled is True
+    assert AnswerPolicy.from_settings(
+        default_settings
+    ).retrieval_defaults.adaptive_context_enabled is True
+
+    rollback_env = tmp_path / "rollback.env"
+    rollback_env.write_text("adaptive_context_enabled=false\n", encoding="utf-8")
+    rollback_settings = Settings(_env_file=rollback_env)
+    assert rollback_settings.adaptive_context_enabled is False
+    assert AnswerPolicy.from_settings(
+        rollback_settings
+    ).retrieval_defaults.adaptive_context_enabled is False
+
+
 def test_eval_profile_does_not_turn_on_router(monkeypatch):
     monkeypatch.setattr(settings, "raglab_profile", "eval")
     monkeypatch.setattr(settings, "router_enabled", True)

@@ -21,6 +21,7 @@ _SELECTION_TIMER_STAGES = {
     "parent_expansion",
     "sibling_expansion",
     "dedup",
+    "adaptive_context",
 }
 
 
@@ -60,6 +61,7 @@ def _retrieval_stage_timings_ms(collector: TraceCollector | None) -> dict[str, f
         },
         "sibling_expansion": {"sibling_expansion"},
         "selected": {"dedup"},
+        "adaptive_context": {"adaptive_context"},
         "corrective": {"corrective_retrieval"},
     }
     return {
@@ -88,6 +90,17 @@ def _feature_flags(policy: AnswerPolicy) -> dict:
         "corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
         "query_decomposition_enabled": policy.query_decomposition_enabled,
         "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
+        "adaptive_context_enabled": policy.retrieval_defaults.adaptive_context_enabled,
+        "adaptive_context_contract_version": policy.retrieval_defaults.adaptive_context_contract_version,
+        "adaptive_context_floor": policy.retrieval_defaults.adaptive_context_floor,
+        "adaptive_context_base_cap": policy.retrieval_defaults.adaptive_context_base_cap,
+        "adaptive_context_uncertain_cap": policy.retrieval_defaults.adaptive_context_uncertain_cap,
+        "adaptive_context_multifacet_cap": policy.retrieval_defaults.adaptive_context_multifacet_cap,
+        "adaptive_context_stabilization_patience": (
+            policy.retrieval_defaults.adaptive_context_stabilization_patience
+        ),
+        "adaptive_context_token_target": policy.retrieval_defaults.adaptive_context_token_target,
+        "adaptive_context_token_estimator": policy.retrieval_defaults.adaptive_context_token_estimator,
         "enable_query_rewriting": policy.query_rewriting_enabled,
         "faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
         "later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
