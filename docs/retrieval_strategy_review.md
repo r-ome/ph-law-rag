@@ -2724,3 +2724,76 @@ predeclared plan and explicit user approval.
   bounded cost).
 - Web retrieval, escalate-on-partial arms, and heuristic gating of the checker
   call — out of scope for Phase 5.
+
+# MiniLM vs Qwen3 reranker serving A/B (predeclared 2026-07-18, approved)
+
+Last live "rerun: yes" item from Historical Experiments Worth Rerunning.
+Retrieval-only, zero paid calls, holdout sealed. Two fresh sealed 131-row
+`original_only` captures under current serving defaults (sibling expansion and
+adaptive context on, corrective off), differing only in `reranker_backend`:
+`minilm` (serving baseline) vs `qwen3` (local replacement candidate). Tags
+`reranker-ab-minilm` / `reranker-ab-qwen3`; comparison `reranker-ab-comparison`
+with declared diff `reranker_backend=["minilm","qwen3"]`.
+
+Prior evidence (disclosed): the sealed 2026-07-15 `phase1-gate-*` bundles
+(pre-ADR-026/027 stack) show Paraphrase selected survival 0.7319 → 0.8986,
+overall 0.8529 → 0.9302, Paraphrase leaf survival 0.7143 → 0.5714 (watch), and
+sealed-trace p95 rerank/retrieval MiniLM 0.85 s / 1.59 s vs Qwen3
+13.29 s / 14.18 s. Bars below were set with this read in hand, before any
+fresh capture exists.
+
+## Predeclared gates (all machine-enforced by the analysis script over
+hash-validated sealed bundles; missing timing data fails, never defaults)
+
+1. **Binding integrity:** `pre_rerank_pool_changed = 0/131`; identical
+   dataset/target/corpus/index identities; both captures
+   `--require-clean-worktree`, strictly sequential processes.
+2. **Primary quality:** Paraphrase (n=25) selected-stage target survival,
+   Qwen3 − MiniLM ≥ **+0.08** absolute. Ambiguous (n=6) direction-only
+   (small-N, n<10) but must not lose more than one row.
+3. **No-regression:** Factual (n=70) ≥ baseline − 0.02; Synthesis (n=18)
+   ≥ baseline − 0.05; overall selected survival ≥ baseline. OOS (n=12,
+   targetless): changed selected contexts reported, informational.
+4. **Watch (non-gating):** leaf survival per category, rank-of-target shifts,
+   changed-context count.
+5. **Operational:** per-row rerank stage latency p95 ≤ **3,000 ms**;
+   end-to-end retrieval p95 ≤ **5,000 ms** (full-precision sealed-trace
+   values). Model-swap micro-benchmark (3 cycles): cold-load to first rerank
+   ≤ **20 s**; rerank latency immediately after a `gemma4:e4b` generation
+   ≤ **2×** steady-state p50; byte-stable = identical IEEE-754 score-vector
+   serialization for a fixed query/pool across two repeats, all scores
+   finite, identical ranking.
+6. **Conclusion binding:** context/prompt hashes and target metrics only;
+   `selected_context_hash` jitter (CP-A2.c) decides nothing.
+
+## Verdict matrix
+
+- Quality + operational pass → recommend a **local MPS serving flip only**
+  (user decision, ADR). This experiment cannot recommend a Fargate/container
+  flip: Qwen3-Reranker on CPU is documented at roughly 4–5 minutes per query
+  (`app/retriever/reranker.py`), and production is pinned to MiniLM by
+  ADR-021. A production flip needs a target-runtime benchmark or a
+  GPU-serving architecture.
+- Quality pass, operational fail → keep MiniLM serving; record Qwen3 as the
+  offline/eval reranker option; note it satisfies the "reranker upgrade" half
+  of Phase 5's re-test trigger.
+- Quality fail → keep MiniLM everywhere; close the rerun item as answered
+  under the current stack.
+
+## Build scope
+
+Comparator: add `_RERANKER_KEYS` (`reranker_backend`, `reranker_model`,
+`qwen3_reranker_model`, `bedrock_rerank_model`; top-level shared_values, same
+handling as `_EVIDENCE_KEYS`) to declared-delta normalization, observed-delta
+detection, and declared-field removal. Tests: one positive acceptance
+(declared `reranker_backend` pair publishes) plus rejections — undeclared
+reranker drift, wrong endpoints, declared-but-unobserved (both arms same), and
+declared backend not masking undeclared `qwen3_reranker_model` drift.
+Analysis and swap-benchmark scripts stay in scratch; captures pin
+`RAGLAB_PROFILE=local` explicitly alongside the backend override.
+
+## Secondary (historical, non-gating)
+
+Same comparison over the 2026-07-15 `phase1-gate-minilm` / `phase1-gate-qwen3`
+bundles: validates the old stack's consistency only, not the current
+sibling/adaptive stack.

@@ -102,6 +102,15 @@ _EVIDENCE_KEYS = (
     "corrective_max_facets",
     "corrective_facet_reserve_n",
 )
+# Reranker identity also lives at the top level of shared_values. A declared
+# reranker pair (e.g. minilm vs qwen3) is the only way two arms may differ on
+# these fields; undeclared drift stays a hard identity rejection.
+_RERANKER_KEYS = (
+    "reranker_backend",
+    "reranker_model",
+    "qwen3_reranker_model",
+    "bedrock_rerank_model",
+)
 _QUERY_SEPARATION_ARMS = {"original_only", "original_plus_rewrite"}
 _LEGACY_SIBLING_DEFAULTS = {
     "sibling_expansion_enabled": False,
@@ -152,7 +161,11 @@ def _normalize_expected_knob_diff(
         raise ValueError("expected_knob_diff must be a mapping")
     normalized = {}
     for name, endpoints in value.items():
-        if name not in _SELECTION_KEYS and name not in _EVIDENCE_KEYS:
+        if (
+            name not in _SELECTION_KEYS
+            and name not in _EVIDENCE_KEYS
+            and name not in _RERANKER_KEYS
+        ):
             raise ValueError(f"unknown retrieval selection knob {name!r}")
         if not isinstance(endpoints, (list, tuple)) or len(endpoints) != 2:
             raise ValueError(
@@ -218,15 +231,16 @@ def _selection_diff(
         for name in _SELECTION_KEYS
         if baseline[name] != candidate[name]
     }
-    baseline_evidence = _subset(baseline_shared, _EVIDENCE_KEYS)
-    candidate_evidence = _subset(candidate_shared, _EVIDENCE_KEYS)
-    diff.update(
-        {
-            name: (baseline_evidence[name], candidate_evidence[name])
-            for name in _EVIDENCE_KEYS
-            if baseline_evidence[name] != candidate_evidence[name]
-        }
-    )
+    for family in (_EVIDENCE_KEYS, _RERANKER_KEYS):
+        baseline_family = _subset(baseline_shared, family)
+        candidate_family = _subset(candidate_shared, family)
+        diff.update(
+            {
+                name: (baseline_family[name], candidate_family[name])
+                for name in family
+                if baseline_family[name] != candidate_family[name]
+            }
+        )
     return diff
 
 
@@ -261,7 +275,7 @@ def _without_declared_knobs(
     comparable = deepcopy(shared_values)
     defaults = comparable["retrieval_defaults"]
     for name in declared:
-        if name in _EVIDENCE_KEYS:
+        if name in _EVIDENCE_KEYS or name in _RERANKER_KEYS:
             comparable.pop(name, None)
         else:
             defaults.pop(name, None)

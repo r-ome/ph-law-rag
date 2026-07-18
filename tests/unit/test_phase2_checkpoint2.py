@@ -615,6 +615,98 @@ def test_comparator_rejects_undeclared_wrong_unobserved_and_unknown_knob_deltas(
         )
 
 
+def test_comparator_accepts_declared_reranker_backend_pair(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
+    _write_bundle("reranker-baseline", minor=1)
+    candidate_shared = _shared_values()
+    candidate_shared["reranker_backend"] = "qwen3"
+    _write_bundle(
+        "reranker-candidate",
+        minor=1,
+        retrieval_config=retrieval_config_identity(
+            candidate_shared, arm="original_only"
+        ),
+        selected_text="selected law reranked by qwen3",
+    )
+
+    report_path = compare_retrieval_bundles(
+        "reranker-baseline",
+        "reranker-candidate",
+        tag="reranker-comparison",
+        expected_arm_pair=("original_only", "original_only"),
+        expected_knob_diff={"reranker_backend": ("minilm", "qwen3")},
+    )
+    report = json.loads(report_path.read_text())
+
+    expected_delta = {
+        "reranker_backend": {"baseline": "minilm", "candidate": "qwen3"}
+    }
+    assert report["declared_knob_diff"] == expected_delta
+    assert report["observed_knob_diff"] == expected_delta
+    assert report["identity_checks"]["reranker"]["matched"] is True
+    assert report["summary"] == {
+        "row_count": 1,
+        "pre_rerank_pool_changed": 0,
+        "selected_context_changed": 1,
+    }
+
+
+def test_comparator_rejects_undeclared_wrong_unobserved_and_masked_reranker_deltas(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
+    _write_bundle("reranker-delta-baseline", minor=1)
+    candidate_shared = _shared_values()
+    candidate_shared["reranker_backend"] = "qwen3"
+    _write_bundle(
+        "reranker-delta-candidate",
+        minor=1,
+        retrieval_config=retrieval_config_identity(
+            candidate_shared, arm="original_only"
+        ),
+    )
+    masked_shared = _shared_values()
+    masked_shared["reranker_backend"] = "qwen3"
+    masked_shared["qwen3_reranker_model"] = "qwen3-drifted"
+    _write_bundle(
+        "reranker-masked-candidate",
+        minor=1,
+        retrieval_config=retrieval_config_identity(
+            masked_shared, arm="original_only"
+        ),
+    )
+
+    kwargs = {
+        "baseline_tag": "reranker-delta-baseline",
+        "candidate_tag": "reranker-delta-candidate",
+        "expected_arm_pair": ("original_only", "original_only"),
+    }
+    with pytest.raises(ValueError, match="undeclared=reranker_backend"):
+        compare_retrieval_bundles(**kwargs, tag="reranker-undeclared")
+    with pytest.raises(ValueError, match="wrong_endpoints=reranker_backend"):
+        compare_retrieval_bundles(
+            **kwargs,
+            tag="reranker-wrong-endpoints",
+            expected_knob_diff={"reranker_backend": ("qwen3", "minilm")},
+        )
+    with pytest.raises(ValueError, match="unobserved=reranker_backend"):
+        compare_retrieval_bundles(
+            baseline_tag="reranker-delta-baseline",
+            candidate_tag="reranker-delta-baseline",
+            expected_arm_pair=("original_only", "original_only"),
+            tag="reranker-unobserved",
+            expected_knob_diff={"reranker_backend": ("minilm", "qwen3")},
+        )
+    with pytest.raises(ValueError, match="undeclared=qwen3_reranker_model"):
+        compare_retrieval_bundles(
+            baseline_tag="reranker-delta-baseline",
+            candidate_tag="reranker-masked-candidate",
+            expected_arm_pair=("original_only", "original_only"),
+            tag="reranker-masked",
+            expected_knob_diff={"reranker_backend": ("minilm", "qwen3")},
+        )
+
+
 def test_comparator_rejects_shared_query_and_corpus_drift(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "eval_results_dir", str(tmp_path))
     _write_bundle("baseline", minor=0)
