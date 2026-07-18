@@ -2502,3 +2502,183 @@ synthesis evidence is n=4, and the mechanism changed 10/30 holdout contexts.
 No schema-1.2 or explicit `packaging_pool` publication is included in this
 graduation. Those are follow-up packaging/provenance work, not prerequisites for
 the default flip.
+
+# Phase 5 plan: Corrective retrieval with global rerank (2026-07-17)
+
+**Status:** Plan approved 2026-07-17; implementation not started.
+
+**Thesis under test:** corrective retrieval works as candidate discovery
+feeding one global rerank plus Phase 4 adaptive packaging, not as a context
+append. PR5c's flat-to-negative result indicted the append packaging; Phase 5
+is the re-test of the facet checker with that packaging replaced.
+
+## Reconciliation with pipeline-refactor PR5 (signed off 2026-07-17)
+
+PR5 built three separable things; Phase 5 replaces only the third:
+
+| PR5 component | Phase 5 fate |
+|---|---|
+| Facet checker (`evidence_gate="crag"`, Haiku, fail-open, `sufficient`/`partial`, never abstains) | Survives as the corrective trigger and the source of `missing_facets`. |
+| Per-facet targeted retrieval against the curated corpus | Survives as candidate discovery; output redirected into the union pool instead of an append. |
+| Additive packaging (`_relevant_to_question` margin filter, post-gate append via `round_robin_merge`, `corrective_max_added` budget) | Retired. Never rerun — this is the retrieval-design bug (eval_102). |
+
+One PR5 design decision is explicitly reversed, with sign-off: §10.1's
+additive invariant ("corrective never removes a baseline chunk") is dropped.
+Under global rerank plus adaptive packaging, a corrective candidate can
+displace a baseline chunk — that is the point of the redesign. The invariant's
+no-new-abstain purpose survives untouched: `min_chunks` runs first and
+unchanged, the checker returns only `sufficient` or `partial`, and it fails
+open on any error. Phase 4's caps bound the displacement blast radius; the A/B
+on changed-context rows measures it.
+
+The PR5c negative result stands as evidence against the append packaging, not
+against the facet checker — the two were never separated in that A/B.
+Non-graduation stays logged; `crag-experimental` is the substrate Phase 5
+modifies, not a parallel design.
+
+## Design
+
+Two-pass selection, one corrective round maximum:
+
+```text
+pass 1 (unchanged serving path):
+  fusion pool -> rerank -> edge/parent/sibling expansion -> dedup -> adaptive select
+facet check (Haiku, cached, fail-open) on the pass-1 adaptive-selected context
+if verdict == partial:
+  per missing facet (<= corrective_max_facets): targeted hybrid retrieval,
+    top corrective_facet_reserve_n per facet in hybrid fused (RRF) order only
+  union = pass-1 pre-rerank fused pool + facet candidates
+  dedup via existing dedup_results semantics
+pass 2: rerank the union ONCE against the original question
+  -> same expansion -> dedup -> adaptive select (Phase 4 v2 caps 7/11/11/2400)
+generate over the pass-2 context
+```
+
+Design decisions:
+
+1. **Checker input is the pass-1 adaptive-selected context** (what generation
+   sees), deviating from PR5's `pre_expansion` choice. PR5's rationale
+   ("missing = genuinely absent, not un-expanded") no longer holds: the union
+   restores the full pre-rerank pool, so anything packaging dropped can be
+   re-surfaced by the global rerank. Owned consequence: `partial` now means
+   "missing from the generation-facing context," which conflates retrieval
+   misses with packaging drops. This is acceptable because pass 2 unions the
+   pre-rerank pool; the CP1 audit classifies the two cases (below).
+2. **Union base is the pass-1 pre-rerank fused pool** (the canonical pool per
+   schema 1.1) — the roadmap's "pre-selection candidate pool."
+3. **Per-facet retrieval does not rerank.** Per-facet candidates are taken in
+   hybrid fused (RRF) order only, top `corrective_facet_reserve_n` per facet.
+   The sole rerank invocation in the corrective path is pass 2 against the
+   original question.
+4. **Pass 2 reuses the serving selection code path verbatim** over the union —
+   no bespoke merge, no round-robin, no margin filter. `round_robin_merge` and
+   `_relevant_to_question` are not used by the new mode; they remain with the
+   legacy append mode until it is retired.
+5. **Union dedup reuses existing `dedup_results` semantics verbatim:**
+   duplicate chunk IDs, explicitly represented merged chunks, and exact
+   normalized text. No provision-family collapse — Section 11 / Article
+   1403-style sibling leaves stay distinct, consistent with Phase 4 v2's
+   defensive-dedup rule. The roadmap's "consolidated provision identity"
+   phrase is satisfied by the merged-chunk case `dedup_results` already
+   handles; this reading is deliberate.
+6. **Blast radius:** corrective candidates enter before the global rerank and
+   adaptive packaging, so Phase 4's caps bound the final context regardless of
+   how many facet candidates are retrieved. Rows judged `sufficient` skip
+   pass 2 entirely and are identical to control by construction.
+
+## Knobs and plumbing
+
+| Knob | Candidate value | Control-normalized value | Notes |
+|---|---|---|---|
+| `evidence_gate` | `crag` | `min_chunks` | Existing field. |
+| `corrective_retrieval_enabled` | `true` | `false` | Existing field. |
+| `corrective_mode` | `global_rerank` | `append` (legacy normalization) | New field; legacy bundles normalize to `append`, the PR5 behavior. |
+| `evidence_judge_model` | `claude-haiku-4-5` | control bundle's recorded value (settings-derived; inert while `evidence_gate=min_chunks`) | Existing PR5 field. |
+| `corrective_max_facets` | `3` | `null` (no facet cap existed pre-introduction) | New field. |
+| `corrective_facet_reserve_n` | `5` | `null` (knob has no meaning under `append` mode) | New field. Predeclared conservative: if CP3 shows real missing facets just below the cutoff, escalation to 8 is a new sealed arm with its own declared delta, never a silent retune. |
+
+`_SELECTION_KEYS` / `BEHAVIOR_FIELDS` / legacy-defaults entries land in the
+same checkpoint that introduces each knob, with a checkpoint test asserting
+the comparator reports exactly the declared delta set below (Phase 3/4
+lesson, baked in — not a review finding).
+
+**Declared delta set (CP3 comparator gate, set equality):** the matched
+comparison of the candidate arm against the `phase4-adaptive-context-v2-minilm`
+control must report exactly:
+
+- `evidence_gate: min_chunks→crag`
+- `corrective_retrieval_enabled: false→true`
+- `corrective_mode: append→global_rerank`
+- `evidence_judge_model: <control-recorded>→claude-haiku-4-5`
+- `corrective_max_facets: null→3`
+- `corrective_facet_reserve_n: null→5`
+
+Any undeclared delta fails the gate. Any missing declared delta fails the
+gate.
+
+## Checkpoints (stop for approval after each)
+
+**CP1 — Facet-checker offline audit (paid, cached, trace-only).** Run the
+Haiku facet checker over the 131 non-holdout rows' sealed pass-1 contexts,
+read from the `phase4-adaptive-context-v2` lineage bundle — no retrieval, no
+generation. Phase-2-rewriter discipline: content-addressed cache,
+pending-marker, explicit user authorization before the first real call, cost
+estimate up front (~131 Haiku calls, one-time, then cache hits).
+Deliverables: partial rate; per-row `missing_facets`; hand-check sample of
+~15 partial rows plus the `sufficient` verdicts on known evidence-gate-miss
+rows (eval_056 pattern); and a mechanical classification of every missing
+facet against the sealed canonical pool — **(a) absent from the pass-1
+pre-rerank pool** (facet retrieval required) versus **(b) present in the pool
+but dropped by selection** (re-selection from the restored pool could recover
+it). The (a)/(b) split forecasts how much prospective lift is attributable to
+facet retrieval versus re-selection.
+**Gate (predeclared):** partial rate within [5%, 35%]; at least half of
+sampled missing facets are real gaps; watch-row (`eval_129`, `eval_124`)
+verdicts inspected. A bad checker kills the phase here, before any mechanism
+is built.
+
+**CP2 — Mechanism and plumbing, offline arm only.** Implement
+union/dedup/global-rerank/re-select as an eval-only arm; knob plumbing per the
+table above. Unit tests: empty `missing_facets` skips pass 2 with output
+identical to pass 1; union dedup collapses duplicate chunk IDs, represented
+merged chunks, and exact normalized text while preserving distinct sibling
+leaves; exactly one rerank invocation over the union (per-facet retrieval is
+fused-order only); the matched-arm comparator test asserts the exact declared
+delta set. No paid calls — the CP1 cache is replayed. Serving profiles
+provably untouched.
+
+**CP3 — Retrieval-only sealed run and comparison.** 131 rows, MiniLM, frozen
+index, CP1 cache. Seal as a write-once bundle; publish the comparison against
+`phase4-adaptive-context-v2-minilm`.
+**Binding gates:** on `sufficient` rows, selected-context, prompt, and source
+hashes are identical to control (evidence-block fields — `method`, verdict,
+facets — differ by design and are excluded from the identity check); on fired
+rows, no loss of expected provisions that the control had (the same
+no-provision-loss bar Phase 4 CP3 failed and CP4 passed); context size within
+the Phase 4 watch bounds; comparator delta set equality per above. Watch rows
+`eval_129` (Section 11 family) and `eval_124` (Section 145) reported
+individually.
+**Small-N regime:** the fired-row count is the regime. If fewer than 10 rows
+fire, category slices are direction-only; gates apply to the named
+provision/target checks, not slice means.
+
+**CP4 — Matched generation A/B** (gemma4, deterministic generation, RAGAS row
+cache, judge changed-context rows only).
+**Gates:** faithfulness flat-or-up on changed rows; context-recall lift beyond
+the established judge-noise band; abstention accuracy not down; zero new false
+abstentions. Report, without gating: the Phase 4 soft spots — ambiguous
+relevancy (n=6) and synthesis relevancy.
+
+**CP5 — Graduation decision.** Keep-or-shelve on CP3 + CP4 evidence; ADR and
+any serving-default flip are the user's call. The holdout stays sealed — it
+was read once for Phase 4's Stage B; any further holdout access requires a
+separate predeclared plan and explicit user approval.
+
+## Explicitly retired / out of scope
+
+- Additive append packaging (`_relevant_to_question` margin filter, post-gate
+  append, `corrective_max_added`) — never rerun.
+- Re-checking the facet verdict after the corrective round (one round,
+  bounded cost).
+- Web retrieval, escalate-on-partial arms, and heuristic gating of the checker
+  call — out of scope for Phase 5.
