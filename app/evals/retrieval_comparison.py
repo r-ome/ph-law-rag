@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import shutil
+import json
+import math
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +22,30 @@ from app.evals.integrity import (
     validate_schema,
     validate_sealed_bundle,
 )
+
+PHASE5_CP3_DECLARED_KNOB_DIFF = {
+    "evidence_gate": ("min_chunks", "crag"),
+    "corrective_retrieval_enabled": (False, True),
+    "corrective_mode": ("append", "global_rerank"),
+    # The locked Phase 4 control records the inert local judge as ``mistral``.
+    "evidence_judge_model": ("mistral", "claude-haiku-4-5"),
+    "corrective_max_facets": (None, 3),
+    "corrective_facet_reserve_n": (None, 5),
+}
+PHASE5_CP3_IDENTITY_FIELDS = (
+    "selected_context_hash",
+    "context_block_hash",
+    "source_map_hash",
+    "system_prompt_hash",
+    "user_prompt_hash",
+)
+PHASE5_CP3_CONTEXT_LIMITS = {
+    "mean": 1509.3,
+    "p95": 2649,
+    "max": 3274,
+    "new_overflow_count": 3,
+    "soft_target": 2400,
+}
 
 _CUTOFF_KEYS = (
     "dense_top_k",
@@ -344,6 +370,214 @@ def _validated_source(tag: str) -> tuple[list[dict[str, Any]], dict[str, Any], d
     return rows, meta, config
 
 
+def _phase5_target_hash(
+    rows: list[dict[str, Any]],
+    baseline_meta: dict[str, Any],
+    candidate_meta: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], str]:
+    """Bind CP3 target checks to the current sidecar and both sealed bundles."""
+    from app.evals.retrieval_targets import load_retrieval_targets
+
+    targets = load_retrieval_targets()
+    eval_ids = [row["eval_id"] for row in rows]
+    try:
+        ordered_target_hash = ordered_hash([sha256(targets[eval_id]) for eval_id in eval_ids])
+    except KeyError as exc:
+        raise ValueError(f"CP3 target sidecar missing {exc.args[0]!r}") from exc
+    expected = {"ordered_target_hash": ordered_target_hash}
+    for arm, meta in (("baseline", baseline_meta), ("candidate", candidate_meta)):
+        if meta.get("targets_identity") != expected:
+            raise ValueError(f"CP3 target drift: {arm} bundle targets_identity mismatch")
+    return targets, ordered_target_hash
+
+
+def _load_cp1_partial_ids(
+    audit_tag: str,
+    *,
+    baseline_meta: dict[str, Any],
+) -> set[str]:
+    """Load CP1's immutable firing population only after hash validation."""
+    root = paths_for(audit_tag).root
+    meta_path = root / "meta.json"
+    rows_path = root / "facet_audit.jsonl"
+    summary_path = root / "facet_audit_summary.json"
+    if not meta_path.exists() or not rows_path.exists() or not summary_path.exists():
+        raise FileNotFoundError(f"CP3 audit artifact {audit_tag!r} is incomplete")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if meta.get("artifact_type") != "facet_audit":
+        raise ValueError("CP3 audit artifact type mismatch")
+    for path, key in ((rows_path, "rows_file_hash"), (summary_path, "summary_file_hash")):
+        if meta.get(key) != file_sha256(path):
+            raise ValueError(f"CP3 audit drift: {key} mismatch")
+    if meta.get("source_bundle_file_hash") != baseline_meta.get("bundle_file_hash"):
+        raise ValueError("CP3 audit drift: source bundle hash mismatch")
+    rows = [json.loads(line) for line in rows_path.read_text(encoding="utf-8").splitlines() if line]
+    if len(rows) != meta.get("row_count"):
+        raise ValueError("CP3 audit drift: row count mismatch")
+    return {row["eval_id"] for row in rows if row.get("verdict") == "partial"}
+
+
+def _target_key(target: dict[str, Any], *, match_mode: str) -> str:
+    if match_mode == "source_only":
+        return f"source:{target['source_id']}"
+    if target.get("unit_label"):
+        return "leaf:{source_id}:{provision_id}:{unit_label}".format(**target)
+    return "provision:{source_id}:{provision_id}".format(**target)
+
+
+def _matched_final_targets(
+    row: dict[str, Any], target_record: dict[str, Any],
+) -> set[str]:
+    """Return expected targets found in *final* selected results only."""
+    selected = row.get("selected_results")
+    if not isinstance(selected, list):
+        raise ValueError(f"{row.get('eval_id')}: selected_results is missing")
+    match_mode = target_record.get("match_mode")
+    if match_mode not in {"exact", "source_only"}:
+        raise ValueError(f"{row.get('eval_id')}: invalid target match mode")
+    matched: set[str] = set()
+    for target in target_record.get("targets", []):
+        for result in selected:
+            metadata = result.get("metadata") or {}
+            if metadata.get("source_id") != target.get("source_id"):
+                continue
+            if match_mode == "source_only":
+                matched.add(_target_key(target, match_mode=match_mode))
+                break
+            if metadata.get("provision_id") != target.get("provision_id"):
+                continue
+            # A leaf annotation is intentionally stricter than provision identity.
+            if target.get("unit_label") and metadata.get("unit_label") != target["unit_label"]:
+                continue
+            matched.add(_target_key(target, match_mode=match_mode))
+            break
+    return matched
+
+
+def _final_rendered_tokens(row: dict[str, Any], *, fired: bool) -> int:
+    """Read the final adaptive selector diagnostic without accepting pass 1."""
+    top_level = row.get("adaptive_context")
+    stages = (row.get("retrieval_trace") or {}).get("stages")
+    adaptive_stages = [
+        stage for stage in stages or []
+        if isinstance(stage, dict) and stage.get("name") == "adaptive_context"
+    ]
+    if isinstance(top_level, dict):
+        if adaptive_stages:
+            raise ValueError(f"{row.get('eval_id')}: derived adaptive context has trace stages")
+        value = top_level.get("rendered_tokens")
+    else:
+        expected_count = 2 if fired else 1
+        if not isinstance(stages, list) or len(adaptive_stages) != expected_count:
+            raise ValueError(
+                f"{row.get('eval_id')}: expected exactly {expected_count} direct adaptive stages"
+            )
+        fields = adaptive_stages[-1].get("fields")
+        if not isinstance(fields, dict):
+            raise ValueError(f"{row.get('eval_id')}: adaptive diagnostic fields are missing")
+        value = fields.get("rendered_tokens")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        raise ValueError(f"{row.get('eval_id')}: invalid adaptive rendered_tokens")
+    return int(value)
+
+
+def _phase5_cp3_gates(
+    baseline_rows: list[dict[str, Any]],
+    candidate_rows: list[dict[str, Any]],
+    *,
+    baseline_meta: dict[str, Any],
+    candidate_meta: dict[str, Any],
+    audit_tag: str,
+) -> dict[str, Any]:
+    """Mechanically enforce every CP3 retrieval-only gate before publication."""
+    targets, target_hash = _phase5_target_hash(baseline_rows, baseline_meta, candidate_meta)
+    expected_fired = _load_cp1_partial_ids(audit_tag, baseline_meta=baseline_meta)
+    baseline_by_id = {row["eval_id"]: row for row in baseline_rows}
+    candidate_by_id = {row["eval_id"]: row for row in candidate_rows}
+    candidate_fired = {
+        eval_id for eval_id, row in candidate_by_id.items()
+        if (row.get("corrective_retrieval") or {}).get("ran") is True
+    }
+    failures: list[str] = []
+
+    if candidate_fired != expected_fired:
+        failures.append("expected_firing_population")
+
+    sufficient_mismatches: dict[str, list[str]] = {}
+    for eval_id in sorted(set(baseline_by_id) - expected_fired):
+        baseline, candidate = baseline_by_id[eval_id], candidate_by_id[eval_id]
+        differing = [
+            field for field in PHASE5_CP3_IDENTITY_FIELDS
+            if baseline.get(field) != candidate.get(field)
+        ]
+        if differing:
+            sufficient_mismatches[eval_id] = differing
+    if sufficient_mismatches:
+        failures.append("sufficient_row_identity")
+
+    target_losses: dict[str, list[str]] = {}
+    for eval_id in sorted(expected_fired):
+        control = _matched_final_targets(baseline_by_id[eval_id], targets[eval_id])
+        candidate = _matched_final_targets(candidate_by_id[eval_id], targets[eval_id])
+        missing = sorted(control - candidate)
+        if missing:
+            target_losses[eval_id] = missing
+    if target_losses:
+        failures.append("fired_row_target_set_preservation")
+
+    baseline_tokens: dict[str, int] = {}
+    candidate_tokens: dict[str, int] = {}
+    try:
+        for eval_id in baseline_by_id:
+            baseline_tokens[eval_id] = _final_rendered_tokens(
+                baseline_by_id[eval_id], fired=False
+            )
+            candidate_tokens[eval_id] = _final_rendered_tokens(
+                candidate_by_id[eval_id], fired=eval_id in expected_fired
+            )
+    except ValueError as exc:
+        failures.append(f"context_diagnostic:{exc}")
+    values = list(candidate_tokens.values())
+    overflow_ids = {key for key, value in candidate_tokens.items() if value > PHASE5_CP3_CONTEXT_LIMITS["soft_target"]}
+    control_overflow_ids = {key for key, value in baseline_tokens.items() if value > PHASE5_CP3_CONTEXT_LIMITS["soft_target"]}
+    context_summary: dict[str, Any] = {}
+    if values:
+        sorted_values = sorted(values)
+        mean = sum(values) / len(values)
+        p95 = sorted_values[math.ceil(0.95 * len(values)) - 1]
+        maximum = max(values)
+        new_overflow = overflow_ids - control_overflow_ids
+        context_summary = {
+            "mean": mean, "p95": p95, "max": maximum,
+            "newly_overflowing_ids": sorted(new_overflow),
+            "resolved_overflow_ids": sorted(control_overflow_ids - overflow_ids),
+            "fired_row_signed_deltas": {
+                key: candidate_tokens[key] - baseline_tokens[key] for key in sorted(expected_fired)
+            },
+        }
+        if (
+            mean > PHASE5_CP3_CONTEXT_LIMITS["mean"]
+            or p95 > PHASE5_CP3_CONTEXT_LIMITS["p95"]
+            or maximum > PHASE5_CP3_CONTEXT_LIMITS["max"]
+            or len(new_overflow) > PHASE5_CP3_CONTEXT_LIMITS["new_overflow_count"]
+        ):
+            failures.append("context_bounds")
+
+    gates = {
+        "target_sidecar_hash": {"pass": True, "ordered_target_hash": target_hash},
+        "expected_firing_population": {
+            "pass": candidate_fired == expected_fired,
+            "expected_ids": sorted(expected_fired), "observed_ids": sorted(candidate_fired),
+        },
+        "sufficient_row_identity": {"pass": not sufficient_mismatches, "mismatches": sufficient_mismatches},
+        "fired_row_target_set_preservation": {"pass": not target_losses, "losses": target_losses},
+        "context_bounds": {"pass": "context_bounds" not in failures, "limits": PHASE5_CP3_CONTEXT_LIMITS, **context_summary},
+    }
+    if failures:
+        raise ValueError("Phase 5 CP3 gate failure: " + "; ".join(failures))
+    return gates
+
+
 def compare_retrieval_bundles(
     baseline_tag: str,
     candidate_tag: str,
@@ -354,6 +588,7 @@ def compare_retrieval_bundles(
         "original_plus_rewrite",
     ),
     expected_knob_diff: dict[str, tuple[Any, Any]] | None = None,
+    phase5_cp3_audit_tag: str | None = None,
 ) -> Path:
     """Validate, compare, and durably publish a per-row retrieval report."""
     expected_arm_pair = _normalize_expected_arm_pair(expected_arm_pair)
@@ -467,6 +702,16 @@ def compare_retrieval_bundles(
             }
         )
 
+    phase5_cp3_gates = None
+    if phase5_cp3_audit_tag is not None:
+        phase5_cp3_gates = _phase5_cp3_gates(
+            baseline_rows,
+            candidate_rows,
+            baseline_meta=baseline_meta,
+            candidate_meta=candidate_meta,
+            audit_tag=phase5_cp3_audit_tag,
+        )
+
     started = datetime.now().astimezone()
     report = {
         "schema": schema_version(),
@@ -513,6 +758,8 @@ def compare_retrieval_bundles(
         },
         "rows": row_changes,
     }
+    if phase5_cp3_gates is not None:
+        report["phase5_cp3_gates"] = phase5_cp3_gates
 
     # Publish into the dated run layout only after every rejection gate above.
     existing_root = paths_for(tag).root
@@ -548,3 +795,21 @@ def compare_retrieval_bundles(
         shutil.rmtree(partial_root, ignore_errors=True)
         raise
     return desired_root / "retrieval_comparison.json"
+
+
+def compare_phase5_cp3_bundles(
+    baseline_tag: str,
+    candidate_tag: str,
+    *,
+    tag: str,
+    facet_audit_tag: str = "phase5-cp1-facet-audit",
+) -> Path:
+    """Publish the CP3 retrieval-only comparator with its sealed gate contract."""
+    return compare_retrieval_bundles(
+        baseline_tag,
+        candidate_tag,
+        tag=tag,
+        expected_arm_pair=("original_only", "original_only"),
+        expected_knob_diff=PHASE5_CP3_DECLARED_KNOB_DIFF,
+        phase5_cp3_audit_tag=facet_audit_tag,
+    )

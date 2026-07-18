@@ -206,6 +206,9 @@ def eval_retrieve(
 	tag: str = typer.Option(..., "--tag"),
 	resume: bool = typer.Option(False, "--resume"),
 	keep_retrieval_models: bool = typer.Option(False, "--keep-retrieval-models", help="diagnostics only"),
+	require_clean_worktree: bool = typer.Option(
+		False, "--require-clean-worktree", help="reject dirty code before sealing a run"
+	),
 	legal_query_separation: bool = typer.Option(
 		False,
 		"--legal-query-separation/--original-only",
@@ -222,7 +225,7 @@ def eval_retrieve(
 	)
 	typer.echo(
 		"Retrieval bundle written to "
-		f"{retrieve_rows(rows, tag=tag, resume=resume, keep_retrieval_models=keep_retrieval_models, query_separation_arm=query_separation_arm, strategy_override=strategy)}"
+		f"{retrieve_rows(rows, tag=tag, resume=resume, keep_retrieval_models=keep_retrieval_models, query_separation_arm=query_separation_arm, strategy_override=strategy, require_clean_worktree=require_clean_worktree)}"
 	)
 
 @app.command("eval-generate")
@@ -292,6 +295,25 @@ def eval_retrieval_compare(
 	except ValueError as exc:
 		raise typer.BadParameter(str(exc)) from exc
 	typer.echo(f"Retrieval comparison written to {path}")
+
+
+@app.command("eval-phase5-cp3-compare")
+def eval_phase5_cp3_compare(
+	baseline_tag: str = typer.Argument("phase4-adaptive-context-v2-minilm"),
+	candidate_tag: str = typer.Argument(...),
+	tag: str = typer.Option(..., "--tag"),
+	facet_audit_tag: str = typer.Option("phase5-cp1-facet-audit", "--facet-audit-tag"),
+):
+	"""Run the sealed Phase 5 CP3 comparator and every binding retrieval gate."""
+	from app.evals.retrieval_comparison import compare_phase5_cp3_bundles
+
+	try:
+		path = compare_phase5_cp3_bundles(
+			baseline_tag, candidate_tag, tag=tag, facet_audit_tag=facet_audit_tag
+		)
+	except (ValueError, FileNotFoundError) as exc:
+		raise typer.BadParameter(str(exc)) from exc
+	typer.echo(f"Phase 5 CP3 comparison written to {path}")
 
 @app.command("eval-context-replay")
 def eval_context_replay(

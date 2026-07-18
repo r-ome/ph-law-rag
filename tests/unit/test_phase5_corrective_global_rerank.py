@@ -169,6 +169,32 @@ def test_global_rerank_calls_rerank_exactly_once_over_union(monkeypatch):
     assert result_state.corrective_ran is True
 
 
+def test_global_rerank_reranker_input_is_ordered_chunk_id_union_with_pool_precedence(monkeypatch):
+    """CP3 precondition: assert the exact pass-2 reranker sequence, not a set."""
+    pool = [_result("pool1"), _result("duplicate", text="pool copy"), _result("pool2")]
+    facets = [_result("duplicate", text="facet copy"), _result("facet1"), _result("facet2")]
+    state, policy = _state(
+        pool=pool, baseline_selected=[], missing_facets=["penalty"]
+    )
+    monkeypatch.setattr(
+        "app.pipeline.corrective.hybrid_retriever", lambda query, **kw: facets
+    )
+    calls = []
+
+    def record_rerank(question, results, **kwargs):
+        calls.append(list(results))
+        return list(results)
+
+    monkeypatch.setattr("app.pipeline.corrective.rerank", record_rerank)
+
+    corrective_retrieve(state, policy)
+
+    assert [[result.chunk_id for result in call] for call in calls] == [
+        ["pool1", "duplicate", "pool2", "facet1", "facet2"]
+    ]
+    assert calls[0][1].text == "pool copy"
+
+
 # ---------------------------------------------------------------------------
 # 3. Union dedup: chunk_id + exact-text collapse, sibling leaves survive.
 # ---------------------------------------------------------------------------
@@ -475,3 +501,102 @@ def test_comparator_rejects_undeclared_extra_delta():
 
     with pytest.raises(ValueError, match="undeclared"):
         rc._require_expected_knob_diff(observed, declared)
+
+
+# ---------------------------------------------------------------------------
+# 9. CP3 sealed-comparator rejection gates.
+# ---------------------------------------------------------------------------
+
+
+def _cp3_row(eval_id, *, fired=False, tokens=1000, unit_label="Article 45(3)"):
+    stages = [{"name": "adaptive_context", "fields": {"rendered_tokens": tokens}}]
+    if fired:
+        stages.append({"name": "adaptive_context", "fields": {"rendered_tokens": tokens}})
+    return {
+        "eval_id": eval_id,
+        "selected_results": [{"metadata": {
+            "source_id": "family_code", "provision_id": "family_code:article:45",
+            "unit_label": unit_label,
+        }}],
+        "corrective_retrieval": {"ran": fired},
+        "selected_context_hash": "selected-" + eval_id,
+        "context_block_hash": "context-" + eval_id,
+        "source_map_hash": "sources-" + eval_id,
+        "system_prompt_hash": "system-" + eval_id,
+        "user_prompt_hash": "user-" + eval_id,
+        "retrieval_trace": {"stages": stages},
+    }
+
+
+def _patch_cp3_inputs(monkeypatch):
+    targets = {
+        "eval_fired": {
+            "match_mode": "exact",
+            "targets": [{
+                "source_id": "family_code", "provision_id": "family_code:article:45",
+                "unit_label": "Article 45(3)",
+            }],
+        },
+        "eval_sufficient": {"match_mode": "source_only", "targets": []},
+    }
+    monkeypatch.setattr(rc, "_phase5_target_hash", lambda *args: (targets, "target-hash"))
+    monkeypatch.setattr(rc, "_load_cp1_partial_ids", lambda *args, **kwargs: {"eval_fired"})
+
+
+def _run_cp3_gates(monkeypatch, baseline, candidate):
+    _patch_cp3_inputs(monkeypatch)
+    return rc._phase5_cp3_gates(
+        baseline, candidate, baseline_meta={}, candidate_meta={}, audit_tag="unused"
+    )
+
+
+def test_cp3_rejects_leaf_target_lost_despite_same_provision(monkeypatch):
+    baseline = [_cp3_row("eval_fired"), _cp3_row("eval_sufficient")]
+    candidate = [
+        _cp3_row("eval_fired", fired=True, unit_label="Article 45(1)"),
+        _cp3_row("eval_sufficient"),
+    ]
+    with pytest.raises(ValueError, match="fired_row_target_set_preservation"):
+        _run_cp3_gates(monkeypatch, baseline, candidate)
+
+
+def test_cp3_rejects_sufficient_prompt_hash_drift(monkeypatch):
+    baseline = [_cp3_row("eval_fired"), _cp3_row("eval_sufficient")]
+    candidate = [_cp3_row("eval_fired", fired=True), _cp3_row("eval_sufficient")]
+    candidate[1]["user_prompt_hash"] = "drifted"
+    with pytest.raises(ValueError, match="sufficient_row_identity"):
+        _run_cp3_gates(monkeypatch, baseline, candidate)
+
+
+def test_cp3_rejects_unexpected_firing_row(monkeypatch):
+    baseline = [_cp3_row("eval_fired"), _cp3_row("eval_sufficient")]
+    candidate = [_cp3_row("eval_fired", fired=True), _cp3_row("eval_sufficient", fired=True)]
+    candidate[1]["retrieval_trace"]["stages"].append(
+        {"name": "adaptive_context", "fields": {"rendered_tokens": 1000}}
+    )
+    with pytest.raises(ValueError, match="expected_firing_population"):
+        _run_cp3_gates(monkeypatch, baseline, candidate)
+
+
+def test_cp3_rejects_context_bound_breach(monkeypatch):
+    baseline = [_cp3_row("eval_fired"), _cp3_row("eval_sufficient")]
+    candidate = [_cp3_row("eval_fired", fired=True, tokens=4000), _cp3_row("eval_sufficient")]
+    with pytest.raises(ValueError, match="context_bounds"):
+        _run_cp3_gates(monkeypatch, baseline, candidate)
+
+
+@pytest.mark.parametrize("stage_count", [0, 3])
+def test_cp3_rejects_invalid_direct_adaptive_stage_counts(stage_count):
+    row = _cp3_row("eval_fired", fired=True)
+    row["retrieval_trace"]["stages"] = [
+        {"name": "adaptive_context", "fields": {"rendered_tokens": 1000}}
+        for _ in range(stage_count)
+    ]
+    with pytest.raises(ValueError, match="expected exactly 2"):
+        rc._final_rendered_tokens(row, fired=True)
+
+
+def test_cp3_rejects_shape_without_adaptive_diagnostic():
+    row = {"eval_id": "eval_999", "retrieval_trace": {"stages": []}}
+    with pytest.raises(ValueError, match="expected exactly 1"):
+        rc._final_rendered_tokens(row, fired=False)

@@ -2505,7 +2505,10 @@ the default flip.
 
 # Phase 5 plan: Corrective retrieval with global rerank (2026-07-17)
 
-**Status:** Plan approved 2026-07-17; implementation not started.
+**Status:** CP1 passed and CP2 is implemented in an eval-only arm (commit
+`0f6bf79`). CP3 is retrieval-only and remains pending its sealed run; its
+predeclared gates below are authoritative alongside the standalone corrective
+checkpoint record.
 
 **Thesis under test:** corrective retrieval works as candidate discovery
 feeding one global rerank plus Phase 4 adaptive packaging, not as a context
@@ -2547,8 +2550,7 @@ facet check (Haiku, cached, fail-open) on the pass-1 adaptive-selected context
 if verdict == partial:
   per missing facet (<= corrective_max_facets): targeted hybrid retrieval,
     top corrective_facet_reserve_n per facet in hybrid fused (RRF) order only
-  union = pass-1 pre-rerank fused pool + facet candidates
-  dedup via existing dedup_results semantics
+  union = pass-1 pre-rerank fused pool + facet candidates, dedup by chunk ID
 pass 2: rerank the union ONCE against the original question
   -> same expansion -> dedup -> adaptive select (Phase 4 v2 caps 7/11/11/2400)
 generate over the pass-2 context
@@ -2574,13 +2576,14 @@ Design decisions:
    no bespoke merge, no round-robin, no margin filter. `round_robin_merge` and
    `_relevant_to_question` are not used by the new mode; they remain with the
    legacy append mode until it is retired.
-5. **Union dedup reuses existing `dedup_results` semantics verbatim:**
-   duplicate chunk IDs, explicitly represented merged chunks, and exact
-   normalized text. No provision-family collapse — Section 11 / Article
-   1403-style sibling leaves stay distinct, consistent with Phase 4 v2's
-   defensive-dedup rule. The roadmap's "consolidated provision identity"
-   phrase is satisfied by the merged-chunk case `dedup_results` already
-   handles; this reading is deliberate.
+5. **Union dedup is two-stage:** before pass-2 reranking the union is deduped
+by duplicate `chunk_id` only, in first-seen order (the pass-1 pool instance
+wins a collision). The verbatim serving tail then applies full
+`dedup_results` semantics after reranking/expansion: represented merged chunks
+and fuzzy same-provision similarity, while sibling-expanded leaves are exempt.
+This deliberately permits near-duplicates to consume reranker slots in CP3;
+if evidence ties target displacement to that effect, full pre-rerank dedup is a
+new arm rather than a silent implementation change.
 6. **Blast radius:** corrective candidates enter before the global rerank and
    adaptive packaging, so Phase 4's caps bound the final context regardless of
    how many facet candidates are retrieved. Rows judged `sufficient` skip
@@ -2618,7 +2621,7 @@ gate.
 
 ## Checkpoints (stop for approval after each)
 
-**CP1 — Facet-checker offline audit (paid, cached, trace-only).** Run the
+**CP1 — Facet-checker offline audit ✅ PASSED (2026-07-17/18).** Run the
 Haiku facet checker over the 131 non-holdout rows' sealed pass-1 contexts,
 read from the `phase4-adaptive-context-v2` lineage bundle — no retrieval, no
 generation. Phase-2-rewriter discipline: content-addressed cache,
@@ -2637,27 +2640,42 @@ sampled missing facets are real gaps; watch-row (`eval_129`, `eval_124`)
 verdicts inspected. A bad checker kills the phase here, before any mechanism
 is built.
 
-**CP2 — Mechanism and plumbing, offline arm only.** Implement
+Result: 26/131 (19.85%) rows were `partial`, inside the 5–35% gate; 33/45
+hand-checked facets were real gaps. The cache is sealed at
+`data/eval_results/facet_audit_cache/v1`; replay is 131/131 hits. The audit
+classified 37 facets absent from the pass-1 pool, four dropped by selection,
+and four judge-noise cases.
+
+**CP2 — Mechanism and plumbing ✅ DONE (`0f6bf79`).** Implement
 union/dedup/global-rerank/re-select as an eval-only arm; knob plumbing per the
 table above. Unit tests: empty `missing_facets` skips pass 2 with output
 identical to pass 1; union dedup collapses duplicate chunk IDs, represented
 merged chunks, and exact normalized text while preserving distinct sibling
 leaves; exactly one rerank invocation over the union (per-facet retrieval is
 fused-order only); the matched-arm comparator test asserts the exact declared
-delta set. No paid calls — the CP1 cache is replayed. Serving profiles
-provably untouched.
+delta set. No paid calls — the CP1 cache is replayed. Shipping profiles remain
+inert.
 
-**CP3 — Retrieval-only sealed run and comparison.** 131 rows, MiniLM, frozen
-index, CP1 cache. Seal as a write-once bundle; publish the comparison against
-`phase4-adaptive-context-v2-minilm`.
-**Binding gates:** on `sufficient` rows, selected-context, prompt, and source
-hashes are identical to control (evidence-block fields — `method`, verdict,
-facets — differ by design and are excluded from the identity check); on fired
-rows, no loss of expected provisions that the control had (the same
-no-provision-loss bar Phase 4 CP3 failed and CP4 passed); context size within
-the Phase 4 watch bounds; comparator delta set equality per above. Watch rows
-`eval_129` (Section 11 family) and `eval_124` (Section 145) reported
-individually.
+**CP3 — Retrieval-only sealed run and comparison (pending).** 131 rows,
+MiniLM, frozen index, CP1 cache (a cache miss is context drift and stops the
+run; no paid-call authorization). Seal as a write-once bundle; publish the
+comparison against `phase4-adaptive-context-v2-minilm`.
+**Binding gates:** comparator delta set equality; `sufficient` rows identical
+on exactly `selected_context_hash`, `context_block_hash`, `source_map_hash`,
+`system_prompt_hash`, and `user_prompt_hash`; expected firing IDs exactly equal
+the 26 hash-validated CP1 partial rows; and, for each fired row, exact matched
+targets from final `selected_results` obey `control ⊆ candidate`. Target
+identity is `(source_id, provision_id, unit_label)` when the annotation has a
+leaf label, otherwise provision identity (or existing source-only semantics).
+The comparator re-hashes the target sidecar and requires both bundles'
+`targets_identity` to match; it also validates the CP1 audit rows, summary,
+and source-bundle hashes before loading its firing set. Context reads the final
+adaptive diagnostic (one direct stage for non-fired rows, two for fired rows;
+derived Phase 4 records use their top-level diagnostic): mean ≤1,509.3,
+p95 ≤2,649, max ≤3,274, and at most three newly overflowing rows above 2,400.
+It reports signed fired-row deltas and resolved/new overflow IDs. CP3 requires
+a clean committed worktree, with the relevant Phase 5 behavior files included
+in the recorded code identity.
 **Small-N regime:** the fired-row count is the regime. If fewer than 10 rows
 fire, category slices are direction-only; gates apply to the named
 provision/target checks, not slice means.

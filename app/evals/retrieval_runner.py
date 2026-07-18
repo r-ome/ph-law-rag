@@ -175,9 +175,13 @@ def _code_identity() -> dict[str, Any]:
         "app/retriever/legal_query_rewriter.py",
         "app/retriever/reranker.py",
         "app/retriever/context_selection.py",
+        "app/retriever/adaptive_context.py",
+        "app/retriever/dedup.py",
         "app/retriever/sibling_expansion.py",
         "app/retriever/context_builder.py",
         "app/retriever/prompts.py",
+        "app/retriever/facet_checker.py",
+        "app/pipeline/policy.py",
     ]
     files = [
         {"path": relative, "sha256": file_sha256(root / relative)}
@@ -193,6 +197,22 @@ def _code_identity() -> dict[str, Any]:
     except Exception:
         git_sha = None
     return {"git_sha": git_sha, "files": files, "hash": ordered_hash(files)}
+
+
+def _require_clean_worktree() -> dict[str, Any]:
+    """Fail before a sealed CP3 capture can inherit unrecorded code changes."""
+    root = Path(__file__).resolve().parents[2]
+    try:
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd=root, text=True, stderr=subprocess.DEVNULL
+        ).splitlines()
+    except Exception as exc:
+        raise RuntimeError("cannot verify clean worktree for sealed retrieval run") from exc
+    if status:
+        raise ValueError("sealed retrieval run requires a clean worktree")
+    return {"clean": True, "git_sha": subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=root, text=True, stderr=subprocess.DEVNULL
+    ).strip()}
 
 
 def _config_identities(
@@ -269,11 +289,13 @@ def retrieve_rows(
     keep_retrieval_models: bool = False,
     query_separation_arm: LegalQuerySeparationArm = "original_only",
     strategy_override: str | None = None,
+    require_clean_worktree: bool = False,
 ) -> Path:
     if any(row.get("split") == "holdout" for row in rows):
         raise ValueError("holdout is sealed and unavailable to eval-retrieve")
     if not rows:
         raise ValueError("eval-retrieve requires at least one non-holdout row")
+    clean_worktree = _require_clean_worktree() if require_clean_worktree else None
     if query_separation_arm not in {"original_only", "original_plus_rewrite"}:
         raise ValueError(f"unsupported query-separation arm {query_separation_arm!r}")
 
@@ -300,6 +322,7 @@ def retrieve_rows(
             query_separation_arm=query_separation_arm,
             strategy_override=strategy_override,
             policy=policy,
+            clean_worktree=clean_worktree,
         )
 
     # Import isolation is intentional: original-only capture and generation replay
@@ -317,6 +340,7 @@ def retrieve_rows(
             query_separation_arm=query_separation_arm,
             strategy_override=strategy_override,
             policy=policy,
+            clean_worktree=clean_worktree,
         )
 
 
@@ -329,6 +353,7 @@ def _retrieve_rows_capture(
     query_separation_arm: LegalQuerySeparationArm,
     strategy_override: str | None,
     policy: AnswerPolicy,
+    clean_worktree: dict[str, Any] | None,
 ) -> Path:
     from app.evals.retrieval_targets import load_retrieval_targets
 
@@ -394,6 +419,8 @@ def _retrieve_rows_capture(
         "generation_config": generation_config,
         **start_storage,
     }
+    if clean_worktree is not None:
+        provenance["clean_worktree"] = clean_worktree
     state_base = {"schema": schema_version(), "tag": tag, **provenance}
     if previous is not None:
         for key in (
