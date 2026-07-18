@@ -473,10 +473,17 @@ def _final_rendered_tokens(row: dict[str, Any], *, fired: bool) -> int:
             raise ValueError(
                 f"{row.get('eval_id')}: expected exactly {expected_count} direct adaptive stages"
             )
-        fields = adaptive_stages[-1].get("fields")
-        if not isinstance(fields, dict):
-            raise ValueError(f"{row.get('eval_id')}: adaptive diagnostic fields are missing")
-        value = fields.get("rendered_tokens")
+        stage = adaptive_stages[-1]
+        # Live TraceCollector stages flatten ``stage["fields"]`` into the
+        # record; accept the older nested fixture shape only as compatibility.
+        value = stage.get("rendered_tokens")
+        if value is None:
+            fields = stage.get("fields")
+            if not isinstance(fields, dict):
+                raise ValueError(
+                    f"{row.get('eval_id')}: adaptive diagnostic fields are missing"
+                )
+            value = fields.get("rendered_tokens")
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
         raise ValueError(f"{row.get('eval_id')}: invalid adaptive rendered_tokens")
     return int(value)

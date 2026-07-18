@@ -642,3 +642,12 @@ def test_cp3_rejects_shape_without_adaptive_diagnostic():
     row = {"eval_id": "eval_999", "retrieval_trace": {"stages": []}}
     with pytest.raises(ValueError, match="expected exactly 1"):
         rc._final_rendered_tokens(row, fired=False)
+
+
+def test_cp3_reads_flattened_direct_adaptive_diagnostic():
+    row = _cp3_row("eval_999", tokens=1234)
+    row["retrieval_trace"]["stages"][0] = {
+        "name": "adaptive_context", "rendered_tokens": 1234
+    }
+
+    assert rc._final_rendered_tokens(row, fired=False) == 1234
