@@ -57,8 +57,8 @@ six rows are eligible, the planned 80% recovery threshold is descriptive rather
 than binding. The sealed `phase2-original-minilm` census found seven rerank-stage
 exact-leaf misses and one radius-1-eligible row (`eval_053`), so Phase 3 is in
 that descriptive regime. No holdout, paid model call, generation A/B, ADR, or graduation is
-part of this implementation checkpoint; those remain gated by the retrieval
-experiment documented in `docs/retrieval_strategy_review.md`.
+part of this implementation checkpoint; those were subsequently gated and
+graduated by the retrieval measurement program (ADR-026; program record below).
 
 The retrieval-only A/B entry point is
 `raglab eval-retrieve --strategy sibling_aware`; without `--strategy`, capture
@@ -127,7 +127,8 @@ provisions across `eval_037`, `eval_039`, `eval_044`, `eval_074`, `eval_106`,
 0.7385→0.6961. The binding retrieval gate therefore fails. No generation replay,
 holdout access, ADR, live seam, or default change follows. Any revision requires
 a separately approved cap/widening plan and a new write-once replay tag; full
-results are in `docs/retrieval_strategy_review.md`.
+results are in the devlog and in git history (`docs/retrieval_strategy_review.md`,
+retired 2026-07-18).
 
 Checkpoint 4 completed with a new write-once contract-v2 replay after attributing
 the eight checkpoint-3 losses to seven cap stops and one token stop. The revised
@@ -197,8 +198,48 @@ exposure-weighted ceiling of ≈4/131 rows against one paid Haiku checker call
 per query. CP1 showed the dominant gap is facets absent from the retrieval
 pool, which reranking cannot recover. The arm stays registered and off; no
 serving change. Re-test only after pool-side recall improves (reranker
-upgrade or corpus growth). Details in `docs/retrieval_strategy_review.md`
-(CP5) and `docs/phase5_corrective_global_rerank_plan.md`.
+upgrade or corpus growth). Details in
+`docs/phase5_corrective_global_rerank_plan.md` and the devlog.
+
+## Retrieval measurement program record (closed 2026-07-18)
+
+The 2026-07 retrieval measurement program ran from
+`docs/retrieval_strategy_review.md`, retired on 2026-07-18 after the program
+closed (full text in git history at `44b3c3a`; narrative in the devlog). Final
+dispositions:
+
+- Phases 0–1: measurement/harness infrastructure, shipped (sealed bundles,
+  per-stage candidate traces, declared-delta comparator).
+- Phase 2 legal query separation: clean negative; `original_plus_rewrite`
+  stays a registered off-by-default eval arm; serving is structurally
+  original-only.
+- Phase 3 sibling-aware expansion: graduated (ADR-026).
+- Phase 4 adaptive final context: graduated (ADR-027).
+- Phase 5 corrective global rerank: shelved at CP5 (section above);
+  `corrective-global-rerank-experimental` registered and off. Re-test trigger:
+  pool-side recall materially improves.
+- Reranker serving A/B (2026-07-18, sealed bundles `reranker-ab-minilm` /
+  `reranker-ab-qwen3`, comparison `reranker-ab-comparison`): every predeclared
+  quality gate passed — Paraphrase selected target survival 0.7319→0.8986
+  (+0.1667, bar +0.08), factual 0.8965→0.9609, synthesis 0.8229→0.8854,
+  overall 0.8529→0.9302, ambiguous −1 row within bound — and every
+  operational gate failed: rerank p95 12,797 ms (bar 3,000), retrieval p95
+  14,670 ms (bar 5,000), cold-load median 21.4 s (bar 20 s). Post-eviction
+  ratio 1.05, byte-stability, finite scores, and ranking determinism all
+  passed (no MPS fp16 corruption). Verdict per the predeclared matrix:
+  **MiniLM stays the serving reranker; Qwen3 is the offline/eval option.**
+  Scope was local-MPS only — no Fargate/GPU implication; production stays
+  pinned to MiniLM per ADR-021. Watch: Qwen3 drops Paraphrase leaf survival
+  0.7143→0.5714 (right provision, wrong leaf). The current-stack survival
+  numbers reproduced the 2026-07-15 pre-ADR-026/027 figures to four decimals:
+  with byte-equal pre-rerank pools and deterministic rerankers, survival at
+  selection is invariant to the graduated sibling/adaptive tail.
+
+Surviving backlog from the program: Bedrock targeted probes (2 RPM quota),
+`scripts/trace_topk_sweep.py` repair (bypasses the legal instruction; `_fuse()`
+mutates scores), Phase 4 schema-1.2 packaging provenance, per-tag process lock
+on `original_only` capture, CP4 paired-generation harness. Retired for good:
+query decomposition, subquery packaging, additive CRAG, `max_distance` tuning.
 
 ## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
 
@@ -375,8 +416,8 @@ mean selected count rises 1.5625%, retrieval p95 rises only 185.54 ms, and all
 schema/provenance/corpus/index identities match. Of 73 hash-changed contexts,
 54 retain byte-identical selected chunk text/order and 19 change content;
 manual effects are 3 helpful, 10 harmful, and 60 neutral. The complete metrics,
-identity hashes, gate evidence, and 73-row review are in
-`docs/retrieval_strategy_review.md`.
+identity hashes, gate evidence, and 73-row review are in the devlog and in git
+history (`docs/retrieval_strategy_review.md`, retired 2026-07-18).
 
 Legal-query separation therefore remains an offline, non-graduated experiment.
 Serving stays original-only, and no generation replay, rollback implementation,

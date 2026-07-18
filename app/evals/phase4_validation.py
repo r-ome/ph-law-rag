@@ -101,30 +101,6 @@ def run_cp_a0_probe(
     }
 
 
-def append_cp_a0_result_to_review(result: dict[str, Any], *, path: str | Path) -> None:
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        target.read_text(encoding="utf-8")
-        + "\n\n### Phase 4 Holdout Validation CP-A0\n\n"
-        + "- Sentinel count: "
-        + str(result["sentinel_count"])
-        + "\n"
-        + "- Matched count: "
-        + str(result["matched_count"])
-        + "\n"
-        + "- Mismatched count: "
-        + str(result["mismatched_count"])
-        + "\n"
-        + "- Binding bridge: "
-        + str(result["bridge"])
-        + "\n"
-        + "- Locked gates: faithfulness/context-recall Δ ≥ -0.01; false "
-        "abstentions must not increase; rendered-token reduction ≥ 0.05.\n",
-        encoding="utf-8",
-    )
-
-
 def _semantic_selection_signature(selected: list[dict[str, Any]]) -> list[dict[str, Any]]:
     from app.retriever.types import RetrievalResult
 

@@ -88,4 +88,6 @@ generation A/B above.
   (baseline), `data/eval_results/runs/2026-07-16/phase3-sibling-aware-minilm`.
 - Generation runs: `.../2026-07-16/phase3-gen-{baseline,sibling}-gemma4`;
   diff `data/eval_results/diffs/diff_phase3-gen-sibling-gemma4.md`.
-- Program record: `docs/retrieval_strategy_review.md` (Phase 3).
+- Program record: `docs/retrieval_strategy_review.md` (Phase 3); retired
+  2026-07-18, full text in git history at `44b3c3a`, summary in
+  `docs/project_plan.md` (program record section).

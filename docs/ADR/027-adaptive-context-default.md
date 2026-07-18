@@ -142,4 +142,6 @@ The final paired verdict was `eligible_for_release_decision`.
 - Holdout ledger:
   `data/eval_results/holdout_aggregate_reads.jsonl`
 - Program record:
-  `docs/retrieval_strategy_review.md` (Phase 4 holdout validation)
+  `docs/retrieval_strategy_review.md` (Phase 4 holdout validation); retired
+  2026-07-18, full text in git history at `44b3c3a`, summary in
+  `docs/project_plan.md` (program record section)

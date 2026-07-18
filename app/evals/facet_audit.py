@@ -1,6 +1,6 @@
 """Phase 5 CP1 — offline CRAG facet-checker audit over a sealed non-holdout bundle.
 
-docs/retrieval_strategy_review.md, "# Phase 5 plan" > "## Checkpoints" > CP1.
+docs/phase5_corrective_global_rerank_plan.md, "Checkpoints" > CP1.
 
 Reuses the CRAG facet-checker prompt contract and parser verbatim from
 ``app.pipeline.evidence`` (never forked/reworded). Mirrors the paid-call cache

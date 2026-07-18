@@ -24,14 +24,13 @@ applies only the six declared evidence/corrective deltas. This is a CP2
 implementation correction, not a new arm or retune; it lands before any sealed
 CP3 result. `crag-experimental` remains pinned for CP1-era reproducibility.
 
-> Standalone working copy of the approved Phase 5 plan. The reconciliation
-> rationale in the `# Phase 5 plan: Corrective retrieval with global rerank
-> (2026-07-17)` section of
-> [`retrieval_strategy_review.md`](retrieval_strategy_review.md) (committed
-> `2152efb`) remains authoritative for the *approved design*. The CP3
-> precondition-4 back-fill landed (`5389697`), so that section now carries
-> checkpoint results too; both records agree, and the shelve decision above is
-> final program state.
+> Standalone working copy of the approved Phase 5 plan — now the sole standing
+> record. The reconciliation rationale originally lived in the `# Phase 5
+> plan: Corrective retrieval with global rerank (2026-07-17)` section of
+> `retrieval_strategy_review.md` (committed `2152efb`, back-filled `5389697`);
+> that document was retired on 2026-07-18 (full text in git history at
+> `44b3c3a`). Both records agreed at retirement, and the shelve decision above
+> is final program state.
 
 **Thesis:** corrective retrieval works as *candidate discovery* feeding one
 global rerank plus Phase 4 adaptive packaging, not as a context append. PR5c's
@@ -207,7 +206,8 @@ paper over it). Seal write-once (suggested tag
    rows have multiple targets; eval_124 has four). It must not be used for
    the fired-row gate.
 4. **Authoritative-record back-fill.** Update the Phase 5 section of
-   `retrieval_strategy_review.md` with CP1/CP2 results and these gate
+   `retrieval_strategy_review.md` (retired 2026-07-18; text in git history at
+   `44b3c3a`) with CP1/CP2 results and these gate
    definitions (or amend its authority claim) — **including the decision-5
    design correction**: that section's canonical diagram and decision 5
    still require full `dedup_results` on the union *before* reranking,

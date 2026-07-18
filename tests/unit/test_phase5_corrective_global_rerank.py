@@ -1,6 +1,6 @@
 """Phase 5 CP2 — corrective global-rerank mechanism + knob/comparator plumbing.
 
-docs/retrieval_strategy_review.md, "# Phase 5 plan" > "## Checkpoints" > CP2.
+docs/phase5_corrective_global_rerank_plan.md, "Checkpoints" > CP2.
 Mechanism-only: no paid calls, no eval runs — the CP1 cache is replayed or
 exercised fail-closed via synthetic cache files.
 """

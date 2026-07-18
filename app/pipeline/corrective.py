@@ -56,7 +56,7 @@ def corrective_retrieve(state: AnswerState, policy: AnswerPolicy) -> AnswerState
 
     ``append`` (default) is the legacy PR5 additive-packaging mechanism,
     unchanged. ``global_rerank`` is the Phase 5 eval-only union+re-select
-    mechanism (docs/retrieval_strategy_review.md, "Phase 5 plan").
+    mechanism (docs/phase5_corrective_global_rerank_plan.md).
     """
     if policy.corrective_mode == "global_rerank":
         return _corrective_retrieve_global_rerank(state, policy)
@@ -159,7 +159,7 @@ def _corrective_retrieve_global_rerank(state: AnswerState, policy: AnswerPolicy)
     rerank against the original question, then the serving selection tail
     reused verbatim (edge/parent/sibling expansion -> dedup -> adaptive select).
 
-    See docs/retrieval_strategy_review.md, "Phase 5 plan", design decisions 1-6.
+    See docs/phase5_corrective_global_rerank_plan.md, design decisions 1-6.
     """
     from app.retriever.context_selection import (
         _snapshot_results,

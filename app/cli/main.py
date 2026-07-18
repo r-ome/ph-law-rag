@@ -125,17 +125,11 @@ def eval_phase4_paired(
 @app.command("eval-phase4-cp-a0")
 def eval_phase4_cp_a0(
 	frozen_tag: str = typer.Option("phase3-sibling-aware-minilm", "--frozen-tag"),
-	record: bool = typer.Option(False, "--record/--no-record", help="append the aggregate probe result to docs/retrieval_strategy_review.md"),
 ):
 	"""Run the locked non-holdout Phase 4 live-retrieval reproducibility probe."""
-	from app.evals.phase4_validation import append_cp_a0_result_to_review, run_cp_a0_probe
+	from app.evals.phase4_validation import run_cp_a0_probe
 
 	result = run_cp_a0_probe(frozen_tag=frozen_tag)
-	if record:
-		append_cp_a0_result_to_review(
-			result,
-			path="docs/retrieval_strategy_review.md",
-		)
 	typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
 
 @app.command("eval-phase4-cp-a2c")
