@@ -707,7 +707,7 @@ than a stable optimization target.
 
 | Experiment | Rerun? | Conditions |
 |---|---|---|
-| MiniLM versus Qwen3 reranker | Yes | Retrieval-only over the frozen 131-row non-holdout set, with generation in a separate process. |
+| MiniLM versus Qwen3 reranker | Done (2026-07-18) | Fresh sealed A/B under the graduated sibling/adaptive stack: every quality gate passed (Paraphrase +0.1667), every operational gate failed (rerank p95 12.8 s vs 3 s bar). MiniLM stays serving; Qwen3 recorded as offline/eval option. See the serving A/B section at the end of this document. |
 | Legal translation versus original-only | Yes, new experiment | After stage metrics exist; one rewrite only, exact-provision success criterion. |
 | Adaptive context selection | Yes, new experiment | Offline replay from frozen reranked candidate traces. |
 | Corrective global rerank | Done (Phase 5, 2026-07-18) | Redesigned and run as Phase 5; CP3 passed, shelved at CP5 (yield 4/26 fired rows vs per-query checker cost; failure mode is pool recall, not ranking). |
@@ -2797,3 +2797,55 @@ Analysis and swap-benchmark scripts stay in scratch; captures pin
 Same comparison over the 2026-07-15 `phase1-gate-minilm` / `phase1-gate-qwen3`
 bundles: validates the old stack's consistency only, not the current
 sibling/adaptive stack.
+
+## Result (2026-07-18): quality graduates, operations fail — MiniLM stays serving
+
+Sealed bundles `reranker-ab-minilm` / `reranker-ab-qwen3` (131 rows, clean
+worktree at `e38120b`, `RAGLAB_PROFILE=local`, sibling + adaptive on,
+corrective off); write-once comparison `reranker-ab-comparison` with the single
+declared `reranker_backend` delta and `pre_rerank_pool_changed = 0/131`. All
+gates machine-enforced by the scratch analysis script over hash-validated
+bundles; recomputed survival matched each bundle's sealed summary.
+
+**Quality — all gates pass:**
+
+| Slice | MiniLM | Qwen3 | Gate |
+|---|---|---|---|
+| Paraphrase (n=25) selected survival | 0.7319 | 0.8986 | +0.1667 ≥ +0.08 ✅ |
+| Factual (n=70) | 0.8965 | 0.9609 | ≥ −0.02 ✅ |
+| Synthesis (n=18) | 0.8229 | 0.8854 | ≥ −0.05 ✅ |
+| Overall | 0.8529 | 0.9302 | ≥ baseline ✅ |
+| Ambiguous (n=6, direction-only) | 0.9167 | 0.8333 | 1 row lost ≤ 1 ✅ |
+
+Row flips: gained `eval_007/071/072/121` (factual), `eval_038/073/125`
+(paraphrase); lost `eval_053` (ambiguous), `eval_122` (paraphrase). OOS
+informational: 12/12 contexts changed hash (score jitter class); no gate.
+Watch: Paraphrase leaf survival **drops** 0.7143 → 0.5714 and factual leaf
+0.875 → 0.75 (right provision, sometimes wrong leaf); synthesis leaf improves
+0.4 → 0.6.
+
+The current-stack survival numbers reproduce the 2026-07-15 pre-ADR-026/027
+figures to four decimals: with byte-equal pre-rerank pools and deterministic
+rerankers, target survival at selection is invariant to the graduated
+sibling/adaptive tail on these arms. The historical write-once comparison
+(`reranker-ab-historical-comparison`) is consistent (non-gating).
+
+**Operational — gates fail:**
+
+- Rerank stage p95 12,797 ms (bar 3,000); end-to-end retrieval p95 14,670 ms
+  (bar 5,000). MiniLM arm: 932 / 1,916 ms.
+- Swap benchmark (3 cycles): cold-load median 21.4 s (bar 20 s; range
+  18.6–27.2 s) **fail**; post-eviction ratio 1.05 pass; byte-stability,
+  finite scores, identical ranking pass in all cycles — no MPS fp16
+  corruption observed.
+
+**Verdict (per predeclared matrix):** keep MiniLM as the serving reranker;
+record Qwen3 as the offline/eval reranker option. No ADR, no default change.
+This experiment was scoped local-MPS-only and cannot inform a
+Fargate/container flip (CPU ≈ 4–5 min/query; ADR-021 pins production to
+MiniLM). Phase 5 re-test nuance: the Qwen3 lift acts at rank/selection, but
+Phase 5's shelving was dominated by pool-absent facets (37 absent vs 4
+dropped-by-selection), so an offline-Qwen3 rerun of Phase 5 would move only
+the small dropped-by-selection class — pool-side recall remains the real
+re-test trigger. The rerun item in Historical Experiments Worth Rerunning is
+closed as answered under the current stack.
