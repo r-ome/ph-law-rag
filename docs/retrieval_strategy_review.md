@@ -710,7 +710,7 @@ than a stable optimization target.
 | MiniLM versus Qwen3 reranker | Yes | Retrieval-only over the frozen 131-row non-holdout set, with generation in a separate process. |
 | Legal translation versus original-only | Yes, new experiment | After stage metrics exist; one rewrite only, exact-provision success criterion. |
 | Adaptive context selection | Yes, new experiment | Offline replay from frozen reranked candidate traces. |
-| Corrective global rerank | Yes, redesigned | Replace additive CRAG packaging; do not rerun the current append behavior. |
+| Corrective global rerank | Done (Phase 5, 2026-07-18) | Redesigned and run as Phase 5; CP3 passed, shelved at CP5 (yield 4/26 fired rows vs per-query checker cost; failure mode is pool recall, not ranking). |
 | Bedrock reranker | Targeted only | Use difficult Paraphrase/Ambiguous probes or cached reranks because of the 2 RPM quota. |
 | Sibling-aware expansion | Yes, new experiment | Plan separately; compare against current parent expansion. |
 | Query decomposition | No | Do not rerun unchanged; prior mechanism was negative. |
@@ -771,7 +771,7 @@ retain aggregate operational counts and retrieval latency only.
 | Corrective retrieval appending separately ranked additions | Retrieval-design bug |
 | Ambiguous category metrics excluding abstentions without an all-row companion report | Evaluation-methodology bug |
 | General decomposition and subquery packaging retained behind flags after negative experiments | Acceptable research code while off by default |
-| Legal rewrite, sibling expansion, adaptive selection, and global corrective rerank | Proposed worthwhile improvements; not yet accepted architecture |
+| Legal rewrite, sibling expansion, adaptive selection, and global corrective rerank | Final dispositions: sibling expansion (ADR-026) and adaptive selection (ADR-027) graduated to accepted architecture; legal rewrite (Phase 2, clean negative) and global corrective rerank (Phase 5, shelved at CP5 on CP3 evidence) remain registered research arms, off by default |
 
 ## Decision Guardrails for the Next Plans
 
@@ -2692,17 +2692,29 @@ selection change. No generation, scoring, holdout access, or CP4 activity ran.
 fire, category slices are direction-only; gates apply to the named
 provision/target checks, not slice means.
 
-**CP4 — Matched generation A/B** (gemma4, deterministic generation, RAGAS row
-cache, judge changed-context rows only).
-**Gates:** faithfulness flat-or-up on changed rows; context-recall lift beyond
-the established judge-noise band; abstention accuracy not down; zero new false
-abstentions. Report, without gating: the Phase 4 soft spots — ambiguous
-relevancy (n=6) and synthesis relevancy.
+**CP4 — Matched generation A/B: NOT RUN.** The plan's stop-after-CP3 option was
+taken (2026-07-18). The changed-prompt cohort from CP3 is four rows, so CP4's
+quality means would have been direction-only under the predeclared small-N rule
+regardless of outcome. The paired-harness precondition (declared-delta
+validation through sealed retrieval bundles, generation/scoring identity,
+changed-subset scoring enforcement, generation-equivalence gate, `error`-field
+persistence, set-based abstention/leak gates with rejection tests) is banked as
+backlog for a future paired experiment with a larger changed cohort.
 
-**CP5 — Graduation decision.** Keep-or-shelve on CP3 + CP4 evidence; ADR and
-any serving-default flip are the user's call. The holdout stays sealed — it
-was read once for Phase 4's Stage B; any further holdout access requires a
-separate predeclared plan and explicit user approval.
+**CP5 — Graduation decision: SHELVED (2026-07-18, user decision on CP3
+evidence).** The mechanism is operationally sound — every CP3 binding gate
+passed, zero target losses, tiny blast radius — but the yield is 4 of 26 fired
+rows with a changed generation prompt (one added chunk each), an
+exposure-weighted ceiling of ≈4/131 rows against one paid Haiku checker call on
+*every* query. CP1's classification already showed the dominant failure mode is
+facets absent from the retrieval pool (37 absent-from-pool vs 4
+dropped-by-selection), which reranking cannot recover. The arm remains
+registered and off (`corrective-global-rerank-experimental`); no ADR, no
+serving change. Re-test condition: pool-side recall materially improves
+(serving reranker upgrade, corpus growth) so that `partial` verdicts mean
+"mis-ranked" rather than "unretrievable." The holdout stays sealed — it was
+read once for Phase 4's Stage B; any further holdout access requires a separate
+predeclared plan and explicit user approval.
 
 ## Explicitly retired / out of scope
 

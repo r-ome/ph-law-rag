@@ -1,9 +1,19 @@
 # Phase 5 — Corrective Retrieval With Global Rerank
 
-**Status:** CP1–CP2 complete and committed (`0f6bf79`); CP3 retrieval-only
-comparison passed on 2026-07-18. This revision also numerically predeclares the
-CP3 context-size and CP4 context-recall gates and tightens the fired-row
-target-preservation gate.
+**Status: SHELVED at CP5 (2026-07-18) on CP3 evidence.** CP1–CP2 complete and
+committed (`0f6bf79`); CP3 retrieval-only comparison passed on 2026-07-18
+(write-once report `phase5-corrective-global-rerank-minilm-r2-cp3-comparison`).
+CP4 was **not run** — the plan's stop-after-CP3 option was taken. Decision
+rationale: the mechanism is operationally sound and passed every binding gate,
+but its measured yield is 4 of 26 fired rows with a changed generation prompt
+(one added chunk each; exposure-weighted ceiling ≈4/131 rows), against the cost
+of one paid Haiku checker call on every query. CP1's audit showed most missing
+facets were absent from the retrieval pool entirely — a pool problem global
+reranking cannot fix. The arm stays registered and off
+(`corrective-global-rerank-experimental`); re-test is warranted only if
+pool-side recall improves (reranker upgrade, corpus growth). This revision also
+numerically predeclares the CP3 context-size and CP4 context-recall gates and
+tightens the fired-row target-preservation gate.
 
 **Pre-result CP2 correction (2026-07-18):** the experimental profile initially
 inherited `_base_profile`'s pinned `RetrievalKnobs`, which silently set sibling
@@ -18,12 +28,10 @@ CP3 result. `crag-experimental` remains pinned for CP1-era reproducibility.
 > rationale in the `# Phase 5 plan: Corrective retrieval with global rerank
 > (2026-07-17)` section of
 > [`retrieval_strategy_review.md`](retrieval_strategy_review.md) (committed
-> `2152efb`) remains authoritative for the *approved design*. For *checkpoint
-> results and gate definitions* this file is currently ahead — that section
-> still reads "implementation not started" and has not absorbed CP1/CP2.
-> Back-filling it (or amending its authority claim) is a **CP3 precondition**
-> (see precondition 4); until that lands, this file wins on checkpoint state
-> and gates.
+> `2152efb`) remains authoritative for the *approved design*. The CP3
+> precondition-4 back-fill landed (`5389697`), so that section now carries
+> checkpoint results too; both records agree, and the shelve decision above is
+> final program state.
 
 **Thesis:** corrective retrieval works as *candidate discovery* feeding one
 global rerank plus Phase 4 adaptive packaging, not as a context append. PR5c's

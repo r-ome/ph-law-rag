@@ -171,7 +171,7 @@ run read the sealed holdout once, aggregate-only, and logged one metric-read
 ledger entry. No schema-1.2 or explicit packaging-pool publication is included
 in ADR-027; that remains follow-up scope.
 
-## Phase 5: Corrective global rerank (experimental; CP3 passed)
+## Phase 5: Corrective global rerank (shelved 2026-07-18)
 
 Phase 5 keeps the cached Haiku facet checker as an eval-only corrective trigger.
 For `partial` verdicts, it adds per-facet hybrid candidates to the pass-1
@@ -189,8 +189,16 @@ predeclared final adaptive-context growth bounds. CP3 passed on 2026-07-18:
 26 expected fired rows, zero sufficient-row identity mismatches, zero target
 losses, mean/p95/max rendered tokens 1,379.96/2,372/2,696, and no new token
 overflows. Five selected-context hashes changed, while the three watch rows
-retained generation-prompt identity. CP3 stops before generation or scoring;
-CP4 requires explicit approval.
+retained generation-prompt identity.
+
+**Shelved at CP5 on CP3 evidence (stop-after-CP3, plan-sanctioned; CP4 not
+run).** Only 4 of 26 fired rows ended with a changed generation prompt — an
+exposure-weighted ceiling of ≈4/131 rows against one paid Haiku checker call
+per query. CP1 showed the dominant gap is facets absent from the retrieval
+pool, which reranking cannot recover. The arm stays registered and off; no
+serving change. Re-test only after pool-side recall improves (reranker
+upgrade or corpus growth). Details in `docs/retrieval_strategy_review.md`
+(CP5) and `docs/phase5_corrective_global_rerank_plan.md`.
 
 ## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
 
