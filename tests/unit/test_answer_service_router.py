@@ -196,11 +196,13 @@ def test_cascade_profile_routes_generation_to_strong_model(monkeypatch):
     }
     assert trace_record["corrective_retrieval"] == {
         "enabled": False,
+        "mode": "append",
         "fired": False,
         "added_chunks": 0,
         "baseline_selected_count": 1,
         "post_selected_count": 1,
         "max_added": 2,
+        "displaced_baseline_count": None,
     }
 
 
@@ -328,9 +330,11 @@ def test_hard_abstain_when_min_chunks_not_met(monkeypatch):
     }
     assert trace_record["corrective_retrieval"] == {
         "enabled": False,
+        "mode": "append",
         "fired": False,
         "added_chunks": 0,
         "baseline_selected_count": 1,
         "post_selected_count": 1,
         "max_added": 2,
+        "displaced_baseline_count": None,
     }

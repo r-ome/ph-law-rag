@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.config import settings
 from app.retriever.edge_expansion import expand_with_edges
@@ -7,6 +8,9 @@ from app.retriever.reranker import rerank
 from app.retriever.strategy import RetrievalKnobs
 from app.retriever.types import RetrievalResult
 from app.observability.context import capture_candidates, stage_timer
+
+if TYPE_CHECKING:
+    from app.retriever.legal_query_rewriter import LegalRewriteDecision
 
 
 @dataclass
@@ -26,6 +30,21 @@ def _snapshot_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
         )
         for r in results
     ]
+
+
+def accepted_legal_query(decision: "LegalRewriteDecision | None") -> str | None:
+    """An accepted legal rewrite becomes the effective legal_query, else None.
+
+    Shared so pass-1 retrieval (app.pipeline.stages.retrieve_context) and Phase 5
+    corrective pass 2 (app.pipeline.corrective, global_rerank mode) derive the
+    adaptive-context structural signal identically. Do not "fix" this to
+    accepted-only — that IS the current behavior; the point is not to diverge.
+    """
+    return (
+        decision.legal_query
+        if decision is not None and decision.status == "accepted"
+        else None
+    )
 
 
 def select_context(
@@ -76,6 +95,24 @@ def select_context(
             pre_expansion = rerank(question, retrieved, knobs=knobs)
             stage["out_n"] = len(pre_expansion)
 
+    return select_post_rerank(question, pre_expansion, knobs, legal_query, retrieved_trace)
+
+
+def select_post_rerank(
+    question: str,
+    pre_expansion: list[RetrievalResult],
+    knobs: RetrievalKnobs | None,
+    legal_query: str | None,
+    retrieved_trace: list[RetrievalResult],
+) -> SelectionResult:
+    """Post-rerank selection pipeline: edge expansion -> prefer_operative ->
+    parent/sibling expansion -> dedup -> adaptive select.
+
+    Factored out of select_context (Phase 5 design decision #4) so the exact
+    serving stages can be re-run verbatim over an arbitrary already-reranked
+    pool. Callers: select_context's own tail (pass 1, both retrieval
+    branches), and app.pipeline.corrective's global_rerank pass 2.
+    """
     edge_expansion_enabled = (
         knobs.edge_expansion_enabled if knobs else settings.edge_expansion_enabled
     )

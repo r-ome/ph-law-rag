@@ -163,3 +163,48 @@ def test_crag_profile_is_registered_with_pinned_judge_and_corrective(monkeypatch
     assert resolution.policy.corrective_retrieval_enabled is True
     assert resolution.policy_overrides["evidence_judge_model"] == "claude-haiku-4-5"
     assert resolution.env_ignored["evidence_judge_model"] == "mistral"
+    # Phase 5 CP2: crag-experimental stays pinned to the legacy append mode so
+    # CP1's sealed audit artifacts remain reproducible under their original config.
+    assert resolution.policy.corrective_mode == "append"
+    assert resolution.policy.corrective_max_facets is None
+    assert resolution.policy.corrective_facet_reserve_n is None
+
+
+def test_corrective_global_rerank_profile_is_registered(monkeypatch):
+    monkeypatch.setattr(settings, "raglab_profile", "corrective-global-rerank-experimental")
+
+    resolution = resolve_policy()
+
+    assert resolution.policy.name == "corrective-global-rerank-experimental"
+    assert resolution.policy.evidence_gate == "crag"
+    assert resolution.policy.evidence_judge_model == "claude-haiku-4-5"
+    assert resolution.policy.corrective_retrieval_enabled is True
+    assert resolution.policy.corrective_mode == "global_rerank"
+    assert resolution.policy.corrective_max_facets == 3
+    assert resolution.policy.corrective_facet_reserve_n == 5
+    # adaptive context stays enabled — required by the __post_init__ guard.
+    assert resolution.policy.retrieval_defaults.adaptive_context_enabled is True
+
+
+def test_corrective_global_rerank_knobs_are_behavior_fields():
+    assert {
+        "corrective_mode",
+        "corrective_max_facets",
+        "corrective_facet_reserve_n",
+    } <= BEHAVIOR_FIELDS
+
+
+@pytest.mark.parametrize(
+    "profile_name", ["local", "cloud", "eval", "cascade", "local-cascade"]
+)
+def test_shipping_profiles_are_unaffected_by_phase5_corrective_knobs(monkeypatch, profile_name):
+    """Phase 5 CP2 adds corrective_mode/corrective_max_facets/corrective_facet_reserve_n;
+    every shipping profile must default to the legacy append/None/None triple —
+    provably unaffected by the new global_rerank mechanism."""
+    monkeypatch.setattr(settings, "raglab_profile", profile_name)
+
+    policy = resolve_policy().policy
+
+    assert policy.corrective_mode == "append"
+    assert policy.corrective_max_facets is None
+    assert policy.corrective_facet_reserve_n is None

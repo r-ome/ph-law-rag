@@ -63,12 +63,29 @@ _ADAPTIVE_CONTEXT_INERT_KEYS = tuple(
     if name.startswith("adaptive_context_")
     and name != "adaptive_context_enabled"
 )
+# Phase 5 CP2: evidence/corrective-mechanism knobs live at the top level of
+# shared_values (AnswerPolicy fields, not RetrievalKnobs), not nested under
+# retrieval_defaults. Declarable alongside _SELECTION_KEYS so a matched-arm
+# comparison can assert an exact delta set spanning both families.
+_EVIDENCE_KEYS = (
+    "evidence_gate",
+    "evidence_judge_model",
+    "corrective_retrieval_enabled",
+    "corrective_mode",
+    "corrective_max_facets",
+    "corrective_facet_reserve_n",
+)
 _QUERY_SEPARATION_ARMS = {"original_only", "original_plus_rewrite"}
 _LEGACY_SIBLING_DEFAULTS = {
     "sibling_expansion_enabled": False,
     "sibling_expansion_radius": 1,
     "sibling_expansion_max_chars": 3000,
     "sibling_expansion_max_tokens": 750,
+}
+_LEGACY_CORRECTIVE_DEFAULTS = {
+    "corrective_mode": "append",
+    "corrective_max_facets": None,
+    "corrective_facet_reserve_n": None,
 }
 _LEGACY_ADAPTIVE_DEFAULTS = {
     "adaptive_context_enabled": False,
@@ -108,7 +125,7 @@ def _normalize_expected_knob_diff(
         raise ValueError("expected_knob_diff must be a mapping")
     normalized = {}
     for name, endpoints in value.items():
-        if name not in _SELECTION_KEYS:
+        if name not in _SELECTION_KEYS and name not in _EVIDENCE_KEYS:
             raise ValueError(f"unknown retrieval selection knob {name!r}")
         if not isinstance(endpoints, (list, tuple)) or len(endpoints) != 2:
             raise ValueError(
@@ -130,6 +147,8 @@ def _comparable_shared_values(
         defaults.setdefault(name, default)
     for name, default in _LEGACY_ADAPTIVE_DEFAULTS.items():
         defaults.setdefault(name, default)
+    for name, default in _LEGACY_CORRECTIVE_DEFAULTS.items():
+        comparable.setdefault(name, default)
     return comparable, profile
 
 
@@ -167,11 +186,21 @@ def _selection_diff(
 ) -> dict[str, tuple[Any, Any]]:
     baseline = _subset(baseline_shared["retrieval_defaults"], _SELECTION_KEYS)
     candidate = _subset(candidate_shared["retrieval_defaults"], _SELECTION_KEYS)
-    return {
+    diff = {
         name: (baseline[name], candidate[name])
         for name in _SELECTION_KEYS
         if baseline[name] != candidate[name]
     }
+    baseline_evidence = _subset(baseline_shared, _EVIDENCE_KEYS)
+    candidate_evidence = _subset(candidate_shared, _EVIDENCE_KEYS)
+    diff.update(
+        {
+            name: (baseline_evidence[name], candidate_evidence[name])
+            for name in _EVIDENCE_KEYS
+            if baseline_evidence[name] != candidate_evidence[name]
+        }
+    )
+    return diff
 
 
 def _require_expected_knob_diff(
@@ -205,7 +234,10 @@ def _without_declared_knobs(
     comparable = deepcopy(shared_values)
     defaults = comparable["retrieval_defaults"]
     for name in declared:
-        defaults.pop(name, None)
+        if name in _EVIDENCE_KEYS:
+            comparable.pop(name, None)
+        else:
+            defaults.pop(name, None)
     return comparable
 
 
@@ -283,6 +315,9 @@ def _identity_parts(
                 "evidence_judge_model",
                 "min_chunks_for_answer",
                 "corrective_retrieval_enabled",
+                "corrective_mode",
+                "corrective_max_facets",
+                "corrective_facet_reserve_n",
             )
         },
     }

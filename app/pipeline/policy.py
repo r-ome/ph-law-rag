@@ -7,6 +7,7 @@ from app.config import settings
 from app.retriever.strategy import RetrievalKnobs
 
 EvidenceGate = Literal["min_chunks", "answerability", "crag"]
+CorrectiveMode = Literal["append", "global_rerank"]
 
 BEHAVIOR_FIELDS: frozenset[str] = frozenset(
     {
@@ -41,6 +42,9 @@ BEHAVIOR_FIELDS: frozenset[str] = frozenset(
         "query_planner_max_subqueries",
         "subquery_packaging_enabled",
         "subquery_reserve_n",
+        "corrective_mode",
+        "corrective_max_facets",
+        "corrective_facet_reserve_n",
         "adaptive_context_enabled",
         "adaptive_context_contract_version",
         "adaptive_context_floor",
@@ -127,6 +131,26 @@ class AnswerPolicy:
     later_enacted_preference_enabled: bool
     query_decomposition_enabled: bool
     query_rewriting_enabled: bool
+    corrective_mode: CorrectiveMode = "append"
+    corrective_max_facets: int | None = None
+    corrective_facet_reserve_n: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.corrective_mode == "global_rerank" and not self.retrieval_defaults.adaptive_context_enabled:
+            raise ValueError(
+                "config error: corrective_mode='global_rerank' requires "
+                "adaptive_context_enabled=True on retrieval_defaults — without adaptive "
+                "packaging, global_rerank would dump the whole union into context "
+                "unbounded (Phase 5 anti-pattern 5)."
+            )
+        if self.corrective_mode == "global_rerank" and self.retrieval_defaults.subquery_packaging_enabled:
+            raise ValueError(
+                "config error: corrective_mode='global_rerank' requires "
+                "subquery_packaging_enabled=False on retrieval_defaults — under packaging, "
+                "SelectionResult.retrieved holds packaged_retrieve's per-subquery output, "
+                "not the pre-rerank fused pool that global_rerank's union step requires "
+                "(Phase 5 design decision 2)."
+            )
 
     @classmethod
     def from_settings(cls, settings_obj=settings, name: str = "local") -> "AnswerPolicy":
@@ -149,6 +173,9 @@ class AnswerPolicy:
             later_enacted_preference_enabled=settings_obj.later_enacted_preference_enabled,
             query_decomposition_enabled=settings_obj.query_decomposition_enabled,
             query_rewriting_enabled=settings_obj.enable_query_rewriting,
+            corrective_mode=settings_obj.corrective_mode,
+            corrective_max_facets=settings_obj.corrective_max_facets,
+            corrective_facet_reserve_n=settings_obj.corrective_facet_reserve_n,
         )
 
     def as_trace_dict(self) -> dict:
@@ -242,6 +269,23 @@ def _base_profile(name: str, settings_obj=settings) -> AnswerPolicy:
             evidence_gate="crag",
             evidence_judge_model=settings_obj.crag_judge_model,
             corrective_retrieval_enabled=True,
+        )
+    if name == "corrective-global-rerank-experimental":
+        # Phase 5 CP2 eval-only arm (docs/retrieval_strategy_review.md, "Phase 5
+        # plan"). Distinct from crag-experimental (which stays pinned to the
+        # legacy append mode CP1 was audited under) so CP1's sealed artifacts
+        # remain reproducible under their original config.
+        return replace(
+            base,
+            generator_model=settings_obj.llm_model,
+            router_enabled=settings_obj.router_enabled,
+            router_model=settings_obj.router_model,
+            evidence_gate="crag",
+            evidence_judge_model="claude-haiku-4-5",
+            corrective_retrieval_enabled=True,
+            corrective_mode="global_rerank",
+            corrective_max_facets=3,
+            corrective_facet_reserve_n=5,
         )
     raise ValueError(f"Unknown RAGLAB_PROFILE: {name}")
 

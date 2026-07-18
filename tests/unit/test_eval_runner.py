@@ -16,11 +16,16 @@ def test_run_rows_persists_selected_chunk_ids_and_strategy_override(tmp_path, mo
         trace_label=None,
         strategy_override=None,
         capture_candidate_stages=False,
+        **kwargs,
     ):
         captured["debug"] = debug
         captured["trace_label"] = trace_label
         captured["strategy_override"] = strategy_override
         captured["capture_candidate_stages"] = capture_candidate_stages
+        captured["eval_id"] = kwargs.get("eval_id")
+        captured["facet_audit_authorize_paid_calls"] = kwargs.get(
+            "facet_audit_authorize_paid_calls"
+        )
         response = {
             "answer": "answer",
             "contexts": ["ctx"],
@@ -83,6 +88,8 @@ def test_run_rows_persists_selected_chunk_ids_and_strategy_override(tmp_path, mo
         "trace_label": "r5",
         "strategy_override": "current_law",
         "capture_candidate_stages": True,
+        "eval_id": "eval_001",
+        "facet_audit_authorize_paid_calls": False,
     }
     assert rows[0]["selected_chunk_ids"] == ["chunk-1", "chunk-2"]
     assert rows[0]["corrective_retrieval"] == {

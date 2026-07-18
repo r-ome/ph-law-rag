@@ -2,66 +2,14 @@ from app.observability.logger import get_logger
 from app.pipeline.policy import AnswerPolicy
 from app.pipeline.state import AnswerState, EvidenceReport
 from app.retriever.answerability import _gate_complete, is_answerable
-from app.retriever.context_builder import build_context
+from app.retriever.facet_checker import (
+    _CRAG_SYSTEM,
+    _parse_crag_output,
+    _render_crag_prompt,
+)
 from app.retriever.types import RetrievalResult
 
 logger = get_logger(__name__)
-
-_CRAG_SYSTEM = """You are a facet checker for a Philippine-law retrieval system.
-A "facet" is a SUBSTANTIVE legal element the question needs answered — a rule,
-element, penalty, requirement, or exception. It is NOT a matter of wording.
-
-List the facets the question needs, then check whether the passages supply the
-substance of each (the rule/number/element itself), even if worded differently.
-
-A facet is MISSING only if the passages do not contain the substantive law needed
-to answer it. Do NOT flag a facet as missing for any of these reasons:
-- the passages don't cite a specific article/section number
-- the passages don't state the rule in one consolidated sentence
-- you would prefer a fuller, more exhaustive, or more definitive phrasing
-- the answer must be inferred by combining two passages
-If every needed rule/element is present in substance, return sufficient.
-When uncertain, prefer sufficient. Never return insufficient.
-
-Reply in exactly this format:
-FACETS: <semicolon-separated substantive facets the question needs>
-PRESENT: <semicolon-separated facets whose substance the passages supply>
-MISSING: <semicolon-separated facets whose substance is absent; write "none" if all present>
-VERDICT: sufficient | partial"""
-
-
-# Judges routinely fill MISSING with a "no gaps" sentinel instead of leaving it
-# blank; treat those as empty so they don't count as a missing facet (→ partial).
-_NULL_FACETS = {"none", "nothing", "n/a", "na", "n.a.", "-", "no missing facets"}
-
-
-def _split_facets(value: str) -> list[str]:
-    return [
-        part.strip()
-        for part in value.split(";")
-        if part.strip() and part.strip().lower() not in _NULL_FACETS
-    ]
-
-
-def _parse_crag_output(output: str) -> tuple[list[str], list[str], list[str], str] | None:
-    fields: dict[str, str] = {}
-    for line in output.splitlines():
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        key = key.strip().upper()
-        if key in {"FACETS", "PRESENT", "MISSING", "VERDICT"}:
-            fields[key] = value.strip()
-
-    verdict = fields.get("VERDICT", "").lower()
-    if verdict not in {"sufficient", "partial"}:
-        return None
-
-    facets = _split_facets(fields.get("FACETS", ""))
-    present = _split_facets(fields.get("PRESENT", ""))
-    missing = _split_facets(fields.get("MISSING", ""))
-    final_verdict = "partial" if missing else "sufficient"
-    return facets, present, missing, final_verdict
 
 
 def _check_crag_facets(
@@ -73,13 +21,7 @@ def _check_crag_facets(
     if not chunks:
         return "sufficient", [], {"facets": [], "present": [], "missing": []}
 
-    context_block, _ = build_context(chunks)
-    user_prompt = f"""Passages:
-{context_block}
-
-Question: {question}
-
-FACETS:"""
+    user_prompt = _render_crag_prompt(question, chunks)
     output: str | None = None
     error: str | None = None
     try:
@@ -122,7 +64,65 @@ FACETS:"""
     }
 
 
-def evaluate_evidence(state: AnswerState, policy: AnswerPolicy) -> EvidenceReport:
+def _check_crag_facets_cached(
+    question: str,
+    chunks: list[RetrievalResult],
+    *,
+    model: str,
+    row_label: str,
+    authorize_paid_calls: bool,
+) -> tuple[str, list[str], dict]:
+    """Facet-checker call routed through the Phase 5 CP1 cache
+    (app.retriever.facet_checker — the same cache app.evals.facet_audit built).
+
+    Used only by the corrective_mode='global_rerank' eval arm. Cache hit -> zero
+    network. Cache miss -> fail closed (RuntimeError naming the row) unless
+    authorize_paid_calls is explicitly set — no paid call ever happens implicitly.
+    """
+    if not chunks:
+        return "sufficient", [], {"facets": [], "present": [], "missing": []}
+
+    from app.retriever.facet_checker import call_and_cache, cached_decision
+
+    rendered_prompt = _render_crag_prompt(question, chunks)
+    decision = cached_decision(rendered_prompt, model=model)
+    if decision is None:
+        if not authorize_paid_calls:
+            raise RuntimeError(
+                f"facet-checker cache miss for row {row_label!r}: no cached CP1 "
+                "decision for this (question, selected-context, model) and paid "
+                "calls are not authorized. Set authorize_paid_calls=True to allow "
+                "a live Haiku call (which will then be cached)."
+            )
+        decision = call_and_cache(rendered_prompt, model=model)
+
+    if decision.operational_fallback:
+        logger.warning(
+            "crag_judge_cache_fallback",
+            model=model,
+            row_label=row_label,
+            error=decision.judge_error,
+        )
+        return "sufficient", [], {
+            "facets": [],
+            "present": [],
+            "missing": [],
+            "judge_error": decision.judge_error,
+            "cache_status": decision.cache_status,
+            "parse_failed": True,
+        }
+
+    return decision.verdict, decision.missing, {
+        "facets": decision.facets,
+        "present": decision.present,
+        "missing": decision.missing,
+        "cache_status": decision.cache_status,
+    }
+
+
+def evaluate_evidence(
+    state: AnswerState, policy: AnswerPolicy, *, authorize_paid_calls: bool = False
+) -> EvidenceReport:
     question = state.effective_question or state.question
     pre_expansion_count = len(state.selection.pre_expansion)
     selected_count = len(state.selection.selected)
@@ -150,11 +150,28 @@ def evaluate_evidence(state: AnswerState, policy: AnswerPolicy) -> EvidenceRepor
         )
 
     if policy.evidence_gate == "crag":
-        verdict, missing_facets, detail = _check_crag_facets(
-            question,
-            state.selection.pre_expansion,
-            model=policy.evidence_judge_model,
+        global_rerank_mode = policy.corrective_mode == "global_rerank"
+        # Phase 5 decision 1: global_rerank's checker input is the pass-1
+        # adaptive-selected context (what generation would see), not
+        # pre_expansion. The legacy append mode keeps PR5's pre_expansion input
+        # unchanged.
+        checker_context = (
+            state.selection.selected if global_rerank_mode else state.selection.pre_expansion
         )
+        if global_rerank_mode:
+            verdict, missing_facets, detail = _check_crag_facets_cached(
+                question,
+                checker_context,
+                model=policy.evidence_judge_model,
+                row_label=state.eval_id or state.session_id or question,
+                authorize_paid_calls=authorize_paid_calls,
+            )
+        else:
+            verdict, missing_facets, detail = _check_crag_facets(
+                question,
+                checker_context,
+                model=policy.evidence_judge_model,
+            )
         return EvidenceReport(
             verdict=verdict,
             method="crag_facets",

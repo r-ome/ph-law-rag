@@ -197,12 +197,9 @@ def prepare_legal_query_separation(state: AnswerState) -> None:
 
 
 def retrieve_context(state: AnswerState) -> None:
-    decision = state.legal_rewrite_decision
-    legal_query = (
-        decision.legal_query
-        if decision is not None and decision.status == "accepted"
-        else None
-    )
+    from app.retriever.context_selection import accepted_legal_query
+
+    legal_query = accepted_legal_query(state.legal_rewrite_decision)
     state.selection = STRATEGIES[state.strategy_name].execute(
         state.effective_question or state.question,
         knobs=state.strategy_knobs,
@@ -214,7 +211,9 @@ def gate_evidence(state: AnswerState) -> None:
     policy = _policy(state)
     from app.pipeline.evidence import evaluate_evidence
 
-    state.evidence = evaluate_evidence(state, policy)
+    state.evidence = evaluate_evidence(
+        state, policy, authorize_paid_calls=state.facet_audit_authorize_paid_calls
+    )
     if state.evidence.verdict == "insufficient":
         state.response = _package(
             ABSTAIN_MESSAGE,

@@ -312,6 +312,30 @@ def eval_context_replay(
 		raise typer.BadParameter(str(exc)) from exc
 	typer.echo(f"Context-selection bundle written to {path}")
 
+@app.command("eval-facet-audit")
+def eval_facet_audit(
+	bundle_tag: str = typer.Argument(
+		"phase4-adaptive-context-v2-minilm",
+		help="sealed non-holdout retrieval bundle tag (Phase 5 CP1 input)",
+	),
+	tag: str = typer.Option(..., "--tag", help="output artifact tag"),
+	authorize_paid_calls: bool = typer.Option(
+		False,
+		"--authorize-paid-calls",
+		help="allow real Haiku calls for cache misses; default mode is zero-network",
+	),
+):
+	"""Phase 5 CP1: offline CRAG facet-checker audit over a sealed bundle."""
+	from app.evals.facet_audit import run_facet_audit
+
+	try:
+		result = run_facet_audit(
+			bundle_tag, output_tag=tag, authorize_paid_calls=authorize_paid_calls
+		)
+	except (ValueError, FileExistsError, PermissionError, FileNotFoundError) as exc:
+		raise typer.BadParameter(str(exc)) from exc
+	typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
 @app.command("eval-sibling-census")
 def eval_sibling_census(
 	trace_path: str,

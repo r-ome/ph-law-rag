@@ -59,6 +59,9 @@ def _active_config() -> dict:
         "edge_expansion_enabled": policy.retrieval_defaults.edge_expansion_enabled,
         "evidence_gate": policy.evidence_gate,
         "corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
+        "corrective_mode": policy.corrective_mode,
+        "corrective_max_facets": policy.corrective_max_facets,
+        "corrective_facet_reserve_n": policy.corrective_facet_reserve_n,
         "answerability_gate_enabled": policy.evidence_gate == "answerability",
         "faithfulness_selfcheck_enabled": policy.selfcheck_enabled,
         "later_enacted_preference_enabled": policy.later_enacted_preference_enabled,
@@ -86,6 +89,7 @@ def run_rows(
     trace_label: str | None = "eval",
     holdout: bool = False,
     policy_overrides: dict | None = None,
+    facet_audit_authorize_paid_calls: bool = False,
 ) -> list[dict]:
     from app.evals.retrieval_metrics import save_retrieval_summary
     from app.evals.retrieval_targets import load_retrieval_targets
@@ -111,11 +115,14 @@ def run_rows(
 
     for i, item in enumerate(rows, start=1):
         start = time.perf_counter()
+        eval_id = item.get("id", item.get("eval_id"))
         answer_kwargs = {
             "debug": debug,
             "trace_label": trace_label,
             "strategy_override": strategy_override,
             "capture_candidate_stages": True,
+            "eval_id": eval_id,
+            "facet_audit_authorize_paid_calls": facet_audit_authorize_paid_calls,
         }
         if policy_overrides is not None:
             answer_kwargs["policy_overrides"] = policy_overrides
@@ -123,7 +130,6 @@ def run_rows(
         if trace_record is None:
             raise RuntimeError("candidate capture did not produce an internal trace")
         elapsed = time.perf_counter() - start
-        eval_id = item.get("id", item.get("eval_id"))
         target_record = targets_by_id.get(eval_id)
         trace_lines = (
             []
@@ -263,6 +269,7 @@ def run_eval_set(
     *,
     policy_overrides: dict | None = None,
     run_label: str | None = None,
+    facet_audit_authorize_paid_calls: bool = False,
 ) -> tuple[list[dict], Path, str]:
     from app.observability.logger import configure_logging
 
@@ -289,11 +296,15 @@ def run_eval_set(
             for k, v in policy_overrides.items()
             if k in knob_field_names and k not in policy_field_names
         }
-        if direct:
-            policy = replace(policy, **direct)
-        if knobs:
+        if direct or knobs:
+            updated_defaults = (
+                replace(policy.retrieval_defaults, **knobs)
+                if knobs
+                else policy.retrieval_defaults
+            )
             policy = replace(
-                policy, retrieval_defaults=replace(policy.retrieval_defaults, **knobs)
+                policy,
+                **({"retrieval_defaults": updated_defaults} | direct),
             )
 
     started_at = datetime.now().astimezone()
@@ -322,6 +333,7 @@ def run_eval_set(
         out_path,
         holdout=holdout,
         policy_overrides=policy_overrides,
+        facet_audit_authorize_paid_calls=facet_audit_authorize_paid_calls,
     )
     end_storage = _storage_identities()
 

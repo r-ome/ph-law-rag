@@ -88,6 +88,9 @@ def _feature_flags(policy: AnswerPolicy) -> dict:
         "evidence_gate": policy.evidence_gate,
         "evidence_judge_model": policy.evidence_judge_model,
         "corrective_retrieval_enabled": policy.corrective_retrieval_enabled,
+        "corrective_mode": policy.corrective_mode,
+        "corrective_max_facets": policy.corrective_max_facets,
+        "corrective_facet_reserve_n": policy.corrective_facet_reserve_n,
         "query_decomposition_enabled": policy.query_decomposition_enabled,
         "subquery_packaging_enabled": policy.retrieval_defaults.subquery_packaging_enabled,
         "adaptive_context_enabled": policy.retrieval_defaults.adaptive_context_enabled,
@@ -177,6 +180,7 @@ def _build_trace_record(
         "evidence": state.evidence.as_trace_dict() if state.evidence else None,
         "corrective_retrieval": {
             "enabled": policy.corrective_retrieval_enabled,
+            "mode": policy.corrective_mode,
             "fired": state.corrective_ran,
             "added_chunks": state.corrective_added_chunks,
             "baseline_selected_count": (
@@ -194,6 +198,7 @@ def _build_trace_record(
                 if state.corrective_max_added is not None
                 else policy.retrieval_defaults.subquery_reserve_n
             ),
+            "displaced_baseline_count": state.corrective_displaced_baseline_count,
         },
     }
 
@@ -242,6 +247,7 @@ def _attach_corrective_metadata(state: AnswerState) -> None:
     policy = state.policy or resolve_policy().policy
     state.response["corrective_retrieval"] = {
         "enabled": policy.corrective_retrieval_enabled,
+        "mode": policy.corrective_mode,
         "fired": state.corrective_ran,
         "added_chunks": state.corrective_added_chunks,
         "baseline_selected_count": (
@@ -259,6 +265,7 @@ def _attach_corrective_metadata(state: AnswerState) -> None:
             if state.corrective_max_added is not None
             else policy.retrieval_defaults.subquery_reserve_n
         ),
+        "displaced_baseline_count": state.corrective_displaced_baseline_count,
     }
 
 
@@ -329,6 +336,8 @@ def run_answer(
     strategy_override: str | None = None,
     policy_overrides: dict | None = None,
     capture_candidate_stages: bool = False,
+    eval_id: str | None = None,
+    facet_audit_authorize_paid_calls: bool = False,
 ) -> tuple[dict, dict | None]:
     trace_id = new_trace_id()
     started = time.perf_counter()
@@ -347,17 +356,23 @@ def run_answer(
             k: v for k, v in policy_overrides.items()
             if k in knob_field_names and k not in policy_field_names
         }
-        if direct:
-            policy = replace(policy, **direct)
-        if knobs:
+        if direct or knobs:
+            updated_defaults = (
+                replace(policy.retrieval_defaults, **knobs)
+                if knobs
+                else policy.retrieval_defaults
+            )
             policy = replace(
-                policy, retrieval_defaults=replace(policy.retrieval_defaults, **knobs)
+                policy,
+                **({"retrieval_defaults": updated_defaults} | direct),
             )
     state = AnswerState(
         question=question,
         debug_enabled=debug_enabled,
         session_id=session_id,
         policy=policy,
+        eval_id=eval_id,
+        facet_audit_authorize_paid_calls=facet_audit_authorize_paid_calls,
     )
 
     with trace_context(trace_id=trace_id, session_id=session_id, collector=collector):

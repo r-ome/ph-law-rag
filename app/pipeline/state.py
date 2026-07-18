@@ -61,6 +61,9 @@ class AnswerState:
     corrective_baseline_selected_count: int | None = None
     corrective_post_selected_count: int | None = None
     corrective_max_added: int | None = None
+    corrective_displaced_baseline_count: int | None = None
+    eval_id: str | None = None
+    facet_audit_authorize_paid_calls: bool = False
     router_decision: object | None = None
     router_skipped_reason: str | None = None
     model_choice: ModelChoice | None = None

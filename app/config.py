@@ -137,6 +137,12 @@ class Settings(BaseSettings):
 	answerability_gate_enabled: bool = False  # off until the revised gate beats baseline on the full 70
 	answerability_gate_model: str = "mistral"  # gate pinned to mistral even when A/B-ing another generator
 	crag_judge_model: str = "claude-haiku-4-5"  # CRAG facet-judge; override (e.g. gemma4:e4b) to run the gatekeeper locally
+	# Phase 5 CP2 corrective mechanism (docs/retrieval_strategy_review.md, "Phase 5
+	# plan"). "append" is the legacy PR5 packaging, kept as the default; the
+	# global_rerank union+re-select mode is eval-arm-only until CP3/CP4/CP5.
+	corrective_mode: Literal["append", "global_rerank"] = "append"
+	corrective_max_facets: int | None = None  # global_rerank only: facets pursued per round
+	corrective_facet_reserve_n: int | None = None  # global_rerank only: top-N per facet, fused order
 	query_decomposition_enabled: bool = False
 	query_planner_model: str = "mistral"
 	query_planner_max_subqueries: int = 3
