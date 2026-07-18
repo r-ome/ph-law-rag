@@ -171,7 +171,7 @@ run read the sealed holdout once, aggregate-only, and logged one metric-read
 ledger entry. No schema-1.2 or explicit packaging-pool publication is included
 in ADR-027; that remains follow-up scope.
 
-## Phase 5: Corrective global rerank (experimental; CP3 pending)
+## Phase 5: Corrective global rerank (experimental; CP3 passed)
 
 Phase 5 keeps the cached Haiku facet checker as an eval-only corrective trigger.
 For `partial` verdicts, it adds per-facet hybrid candidates to the pass-1
@@ -185,8 +185,12 @@ CP1 passed with 26/131 partial rows and a sealed cache; CP2 implemented the
 mechanism and policy guards. Before CP3's write-once MiniLM retrieval capture,
 the comparator verifies the six declared config deltas, CP1 hash-bound firing
 population, final selected target-set preservation at leaf granularity, and
-predeclared final adaptive-context growth bounds. CP3 stops before generation
-or scoring; CP4 requires explicit approval.
+predeclared final adaptive-context growth bounds. CP3 passed on 2026-07-18:
+26 expected fired rows, zero sufficient-row identity mismatches, zero target
+losses, mean/p95/max rendered tokens 1,379.96/2,372/2,696, and no new token
+overflows. Five selected-context hashes changed, while the three watch rows
+retained generation-prompt identity. CP3 stops before generation or scoring;
+CP4 requires explicit approval.
 
 ## Phase 2 Checkpoint 4: CLI-Only Two-Lane Retrieval (implemented 2026-07-15)
 

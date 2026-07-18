@@ -1,9 +1,8 @@
 # Phase 5 — Corrective Retrieval With Global Rerank
 
-**Status:** CP1–CP2 complete and committed (`0f6bf79`); CP3 preconditions are
-implemented and documented, pending their required commit before the sealed
-retrieval-only run. This revision also numerically predeclares the CP3
-context-size and CP4 context-recall gates and tightens the fired-row
+**Status:** CP1–CP2 complete and committed (`0f6bf79`); CP3 retrieval-only
+comparison passed on 2026-07-18. This revision also numerically predeclares the
+CP3 context-size and CP4 context-recall gates and tightens the fired-row
 target-preservation gate.
 
 **Pre-result CP2 correction (2026-07-18):** the experimental profile initially
@@ -163,7 +162,7 @@ cache primitives relocated to `app/retriever/facet_checker.py` (import
 boundary), cache keys unchanged. Full unit suite 416 passed; shipping
 profiles proven inert.
 
-### CP3 — Retrieval-only sealed run ⏳ NEXT (blocked on preconditions below)
+### CP3 — Retrieval-only sealed run ✅ PASSED (2026-07-18)
 
 131 rows, MiniLM, frozen index, CP1 cache replay (zero paid calls; a cache
 miss = pass-1 context drift ⇒ stop and report, never authorize calls to
@@ -236,6 +235,22 @@ paper over it). Seal write-once (suggested tag
    cover every Phase 5 behavior file with dirty-state provenance recorded
    in the bundle. Clean worktree is the default; the expansion is the
    fallback only if a dirty run is explicitly approved.
+
+Result: sealed candidate
+`phase5-corrective-global-rerank-minilm-r2` compared against
+`phase4-adaptive-context-v2-minilm`; published report
+`phase5-corrective-global-rerank-minilm-r2-cp3-comparison`. All 131 rows
+passed the exact six-delta contract. The expected and observed firing sets were
+the same 26 CP1 partial rows; all 105 sufficient rows retained all five frozen
+identity hashes; fired-row target preservation had zero losses. Final rendered
+context mean was 1,379.96 (limit 1,509.3), p95 2,372 (limit 2,649), maximum
+2,696 (limit 3,274), with zero newly overflowing rows. Five selected-context
+hashes changed; four fired rows changed selected chunk IDs, with one displaced
+baseline chunk (eval_050) and no annotated-target loss. Watch rows eval_129,
+eval_124, and eval_058 retained identical generation prompts; eval_058 fired
+but had no final selection change. Post-correction facet recovery is
+reporting-only and cannot be asserted from this design, which deliberately does
+not re-check the facet verdict after pass 2.
 
 Binding gates:
 

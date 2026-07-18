@@ -2656,7 +2656,7 @@ fused-order only); the matched-arm comparator test asserts the exact declared
 delta set. No paid calls — the CP1 cache is replayed. Shipping profiles remain
 inert.
 
-**CP3 — Retrieval-only sealed run and comparison (pending).** 131 rows,
+**CP3 — Retrieval-only sealed run and comparison ✅ PASSED (2026-07-18).** 131 rows,
 MiniLM, frozen index, CP1 cache (a cache miss is context drift and stops the
 run; no paid-call authorization). Seal as a write-once bundle; publish the
 comparison against `phase4-adaptive-context-v2-minilm`.
@@ -2676,6 +2676,18 @@ p95 ≤2,649, max ≤3,274, and at most three newly overflowing rows above 2,400
 It reports signed fired-row deltas and resolved/new overflow IDs. CP3 requires
 a clean committed worktree, with the relevant Phase 5 behavior files included
 in the recorded code identity.
+
+Result: the sealed `phase5-corrective-global-rerank-minilm-r2` candidate passed
+the write-once CP3 comparison against `phase4-adaptive-context-v2-minilm`.
+All six and only six declared deltas were observed; the firing set was the 26
+hash-validated CP1 partial rows; all 105 sufficient rows matched on the five
+generation-facing identity hashes; and final selected target preservation had
+zero losses. Final rendered context was mean 1,379.96, p95 2,372, max 2,696,
+with no newly overflowing rows. The comparison reported five selected-context
+hash changes, four fired rows with changed selected IDs, and one displaced
+baseline chunk (eval_050) without annotated-target loss. Watch rows eval_129,
+eval_124, and eval_058 retained prompt identity; eval_058 fired without a final
+selection change. No generation, scoring, holdout access, or CP4 activity ran.
 **Small-N regime:** the fired-row count is the regime. If fewer than 10 rows
 fire, category slices are direction-only; gates apply to the named
 provision/target checks, not slice means.
