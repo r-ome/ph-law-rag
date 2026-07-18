@@ -490,6 +490,9 @@ def _phase5_cp3_gates(
     audit_tag: str,
 ) -> dict[str, Any]:
     """Mechanically enforce every CP3 retrieval-only gate before publication."""
+    clean_worktree = candidate_meta.get("clean_worktree")
+    if not isinstance(clean_worktree, dict) or clean_worktree.get("clean") is not True:
+        raise ValueError("CP3 clean-worktree provenance is missing or unclean")
     targets, target_hash = _phase5_target_hash(baseline_rows, baseline_meta, candidate_meta)
     expected_fired = _load_cp1_partial_ids(audit_tag, baseline_meta=baseline_meta)
     baseline_by_id = {row["eval_id"]: row for row in baseline_rows}
@@ -508,7 +511,11 @@ def _phase5_cp3_gates(
         baseline, candidate = baseline_by_id[eval_id], candidate_by_id[eval_id]
         differing = [
             field for field in PHASE5_CP3_IDENTITY_FIELDS
-            if baseline.get(field) != candidate.get(field)
+            if (
+                baseline.get(field) is None
+                or candidate.get(field) is None
+                or baseline.get(field) != candidate.get(field)
+            )
         ]
         if differing:
             sufficient_mismatches[eval_id] = differing
@@ -564,6 +571,7 @@ def _phase5_cp3_gates(
             failures.append("context_bounds")
 
     gates = {
+        "clean_worktree_provenance": {"pass": True, "value": clean_worktree},
         "target_sidecar_hash": {"pass": True, "ordered_target_hash": target_hash},
         "expected_firing_population": {
             "pass": candidate_fired == expected_fired,

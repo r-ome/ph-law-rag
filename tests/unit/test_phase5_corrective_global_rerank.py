@@ -546,7 +546,11 @@ def _patch_cp3_inputs(monkeypatch):
 def _run_cp3_gates(monkeypatch, baseline, candidate):
     _patch_cp3_inputs(monkeypatch)
     return rc._phase5_cp3_gates(
-        baseline, candidate, baseline_meta={}, candidate_meta={}, audit_tag="unused"
+        baseline,
+        candidate,
+        baseline_meta={},
+        candidate_meta={"clean_worktree": {"clean": True, "git_sha": "abc123"}},
+        audit_tag="unused",
     )
 
 
@@ -566,6 +570,25 @@ def test_cp3_rejects_sufficient_prompt_hash_drift(monkeypatch):
     candidate[1]["user_prompt_hash"] = "drifted"
     with pytest.raises(ValueError, match="sufficient_row_identity"):
         _run_cp3_gates(monkeypatch, baseline, candidate)
+
+
+def test_cp3_rejects_missing_sufficient_identity_field(monkeypatch):
+    baseline = [_cp3_row("eval_fired"), _cp3_row("eval_sufficient")]
+    candidate = [_cp3_row("eval_fired", fired=True), _cp3_row("eval_sufficient")]
+    baseline[1].pop("source_map_hash")
+    candidate[1].pop("source_map_hash")
+    with pytest.raises(ValueError, match="sufficient_row_identity"):
+        _run_cp3_gates(monkeypatch, baseline, candidate)
+
+
+def test_cp3_rejects_missing_clean_worktree_provenance(monkeypatch):
+    _patch_cp3_inputs(monkeypatch)
+    baseline = [_cp3_row("eval_fired"), _cp3_row("eval_sufficient")]
+    candidate = [_cp3_row("eval_fired", fired=True), _cp3_row("eval_sufficient")]
+    with pytest.raises(ValueError, match="clean-worktree provenance"):
+        rc._phase5_cp3_gates(
+            baseline, candidate, baseline_meta={}, candidate_meta={}, audit_tag="unused"
+        )
 
 
 def test_cp3_rejects_unexpected_firing_row(monkeypatch):
