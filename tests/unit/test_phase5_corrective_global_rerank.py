@@ -543,6 +543,25 @@ def _patch_cp3_inputs(monkeypatch):
     monkeypatch.setattr(rc, "_load_cp1_partial_ids", lambda *args, **kwargs: {"eval_fired"})
 
 
+def test_cp3_recomputes_and_binds_target_sidecar_hash(monkeypatch):
+    targets = {
+        "eval_fired": {"eval_id": "eval_fired", "match_mode": "exact", "targets": []}
+    }
+    expected = {"ordered_target_hash": rc.ordered_hash([rc.sha256(targets["eval_fired"])])}
+    monkeypatch.setattr(
+        "app.evals.retrieval_targets.load_retrieval_targets", lambda: targets
+    )
+
+    loaded, target_hash = rc._phase5_target_hash(
+        [{"eval_id": "eval_fired"}],
+        {"targets_identity": expected},
+        {"targets_identity": expected},
+    )
+
+    assert loaded == targets
+    assert target_hash == expected["ordered_target_hash"]
+
+
 def _run_cp3_gates(monkeypatch, baseline, candidate):
     _patch_cp3_inputs(monkeypatch)
     return rc._phase5_cp3_gates(

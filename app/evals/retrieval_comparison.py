@@ -16,6 +16,7 @@ from app.evals.integrity import (
     adapt_retrieval_config,
     atomic_write_json,
     file_sha256,
+    ordered_hash,
     paths_for,
     schema_version,
     sha256,
