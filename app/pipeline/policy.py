@@ -34,7 +34,9 @@ BEHAVIOR_FIELDS: frozenset[str] = frozenset(
         "consolidated_dedup_enabled",
         "min_chunks_for_answer",
         "answerability_gate_enabled",
+        "evidence_gate",
         "evidence_judge_model",
+        "corrective_retrieval_enabled",
         "faithfulness_selfcheck_enabled",
         "later_enacted_preference_enabled",
         "query_decomposition_enabled",
@@ -200,6 +202,21 @@ class PolicyResolution:
 
 
 def _base_profile(name: str, settings_obj=settings) -> AnswerPolicy:
+    if name == "corrective-global-rerank-experimental":
+        # Phase 5 CP3 compares this eval-only arm against a control captured
+        # through the settings-derived local policy. Inherit that same pass-1
+        # policy so the declared evidence/corrective knobs are the only deltas;
+        # the comparator and CP1 cache both fail closed on any drift.
+        return replace(
+            AnswerPolicy.from_settings(settings_obj, name=name),
+            evidence_gate="crag",
+            evidence_judge_model="claude-haiku-4-5",
+            corrective_retrieval_enabled=True,
+            corrective_mode="global_rerank",
+            corrective_max_facets=3,
+            corrective_facet_reserve_n=5,
+        )
+
     base = AnswerPolicy(
         name=name,
         generator_model="gemma4:e4b",
@@ -261,6 +278,8 @@ def _base_profile(name: str, settings_obj=settings) -> AnswerPolicy:
             ),
         )
     if name == "crag-experimental":
+        # Intentionally remains on the pinned legacy base for CP1-era
+        # reproducibility; only the Phase 5 global-rerank arm tracks control.
         return replace(
             base,
             generator_model=settings_obj.llm_model,
@@ -269,23 +288,6 @@ def _base_profile(name: str, settings_obj=settings) -> AnswerPolicy:
             evidence_gate="crag",
             evidence_judge_model=settings_obj.crag_judge_model,
             corrective_retrieval_enabled=True,
-        )
-    if name == "corrective-global-rerank-experimental":
-        # Phase 5 CP2 eval-only arm (docs/retrieval_strategy_review.md, "Phase 5
-        # plan"). Distinct from crag-experimental (which stays pinned to the
-        # legacy append mode CP1 was audited under) so CP1's sealed artifacts
-        # remain reproducible under their original config.
-        return replace(
-            base,
-            generator_model=settings_obj.llm_model,
-            router_enabled=settings_obj.router_enabled,
-            router_model=settings_obj.router_model,
-            evidence_gate="crag",
-            evidence_judge_model="claude-haiku-4-5",
-            corrective_retrieval_enabled=True,
-            corrective_mode="global_rerank",
-            corrective_max_facets=3,
-            corrective_facet_reserve_n=5,
         )
     raise ValueError(f"Unknown RAGLAB_PROFILE: {name}")
 

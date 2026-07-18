@@ -186,6 +186,29 @@ def test_corrective_global_rerank_profile_is_registered(monkeypatch):
     assert resolution.policy.retrieval_defaults.adaptive_context_enabled is True
 
 
+def test_corrective_global_rerank_profile_declares_exactly_six_control_deltas(
+    monkeypatch,
+):
+    """CP3 requires pass-1 parity with the settings-derived Phase 4 control."""
+    monkeypatch.setattr(settings, "raglab_profile", "corrective-global-rerank-experimental")
+    monkeypatch.setattr(settings, "sibling_expansion_enabled", True)
+
+    baseline = AnswerPolicy.from_settings(
+        settings, name="corrective-global-rerank-experimental"
+    )
+    resolution = resolve_policy()
+
+    assert resolution.policy.retrieval_defaults == baseline.retrieval_defaults
+    assert resolution.policy_overrides == {
+        "corrective_facet_reserve_n": 5,
+        "corrective_max_facets": 3,
+        "corrective_mode": "global_rerank",
+        "corrective_retrieval_enabled": True,
+        "evidence_gate": "crag",
+        "evidence_judge_model": "claude-haiku-4-5",
+    }
+
+
 def test_corrective_global_rerank_knobs_are_behavior_fields():
     assert {
         "corrective_mode",

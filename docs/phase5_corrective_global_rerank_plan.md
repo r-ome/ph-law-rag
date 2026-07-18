@@ -6,6 +6,15 @@ retrieval-only run. This revision also numerically predeclares the CP3
 context-size and CP4 context-recall gates and tightens the fired-row
 target-preservation gate.
 
+**Pre-result CP2 correction (2026-07-18):** the experimental profile initially
+inherited `_base_profile`'s pinned `RetrievalKnobs`, which silently set sibling
+expansion off while the Phase 4 control used the settings-derived local policy
+with it on. That created an undeclared seventh delta and a deterministic CP1
+cache miss. The profile now derives from `AnswerPolicy.from_settings()` and
+applies only the six declared evidence/corrective deltas. This is a CP2
+implementation correction, not a new arm or retune; it lands before any sealed
+CP3 result. `crag-experimental` remains pinned for CP1-era reproducibility.
+
 > Standalone working copy of the approved Phase 5 plan. The reconciliation
 > rationale in the `# Phase 5 plan: Corrective retrieval with global rerank
 > (2026-07-17)` section of
