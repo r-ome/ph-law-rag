@@ -5,19 +5,76 @@ import { getDocument, listChunks } from "@/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/panel";
+import { docStatusTone } from "@/lib/status";
+import { formatDate } from "@/lib/format";
 
-function statusVariant(status: string): "default" | "secondary" | "outline" {
-  if (status === "operative") return "default";
-  if (status === "unknown") return "outline";
-  return "secondary";
+const MARKER_RE =
+  /^((?:ART(?:ICLE)?|Art(?:icle)?|SEC(?:TION)?|Sec(?:tion)?|§)\.?\s*[\dA-Za-z().-]+\.?)(\s+)([\s\S]*)$/;
+
+function splitIntoParagraphs(text: string): string[] {
+  const blocks = text
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+  const paragraphs: string[] = [];
+  for (const block of blocks) {
+    const lines = block
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    let current: string[] = [];
+    for (const line of lines) {
+      if (MARKER_RE.test(line) && current.length > 0) {
+        paragraphs.push(current.join("\n"));
+        current = [line];
+      } else {
+        current.push(line);
+      }
+    }
+    if (current.length > 0) paragraphs.push(current.join("\n"));
+  }
+  return paragraphs;
 }
 
-function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+function NormalizedText({ text }: { text: string }) {
+  const paragraphs = splitIntoParagraphs(text);
   return (
-    <div className="grid grid-cols-[160px_1fr] gap-2 py-1">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd>{value}</dd>
+    <div className="font-serif text-sm leading-[1.7]">
+      {paragraphs.map((para, i) => {
+        const m = para.match(MARKER_RE);
+        return (
+          <p key={i} className="mb-3.5 whitespace-pre-line last:mb-0">
+            {m ? (
+              <>
+                <strong>{m[1]}</strong>
+                {m[2]}
+                {m[3]}
+              </>
+            ) : (
+              para
+            )}
+          </p>
+        );
+      })}
     </div>
+  );
+}
+
+function MetaRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={mono ? "font-mono text-[12.5px]" : undefined}>{value}</dd>
+    </>
   );
 }
 
@@ -38,8 +95,8 @@ export default function CorpusDetail() {
   });
 
   if (!docId) return <p>Not found.</p>;
-  if (isLoading) return <p>Loading…</p>;
-  if (error) return <p className="text-red-600">Document not found.</p>;
+  if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
+  if (error) return <p className="text-danger">Document not found.</p>;
   if (!data) return null;
 
   const hasEdges =
@@ -49,45 +106,67 @@ export default function CorpusDetail() {
     data.implements.length > 0;
 
   return (
-    <div className="space-y-6">
-      <Link to="/" className="text-sm text-muted-foreground hover:underline">
+    <div className="mx-auto max-w-[900px]">
+      <Link
+        to="/"
+        className="text-[12.5px] text-muted-foreground hover:underline"
+      >
         ← Corpus
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-semibold">{data.title}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{data.category}</Badge>
-          <Badge variant="secondary">{data.doc_type}</Badge>
-          <Badge variant={statusVariant(data.status)}>{data.status}</Badge>
-          {data.official_number && <Badge variant="outline">{data.official_number}</Badge>}
-        </div>
+      <h1 className="mt-4 font-serif text-[28px] font-semibold tracking-[-0.015em]">
+        {data.title}
+      </h1>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">{data.category}</Badge>
+        <Badge variant="secondary">{data.doc_type}</Badge>
+        <Badge variant={docStatusTone(data.status)}>{data.status}</Badge>
+        {data.official_number ? (
+          <Badge variant="outline" className="font-mono">
+            {data.official_number}
+          </Badge>
+        ) : null}
       </div>
 
-      <dl className="text-sm">
+      <dl className="mt-5 grid grid-cols-[170px_1fr] gap-x-4 gap-y-2.5 text-[13px]">
         <MetaRow
           label="Source URL"
+          mono
           value={
-            <a href={data.url} target="_blank" rel="noreferrer" className="hover:underline">
+            <a
+              href={data.url}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline"
+            >
               {data.url}
             </a>
           }
         />
-        {data.source_index && <MetaRow label="Source index" value={data.source_index} />}
-        {data.availability && <MetaRow label="Availability" value={data.availability} />}
-        {data.structure && <MetaRow label="Structure" value={data.structure} />}
-        {data.approval_date && <MetaRow label="Approval date" value={data.approval_date} />}
-        {data.effectivity_date && (
-          <MetaRow label="Effectivity date" value={data.effectivity_date} />
-        )}
-        {data.last_fetched && <MetaRow label="Last fetched" value={data.last_fetched} />}
-        {data.content_length != null && (
-          <MetaRow label="Content length" value={data.content_length} />
-        )}
-        {data.extraction_method && (
+        {data.source_index ? (
+          <MetaRow label="Source index" value={data.source_index} />
+        ) : null}
+        {data.availability ? (
+          <MetaRow label="Availability" value={data.availability} />
+        ) : null}
+        {data.structure ? <MetaRow label="Structure" value={data.structure} /> : null}
+        {data.approval_date ? (
+          <MetaRow label="Approval date" value={formatDate(data.approval_date)} />
+        ) : null}
+        {data.effectivity_date ? (
+          <MetaRow label="Effectivity date" value={formatDate(data.effectivity_date)} />
+        ) : null}
+        {data.last_fetched ? (
+          <MetaRow label="Last fetched" value={formatDate(data.last_fetched, { withTime: true })} />
+        ) : null}
+        {data.content_length != null ? (
+          <MetaRow label="Content length" mono value={data.content_length} />
+        ) : null}
+        {data.extraction_method ? (
           <MetaRow label="Extraction method" value={data.extraction_method} />
-        )}
-        {data.tags.length > 0 && (
+        ) : null}
+        {data.tags.length > 0 ? (
           <MetaRow
             label="Tags"
             value={
@@ -100,69 +179,80 @@ export default function CorpusDetail() {
               </div>
             }
           />
-        )}
+        ) : null}
       </dl>
 
-      {hasEdges && (
-        <div>
-          <h2 className="text-sm font-semibold text-muted-foreground">Amendment edges</h2>
-          <dl className="text-sm">
-            {data.amends.length > 0 && (
-              <MetaRow label="Amends" value={data.amends.join(", ")} />
-            )}
-            {data.repeals.length > 0 && (
-              <MetaRow label="Repeals" value={data.repeals.join(", ")} />
-            )}
-            {data.supersedes.length > 0 && (
-              <MetaRow label="Supersedes" value={data.supersedes.join(", ")} />
-            )}
-            {data.implements.length > 0 && (
-              <MetaRow label="Implements" value={data.implements.join(", ")} />
-            )}
-          </dl>
-        </div>
-      )}
+      {hasEdges ? (
+        <Panel className="mt-6">
+          <PanelHeader>
+            <PanelTitle className="text-[15px]">Amendment edges</PanelTitle>
+          </PanelHeader>
+          <PanelBody>
+            <dl className="grid grid-cols-[170px_1fr] gap-x-4 gap-y-2.5 text-[13px]">
+              {data.amends.length > 0 ? (
+                <MetaRow label="Amends" mono value={data.amends.join(", ")} />
+              ) : null}
+              {data.repeals.length > 0 ? (
+                <MetaRow label="Repeals" mono value={data.repeals.join(", ")} />
+              ) : null}
+              {data.supersedes.length > 0 ? (
+                <MetaRow label="Supersedes" mono value={data.supersedes.join(", ")} />
+              ) : null}
+              {data.implements.length > 0 ? (
+                <MetaRow label="Implements" mono value={data.implements.join(", ")} />
+              ) : null}
+            </dl>
+          </PanelBody>
+        </Panel>
+      ) : null}
 
-      <div>
-        <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Normalized text</h2>
-        <ScrollArea className="h-[50vh] rounded-md border p-4">
+      <h2 className="mt-6 mb-2 text-[11px] font-semibold tracking-[0.06em] text-faint uppercase">
+        Normalized text
+      </h2>
+      <ScrollArea className="h-[340px] rounded-xl border border-border bg-card">
+        <div className="px-5 py-4">
           {data.normalized_text ? (
-            <pre className="whitespace-pre-wrap font-sans text-sm">{data.normalized_text}</pre>
+            <NormalizedText text={data.normalized_text} />
           ) : (
             <p className="text-muted-foreground">No normalized text.</p>
           )}
-        </ScrollArea>
-      </div>
+        </div>
+      </ScrollArea>
 
-      <div>
+      <div className="mt-3.5">
         <Button variant="outline" onClick={() => setShowChunks((v) => !v)}>
           {showChunks ? "Hide chunks" : "Show chunks"}
         </Button>
-        {showChunks && (
+        {showChunks ? (
           <div className="mt-3 space-y-2">
-            {chunksLoading && <p>Loading chunks…</p>}
-            {chunkData && (
+            {chunksLoading ? (
+              <p className="text-muted-foreground">Loading chunks…</p>
+            ) : null}
+            {chunkData ? (
               <>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-mono text-[12.5px] text-faint">
                   {chunkData.chunk_count} chunks
                 </p>
                 <ul className="space-y-2">
                   {chunkData.chunks.map((c) => (
-                    <li key={c.chunk_id} className="rounded-md border p-3 text-sm">
-                      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
+                    <li
+                      key={c.chunk_id}
+                      className="rounded-xl border border-border bg-card p-3 text-sm"
+                    >
+                      <div className="mb-1 flex items-center gap-2 font-mono text-[11px] text-faint">
                         <span>#{c.chunk_index}</span>
                         <span>{c.char_count} chars</span>
                         <span>{c.token_estimate} tok</span>
-                        {c.qdrant_id && <span className="font-mono">{c.qdrant_id}</span>}
+                        {c.qdrant_id ? <span>{c.qdrant_id}</span> : null}
                       </div>
                       <p>{c.text.slice(0, 200)}</p>
                     </li>
                   ))}
                 </ul>
               </>
-            )}
+            ) : null}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

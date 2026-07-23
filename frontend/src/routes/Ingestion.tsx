@@ -3,7 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listSyncRuns, startSync, type SyncRun } from "@/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  Panel,
+  PanelBody,
+  PanelHeader,
+  PanelTitle,
+} from "@/components/ui/panel";
 import {
   Table,
   TableBody,
@@ -12,26 +18,40 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-function statusVariant(status?: string | null): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "completed") return "default";
-  if (status === "partial") return "secondary";
-  if (status === "failed") return "destructive";
-  return "outline";
-}
+import { toneVariant } from "@/lib/status";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 function RunRow({ run }: { run: SyncRun }) {
   return (
     <TableRow>
-      <TableCell>{run.started_at ?? "—"}</TableCell>
-      <TableCell>{run.completed_at ?? "—"}</TableCell>
-      <TableCell>
-        <Badge variant={statusVariant(run.status)}>{run.status ?? "unknown"}</Badge>
+      <TableCell className="text-[12px] text-muted-foreground">
+        {formatDate(run.started_at, { withTime: true })}
       </TableCell>
-      <TableCell className="text-right">{run.scanned_count ?? 0}</TableCell>
-      <TableCell className="text-right">{run.changed_count ?? 0}</TableCell>
-      <TableCell className="text-right">{run.unchanged_count ?? 0}</TableCell>
-      <TableCell className="text-right">{run.failed_count ?? 0}</TableCell>
+      <TableCell className="text-[12px] text-muted-foreground">
+        {formatDate(run.completed_at, { withTime: true })}
+      </TableCell>
+      <TableCell>
+        <Badge variant={toneVariant(run.status)}>{run.status ?? "unknown"}</Badge>
+      </TableCell>
+      <TableCell className="text-right font-mono">{run.scanned_count ?? 0}</TableCell>
+      <TableCell
+        className={cn(
+          "text-right font-mono",
+          (run.changed_count ?? 0) > 0 && "text-gold",
+        )}
+      >
+        {run.changed_count ?? 0}
+      </TableCell>
+      <TableCell className="text-right font-mono">{run.unchanged_count ?? 0}</TableCell>
+      <TableCell
+        className={cn(
+          "text-right font-mono",
+          (run.failed_count ?? 0) > 0 && "text-danger",
+        )}
+      >
+        {run.failed_count ?? 0}
+      </TableCell>
     </TableRow>
   );
 }
@@ -74,35 +94,42 @@ export default function Ingestion() {
   const syncing = start.isPending || Boolean(watchId);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Ingestion</h1>
-          <p className="text-sm text-muted-foreground">Sync runs and corpus refresh status.</p>
-        </div>
-        <Button disabled={syncing} onClick={() => start.mutate()}>
-          {syncing ? "Syncing…" : "Run sync"}
-        </Button>
-      </div>
+    <div className="mx-auto max-w-[1180px]">
+      <PageHeader
+        eyebrow="Corpus refresh"
+        title="Ingestion"
+        subtitle="Sync runs fetch, normalize, hash, chunk, embed and index all enabled sources."
+        actions={
+          <Button disabled={syncing} onClick={() => start.mutate()}>
+            {syncing ? "Syncing…" : "Run sync"}
+          </Button>
+        }
+      />
 
-      {start.isError && <p className="text-sm text-red-600">Failed to start sync.</p>}
-      {timeoutNotice && (
-        <p className="text-sm text-muted-foreground">
+      {start.isError ? (
+        <p className="mb-3 text-sm text-danger">Failed to start sync.</p>
+      ) : null}
+      {timeoutNotice ? (
+        <p className="mb-3 text-sm text-muted-foreground">
           Sync is taking longer than expected — check back shortly.
         </p>
-      )}
+      ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {runsQuery.isLoading && <p>Loading…</p>}
-          {runsQuery.error && <p className="text-red-600">Failed to load sync runs.</p>}
-          {runsQuery.data && (
+      <Panel>
+        <PanelHeader>
+          <PanelTitle>History</PanelTitle>
+        </PanelHeader>
+        <PanelBody className="px-0 py-0">
+          {runsQuery.isLoading ? (
+            <p className="px-[18px] py-3 text-muted-foreground">Loading…</p>
+          ) : null}
+          {runsQuery.error ? (
+            <p className="px-[18px] py-3 text-danger">Failed to load sync runs.</p>
+          ) : null}
+          {runsQuery.data ? (
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted">
                   <TableHead>Started</TableHead>
                   <TableHead>Completed</TableHead>
                   <TableHead>Status</TableHead>
@@ -118,9 +145,9 @@ export default function Ingestion() {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          ) : null}
+        </PanelBody>
+      </Panel>
     </div>
   );
 }

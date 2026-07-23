@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,17 +9,9 @@ import {
   type ConversationTurn,
 } from "@/api/client";
 import { citedRefs, renderAnswerWithCitations } from "@/lib/citations";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type Highlight = { turnIndex: number; ref: number } | null;
 type SourceGroup = ChatSource & { refs: number[] };
@@ -31,7 +23,7 @@ function sourceKey(source: ChatSource) {
     source.url,
     source.locator ?? "",
     source.via ?? "",
-  ].join("\u001f");
+  ].join("");
 }
 
 function groupSources(sources: ChatSource[]): SourceGroup[] {
@@ -65,43 +57,49 @@ function SourceCards({
   if (sourceGroups.length === 0) return null;
 
   return (
-    <div className="mt-3 grid gap-2">
+    <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
       {sourceGroups.map((source) => {
         const active =
-          highlight != null && highlight.turnIndex === turnIndex && source.refs.includes(highlight.ref);
-        const refs = source.refs.join(", ");
+          highlight != null &&
+          highlight.turnIndex === turnIndex &&
+          source.refs.includes(highlight.ref);
+        const refLabel = source.refs.join(", ");
         return (
-          <Card
+          <div
             key={`${turnIndex}-${sourceKey(source)}`}
             id={`src-${turnIndex}-${source.refs[0]}`}
-            size="sm"
-            className={active ? "ring-2 ring-primary" : undefined}
+            className={cn(
+              "rounded-[9px] border border-border bg-muted p-3 transition-shadow",
+              active && "ring-2 ring-primary"
+            )}
           >
-            <CardHeader>
-              {source.refs.slice(1).map((ref) => (
-                <span key={ref} id={`src-${turnIndex}-${ref}`} className="sr-only" />
-              ))}
-              <CardTitle className="text-sm">
-                [{refs}] {source.title}
-              </CardTitle>
-              {source.locator && <CardDescription>{source.locator}</CardDescription>}
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs">
-              {source.via && (
-                <Badge variant="secondary" className="w-fit">
+            {source.refs.slice(1).map((ref) => (
+              <span key={ref} id={`src-${turnIndex}-${ref}`} className="sr-only" />
+            ))}
+            <div className="text-[12.5px] leading-[1.35] font-semibold">
+              <span className="font-mono text-primary">[{refLabel}]</span> {source.title}
+            </div>
+            {source.locator ? (
+              <div className="mt-1 text-[11.5px] text-muted-foreground">
+                {source.locator}
+              </div>
+            ) : null}
+            <div className="mt-2 flex items-center gap-1.5">
+              {source.via ? (
+                <span className="rounded-full bg-primary-bg px-1.5 py-0.5 text-[10px] font-medium text-primary">
                   {source.via}
-                </Badge>
-              )}
+                </span>
+              ) : null}
               <a
                 href={source.url}
                 target="_blank"
                 rel="noreferrer"
-                className="block break-all hover:underline"
+                className="truncate font-mono text-[10.5px] text-faint hover:underline"
               >
                 {source.url}
               </a>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -118,12 +116,20 @@ function TurnView({
   highlight: Highlight;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="ml-auto max-w-[78ch] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">
+    <div className="flex flex-col gap-3">
+      <div className="max-w-[80%] self-end rounded-[14px_14px_4px_14px] bg-primary px-[15px] py-2.5 text-[13.5px] leading-[1.5] text-primary-foreground">
         {turn.question}
       </div>
-      <div className="max-w-[82ch] rounded-lg border bg-card px-3 py-2 text-sm leading-6">
-        <div className="whitespace-pre-wrap">
+      <div className="rounded-[14px_14px_14px_4px] border border-border bg-card px-[18px] py-4 shadow-[var(--shadow)]">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] border border-primary-bd bg-primary-bg font-serif text-[12px] font-bold text-primary">
+            §
+          </span>
+          <span className="text-[11px] font-semibold tracking-[0.06em] text-faint uppercase">
+            Answer
+          </span>
+        </div>
+        <div className="font-serif text-[15px] leading-[1.65] whitespace-pre-wrap">
           {renderAnswerWithCitations(turn.answer, turn.sources, (ref) =>
             onCite(turn.turn_index, ref),
           )}
@@ -146,6 +152,7 @@ export default function Chat() {
   const [question, setQuestion] = useState("");
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<Highlight>(null);
+  const latestTurnRef = useRef<HTMLDivElement>(null);
 
   const conversationsQuery = useQuery({
     queryKey: ["conversations"],
@@ -158,7 +165,15 @@ export default function Chat() {
     enabled: Boolean(sessionId),
   });
 
-  const turns = useMemo(() => conversationQuery.data?.turns ?? [], [conversationQuery.data]);
+  const turns = useMemo(
+    () => conversationQuery.data?.turns ?? [],
+    [conversationQuery.data],
+  );
+
+  useEffect(() => {
+    if (turns.length === 0 && !pendingQuestion) return;
+    latestTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [turns.length, pendingQuestion]);
 
   const mutation = useMutation({
     mutationFn: (q: string) => ask({ question: q, session_id: sessionId ?? null }),
@@ -192,51 +207,58 @@ export default function Chat() {
   }
 
   return (
-    <div className="grid h-[calc(100vh-7rem)] min-h-0 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col rounded-lg border bg-card">
-        <div className="flex items-center justify-between px-3 py-3">
-          <h2 className="text-sm font-semibold">Conversations</h2>
-          <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/chat" />}>
-            New chat
+    <div className="grid h-[calc(100vh-7rem)] min-h-0 grid-cols-1 overflow-hidden rounded-xl border border-border lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside className="flex min-h-0 flex-col overflow-y-auto border-r border-border bg-muted">
+        <div className="flex items-center justify-between px-4 pt-4 pb-2.5">
+          <h2 className="font-serif text-[15px] font-semibold">Conversations</h2>
+          <Button
+            size="xs"
+            variant="tint-primary-pill"
+            nativeButton={false}
+            render={<Link to="/chat" />}
+          >
+            New
           </Button>
         </div>
-        <Separator />
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {conversationsQuery.isLoading && <p className="p-2 text-sm">Loading…</p>}
-          {conversationsQuery.error && (
-            <p className="p-2 text-sm text-red-600">Failed to load conversations.</p>
-          )}
-          <div className="space-y-1">
-            {(conversationsQuery.data?.conversations ?? []).map((c) => (
-              <Link
-                key={c.session_id}
-                to={`/chat/${c.session_id}`}
-                className={
-                  c.session_id === sessionId
-                    ? "block rounded-md bg-muted px-2 py-2 text-sm text-foreground"
-                    : "block rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted"
-                }
-              >
-                <span className="block truncate font-medium">{c.title}</span>
-                <span className="text-xs text-muted-foreground">{c.turn_count} turns</span>
-              </Link>
-            ))}
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 px-2.5 pb-3.5">
+          {conversationsQuery.isLoading ? (
+            <p className="p-2 text-sm text-muted-foreground">Loading…</p>
+          ) : null}
+          {conversationsQuery.error ? (
+            <p className="p-2 text-sm text-danger">Failed to load conversations.</p>
+          ) : null}
+          {(conversationsQuery.data?.conversations ?? []).map((c) => (
+            <Link
+              key={c.session_id}
+              to={`/chat/${c.session_id}`}
+              className={cn(
+                "rounded-lg px-3 py-2.5 hover:bg-card",
+                c.session_id === sessionId && "border border-border bg-card",
+              )}
+            >
+              <span className="block truncate text-[12.5px] font-medium">{c.title}</span>
+              <span className="mt-0.5 block text-[11px] text-faint">
+                {c.turn_count} turns
+              </span>
+            </Link>
+          ))}
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-background">
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {!sessionId && turns.length === 0 && !pendingQuestion && (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              Ask a question about Philippine law.
-            </div>
-          )}
-          {sessionId && conversationQuery.isLoading && <p>Loading…</p>}
-          {conversationQuery.error && (
-            <p className="text-red-600">Failed to load conversation.</p>
-          )}
-          <div className="space-y-6">
+      <section className="flex min-h-0 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto px-[30px] py-[26px]">
+          <div className="mx-auto flex max-w-[760px] flex-col gap-[26px]">
+            {!sessionId && turns.length === 0 && !pendingQuestion ? (
+              <div className="flex h-full items-center justify-center py-20 text-center text-muted-foreground">
+                Ask a question about Philippine law.
+              </div>
+            ) : null}
+            {sessionId && conversationQuery.isLoading ? (
+              <p className="text-muted-foreground">Loading…</p>
+            ) : null}
+            {conversationQuery.error ? (
+              <p className="text-danger">Failed to load conversation.</p>
+            ) : null}
             {turns.map((turn) => (
               <TurnView
                 key={turn.turn_index}
@@ -245,29 +267,32 @@ export default function Chat() {
                 highlight={highlight}
               />
             ))}
-            {pendingQuestion && (
-              <div className="space-y-3">
-                <div className="ml-auto max-w-[78ch] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">
+            {pendingQuestion ? (
+              <div className="flex flex-col gap-3">
+                <div className="max-w-[80%] self-end rounded-[14px_14px_4px_14px] bg-primary px-[15px] py-2.5 text-[13.5px] leading-[1.5] text-primary-foreground">
                   {pendingQuestion}
                 </div>
-                <div className="max-w-[82ch] rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">
+                <div className="rounded-[14px_14px_14px_4px] border border-border bg-card px-[18px] py-4 text-sm text-muted-foreground shadow-[var(--shadow)]">
                   Thinking…
                 </div>
               </div>
-            )}
+            ) : null}
+            <div ref={latestTurnRef} aria-hidden="true" />
           </div>
         </div>
-        <Separator />
-        <div className="p-3">
-          {mutation.isError && (
-            <p className="mb-2 text-sm text-red-600">Failed to send question.</p>
-          )}
-          <div className="flex gap-2">
+
+        <div className="border-t border-border bg-muted px-[30px] py-3.5">
+          {mutation.isError ? (
+            <p className="mx-auto mb-2 max-w-[760px] text-sm text-danger">
+              Failed to send question.
+            </p>
+          ) : null}
+          <div className="mx-auto flex max-w-[760px] items-end gap-2.5">
             <Textarea
               value={question}
               disabled={mutation.isPending}
               placeholder="Ask a legal question…"
-              className="min-h-20 resize-none"
+              className="min-h-[52px] flex-1 resize-none rounded-[11px] border-border-strong bg-card"
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -276,10 +301,18 @@ export default function Chat() {
                 }
               }}
             />
-            <Button className="self-end" disabled={mutation.isPending} onClick={send}>
+            <Button
+              className="self-end px-5"
+              disabled={mutation.isPending}
+              onClick={send}
+            >
               Send
             </Button>
           </div>
+          <p className="mx-auto mt-2 max-w-[760px] text-[11px] text-faint">
+            Answers are grounded in the indexed primary sources and cite article/section
+            numbers. The system abstains when the corpus can't support an answer.
+          </p>
         </div>
       </section>
     </div>

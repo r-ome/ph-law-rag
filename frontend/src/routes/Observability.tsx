@@ -3,8 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { getTrace, listTraces } from "@/api/client";
 import TraceView from "@/components/TraceView";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/panel";
+import { formatDate } from "@/lib/format";
 import {
   Table,
   TableBody,
@@ -35,32 +37,39 @@ export default function Observability() {
   });
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Observability</h1>
-        <p className="text-sm text-muted-foreground">Browse persisted retrieval traces.</p>
-      </div>
+    <div className="mx-auto max-w-[1240px] space-y-4">
+      <PageHeader
+        eyebrow="Persisted traces"
+        title="Observability"
+        subtitle="Browse persisted retrieval traces. Click a row to inspect its full trace."
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Trace History</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Input
-            value={date}
-            type="date"
-            aria-label="Trace date"
-            className="w-[180px]"
-            onChange={(e) => {
-              setDate(e.target.value);
-              setSelectedId(null);
-            }}
-          />
-          {tracesQuery.isLoading && <p>Loading...</p>}
-          {tracesQuery.error && <p className="text-sm text-red-600">Failed to load traces.</p>}
+      <div className="mb-3.5 flex items-center gap-2.5">
+        <Input
+          value={date}
+          type="date"
+          aria-label="Trace date"
+          className="w-[180px]"
+          onChange={(e) => {
+            setDate(e.target.value);
+            setSelectedId(null);
+          }}
+        />
+        <span className="font-mono text-[12.5px] text-faint">
+          {tracesQuery.data?.traces.length ?? 0} traces
+        </span>
+      </div>
+      {tracesQuery.isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
+      {tracesQuery.error ? <p className="text-danger">Failed to load traces.</p> : null}
+
+      <Panel>
+        <PanelHeader>
+          <PanelTitle>Trace History</PanelTitle>
+        </PanelHeader>
+        <PanelBody className="px-0 py-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted">
                 <TableHead>Timestamp</TableHead>
                 <TableHead>Question</TableHead>
                 <TableHead>Strategy</TableHead>
@@ -77,11 +86,13 @@ export default function Observability() {
                   className="cursor-pointer"
                   onClick={() => setSelectedId(trace.trace_id)}
                 >
-                  <TableCell className="whitespace-nowrap text-xs">{trace.timestamp ?? "n/a"}</TableCell>
+                  <TableCell className="whitespace-nowrap text-[12px] text-faint">
+                    {formatDate(trace.timestamp, { withTime: true })}
+                  </TableCell>
                   <TableCell>{truncate(trace.question)}</TableCell>
-                  <TableCell>{trace.strategy ?? "n/a"}</TableCell>
-                  <TableCell>{trace.latency_ms ?? "n/a"} ms</TableCell>
-                  <TableCell className="whitespace-nowrap text-xs">
+                  <TableCell className="font-mono text-[11px] text-muted-foreground">{trace.strategy ?? "n/a"}</TableCell>
+                  <TableCell className="font-mono text-[11px] text-muted-foreground">{trace.latency_ms ?? "n/a"} ms</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
                     r {trace.stage_counts.retrieved ?? 0} / p{" "}
                     {trace.stage_counts.pre_expansion ?? 0} / s{" "}
                     {trace.stage_counts.selected ?? 0}
@@ -89,19 +100,22 @@ export default function Observability() {
                   <TableCell>
                     <div className="flex gap-1">
                       {trace.abstained && <Badge variant="outline">abstained</Badge>}
-                      {trace.error && <Badge variant="destructive">error</Badge>}
+                      {trace.error && <Badge variant="danger">error</Badge>}
+                      {!trace.abstained && !trace.error && (
+                        <span className="text-[11px] font-semibold text-primary">answered</span>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell>{trace.trace_label ?? ""}</TableCell>
+                  <TableCell className="font-mono text-[11px] text-faint">{trace.trace_label ?? ""}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </PanelBody>
+      </Panel>
 
-      {selectedId && traceQuery.isLoading && <p>Loading trace...</p>}
-      {selectedId && traceQuery.error && <p className="text-sm text-red-600">Trace not found.</p>}
+      {selectedId && traceQuery.isLoading && <p className="text-muted-foreground">Loading trace...</p>}
+      {selectedId && traceQuery.error && <p className="text-danger">Trace not found.</p>}
       {traceQuery.data && <TraceView trace={traceQuery.data} />}
     </div>
   );

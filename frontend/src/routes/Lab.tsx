@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getLogs, inspectRetrieval } from "@/api/client";
 import type { LogEntry } from "@/api/client";
+import { formatTime } from "@/lib/format";
 import TraceView from "@/components/TraceView";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Select,
   SelectContent,
@@ -37,16 +39,9 @@ const RERANKERS: { value: Reranker; label: string }[] = [
 ];
 
 function logLevelColor(level?: string | null): string {
-  if (level === "error" || level === "critical") return "oklch(0.52 0.17 32)";
-  if (level === "warning") return "oklch(0.48 0.10 78)";
-  return "oklch(0.52 0.02 245)";
-}
-
-function formatLogTime(timestamp?: string | null): string {
-  if (!timestamp) return "";
-  const d = new Date(timestamp);
-  if (Number.isNaN(d.getTime())) return timestamp;
-  return d.toLocaleTimeString([], { hour12: false });
+  if (level === "error" || level === "critical") return "var(--danger)";
+  if (level === "warning") return "var(--warn)";
+  return "var(--muted)";
 }
 
 function splitExtra(extra: LogEntry["extra"]): { inline: string; blocks: [string, string][] } {
@@ -83,18 +78,18 @@ function LiveLogPanel({
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle>Ask logs</CardTitle>
         {running && (
-          <span className="flex items-center gap-1.5 text-[0.975rem] text-muted-foreground">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
             live
           </span>
         )}
       </CardHeader>
       <CardContent>
         {!started && (
-          <p className="text-[1.1375rem] text-muted-foreground">Run a question to see its logs live.</p>
+          <p className="text-sm text-muted-foreground">Run a question to see its logs live.</p>
         )}
         {started && entries.length === 0 && (
-          <p className="text-[1.1375rem] text-muted-foreground">Waiting for log entries…</p>
+          <p className="text-sm text-muted-foreground">Waiting for log entries…</p>
         )}
         {entries.length > 0 && (
           <div ref={scrollRef} className="max-h-[70vh] space-y-1.5 overflow-y-auto pr-1">
@@ -103,9 +98,9 @@ function LiveLogPanel({
               return (
                 <div
                   key={`${entry.timestamp ?? "raw"}-${index}`}
-                  className="font-mono text-[0.975rem] leading-5"
+                  className="font-mono text-[11px] leading-5"
                 >
-                  <span className="text-muted-foreground">{formatLogTime(entry.timestamp)}</span>{" "}
+                  <span className="text-muted-foreground">{formatTime(entry.timestamp)}</span>{" "}
                   <span className="font-semibold" style={{ color: logLevelColor(entry.level) }}>
                     {entry.level ?? "raw"}
                   </span>{" "}
@@ -191,12 +186,13 @@ export default function Lab() {
   const data = mutation.data;
 
   return (
-    <div className="gap-5 space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:space-y-0">
+    <div className="mx-auto max-w-[1300px] gap-5 space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:space-y-0">
       <div className="space-y-5">
-        <div>
-          <h1 className="text-[1.95rem] font-semibold">Retrieval Lab</h1>
-          <p className="text-[1.1375rem] text-muted-foreground">Run one query and inspect the retrieval trace.</p>
-        </div>
+        <PageHeader
+          eyebrow="Trace inspector"
+          title="Retrieval Lab"
+          subtitle="Run one query and inspect the full retrieval trace, stage by stage."
+        />
 
         <Card>
           <CardContent className="space-y-3">
@@ -207,10 +203,10 @@ export default function Lab() {
               className="min-h-28 resize-none"
               onChange={(e) => setQuestion(e.target.value)}
             />
-            <div className="space-y-2 rounded-md border p-3">
-              <span className="text-[1.1375rem] font-medium">Config</span>
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <span className="text-sm font-medium">Config</span>
               <div className="flex flex-wrap items-center gap-4">
-                <label className="flex cursor-pointer items-center gap-2 text-[1.1375rem]">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="checkbox"
                     checked={cragEnabled}
@@ -220,7 +216,7 @@ export default function Lab() {
                   />
                   CRAG evidence gate
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 text-[1.1375rem]">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="checkbox"
                     checked={decompositionEnabled}
@@ -232,7 +228,7 @@ export default function Lab() {
                 </label>
                 {decompositionEnabled && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[1.1375rem] text-muted-foreground">Planner model</span>
+                    <span className="text-xs text-muted-foreground">Planner model</span>
                     <Select value={plannerModel} onValueChange={(v) => v && setPlannerModel(v)}>
                       <SelectTrigger className="w-[200px]" aria-label="Query planner model">
                         <SelectValue placeholder="Planner model" />
@@ -248,7 +244,7 @@ export default function Lab() {
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <span className="text-[1.1375rem] text-muted-foreground">Reranker</span>
+                  <span className="text-xs text-muted-foreground">Reranker</span>
                   <Select
                     value={reranker}
                     onValueChange={(v) => v && setReranker(v as Reranker)}
@@ -267,7 +263,7 @@ export default function Lab() {
                 </div>
                 {cragEnabled && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[1.1375rem] text-muted-foreground">Evidence judge</span>
+                    <span className="text-xs text-muted-foreground">Evidence judge</span>
                     <Select value={cragJudgeModel} onValueChange={(v) => v && setCragJudgeModel(v)}>
                       <SelectTrigger className="w-[200px]" aria-label="Evidence judge model">
                         <SelectValue placeholder="Evidence judge" />
@@ -303,9 +299,9 @@ export default function Lab() {
           </CardContent>
         </Card>
 
-        {mutation.isError && <p className="text-[1.1375rem] text-red-600">Failed to run retrieval.</p>}
+        {mutation.isError && <p className="text-sm text-danger">Failed to run retrieval.</p>}
         {data?.error && (
-          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-[1.1375rem] text-red-700">
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-danger">
             {data.error_message ?? "Retrieval returned an error."}
           </p>
         )}
@@ -315,11 +311,11 @@ export default function Lab() {
               <CardTitle>Answer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="whitespace-pre-wrap text-[1.1375rem] leading-6">{data.answer}</div>
+              <div className="font-serif text-sm leading-[1.6] whitespace-pre-wrap">{data.answer}</div>
               {data.sources.length > 0 && (
                 <div className="grid gap-2 md:grid-cols-2">
                   {data.sources.map((source) => (
-                    <div key={source.ref} className="rounded-md border p-3 text-[1.1375rem]">
+                    <div key={source.ref} className="rounded-lg border border-border bg-muted p-3 text-sm">
                       <div className="font-medium">
                         [{source.ref}] {source.title}
                       </div>
@@ -331,7 +327,7 @@ export default function Lab() {
                         href={source.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-2 block break-all text-[0.975rem] hover:underline"
+                        className="mt-2 block break-all text-xs hover:underline"
                       >
                         {source.url}
                       </a>
@@ -344,7 +340,7 @@ export default function Lab() {
         )}
         {data?.trace && <TraceView trace={data.trace} />}
         {data && !data.trace && (
-          <p className="text-[1.1375rem] text-muted-foreground">No trace was returned for this run.</p>
+          <p className="text-sm text-muted-foreground">No trace was returned for this run.</p>
         )}
       </div>
 

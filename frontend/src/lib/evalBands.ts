@@ -53,39 +53,15 @@ export function pct(v: number | null | undefined): string {
 
 function bandVisual(key: BandKey, label: string): Band {
   if (key === "strong") {
-    return {
-      key,
-      label,
-      color: "oklch(0.40 0.10 158)",
-      bg: "oklch(0.955 0.035 158)",
-      bd: "oklch(0.85 0.06 158)",
-    };
+    return { key, label, color: "var(--primary)", bg: "var(--primary-bg)", bd: "var(--primary-bd)" };
   }
   if (key === "fair") {
-    return {
-      key,
-      label,
-      color: "oklch(0.48 0.10 78)",
-      bg: "oklch(0.955 0.05 88)",
-      bd: "oklch(0.86 0.07 85)",
-    };
+    return { key, label, color: "var(--warn)", bg: "var(--warn-bg)", bd: "var(--warn-bd)" };
   }
   if (key === "weak") {
-    return {
-      key,
-      label,
-      color: "oklch(0.52 0.17 32)",
-      bg: "oklch(0.955 0.05 38)",
-      bd: "oklch(0.86 0.08 36)",
-    };
+    return { key, label, color: "var(--danger)", bg: "var(--danger-bg)", bd: "var(--danger-bd)" };
   }
-  return {
-    key,
-    label,
-    color: "oklch(0.52 0.02 245)",
-    bg: "oklch(0.955 0.006 95)",
-    bd: "oklch(0.88 0.01 95)",
-  };
+  return { key, label, color: "var(--faint)", bg: "var(--muted)", bd: "var(--border)" };
 }
 
 export function band(
@@ -128,7 +104,7 @@ export function trend(
     return {
       show: true,
       sym: "≈",
-      color: "oklch(0.55 0.02 245)",
+      color: "var(--muted)",
       title: `${deltaFmt} vs previous run · within judge noise`,
       deltaFmt,
     };
@@ -137,7 +113,7 @@ export function trend(
     return {
       show: true,
       sym: "▲",
-      color: "oklch(0.42 0.11 158)",
+      color: "var(--primary)",
       title: `${deltaFmt} vs previous run`,
       deltaFmt,
     };
@@ -145,7 +121,7 @@ export function trend(
   return {
     show: true,
     sym: "▼",
-    color: "oklch(0.55 0.19 30)",
+    color: "var(--danger)",
     title: `${deltaFmt} vs previous run`,
     deltaFmt,
   };
@@ -153,9 +129,9 @@ export function trend(
 
 export function splitStyle(holdout: boolean): SplitStyle {
   if (holdout) {
-    return { color: "oklch(0.45 0.06 300)", bg: "oklch(0.955 0.03 305)", bd: "oklch(0.86 0.05 305)" };
+    return { color: "var(--violet)", bg: "var(--violet-bg)", bd: "var(--violet-bd)" };
   }
-  return { color: "oklch(0.40 0.10 158)", bg: "oklch(0.955 0.03 158)", bd: "oklch(0.86 0.05 158)" };
+  return { color: "var(--primary)", bg: "var(--primary-bg)", bd: "var(--primary-bd)" };
 }
 
 export const NOISE_NOTE =

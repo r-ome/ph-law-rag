@@ -24,7 +24,7 @@ export function renderAnswerWithCitations(
         <button
           key={`cite-${key++}`}
           type="button"
-          className="mx-0.5 rounded bg-muted px-1 text-xs font-medium text-primary hover:underline"
+          className="mx-px inline-block cursor-pointer rounded-[4px] border border-primary-bd bg-primary-bg px-1 align-[1px] font-mono text-[11px] font-semibold text-primary hover:brightness-95"
           onClick={() => onCite?.(n)}
           aria-label={`Citation ${n}`}
         >

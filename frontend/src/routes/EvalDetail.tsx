@@ -14,6 +14,8 @@ import {
   type MetricKey,
 } from "@/lib/evalBands";
 import { defaultRowFilters, filterRows, type RowFilters } from "@/lib/evalRows";
+import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { EvalMetricTile } from "@/components/EvalMetricTile";
 import { SortableTableHead } from "@/components/SortableTableHead";
 import EvalRowSheet from "@/components/EvalRowSheet";
@@ -41,8 +43,7 @@ import {
 function Pill({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
   return (
     <span
-      className={`rounded-full border px-2.5 py-0.5 text-xs ${mono ? "font-mono" : ""}`}
-      style={{ borderColor: "oklch(0.86 0.014 95)", color: "oklch(0.48 0.025 245)" }}
+      className={`rounded-full border border-border bg-muted px-2.5 py-[3px] text-[11.5px] text-muted-foreground ${mono ? "font-mono" : ""}`}
     >
       {children}
     </span>
@@ -167,16 +168,11 @@ function SummaryTiles({ run, bands }: { run: EvalRunDetail; bands: EvalPolicy["q
 
 function HowToRead({ noiseFloor }: { noiseFloor: number }) {
   return (
-    <div
-      className="flex gap-3 rounded-xl px-4 py-4"
-      style={{ background: "oklch(0.24 0.02 245)" }}
-    >
-      <span className="text-[17px] leading-tight">⚖️</span>
-      <div className="flex flex-col gap-1">
-        <span className="text-[13.5px] font-semibold" style={{ color: "oklch(0.95 0.01 95)" }}>
-          How to read these scores
-        </span>
-        <p className="m-0 max-w-[900px] text-xs leading-relaxed" style={{ color: "oklch(0.78 0.02 245)" }}>
+    <div className="flex gap-3 rounded-xl bg-[var(--sidebar-bg)] px-[17px] py-3.5 text-[var(--sidebar-fg)]">
+      <span className="shrink-0 font-serif text-lg font-bold text-gold">§</span>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[13px] font-semibold">How to read these scores</span>
+        <p className="m-0 max-w-[900px] text-xs leading-relaxed text-[var(--sidebar-muted)]">
           {NOISE_NOTE} Current noise floor: ±{noiseFloor.toFixed(2)}.
         </p>
       </div>
@@ -283,7 +279,7 @@ function ComparePanel({
           <p className="text-sm text-muted-foreground">No other runs available for comparison.</p>
         )}
         {diffQuery.isLoading && <p>Loading comparison…</p>}
-        {diffQuery.error && <p className="text-sm text-red-600">Failed to load comparison.</p>}
+        {diffQuery.error && <p className="text-sm text-danger">Failed to load comparison.</p>}
         {diff && <DiffTables diff={diff} bands={bands} noiseFloor={noiseFloor} />}
       </CardContent>
     </Card>
@@ -395,10 +391,7 @@ function DiffTables({
         </Table>
       </div>
       {anyWithin && (
-        <p
-          className="m-0 rounded-lg border px-3 py-2 text-xs leading-relaxed"
-          style={{ color: "oklch(0.5 0.03 60)", background: "oklch(0.965 0.02 85)", borderColor: "oklch(0.88 0.03 85)" }}
-        >
+        <p className="m-0 rounded-lg border border-warn-bd bg-warn-bg px-3 py-2 text-xs leading-relaxed text-warn">
           ≈ Several gains fall within the judge&apos;s ±{noiseFloor.toFixed(2)} noise floor — confirm them with paired,
           same-question deltas before calling them real.
         </p>
@@ -471,7 +464,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-[20px]">Per-question rows</CardTitle>
+          <CardTitle>Per-question rows</CardTitle>
         </CardHeader>
         <CardContent>
           <p>Loading rows…</p>
@@ -484,10 +477,10 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-[20px]">Per-question rows</CardTitle>
+          <CardTitle>Per-question rows</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-red-600">Failed to load rows.</p>
+          <p className="text-sm text-danger">Failed to load rows.</p>
         </CardContent>
       </Card>
     );
@@ -497,7 +490,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-[20px]">Per-question rows</CardTitle>
+          <CardTitle>Per-question rows</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Holdout run — per-row data is redacted.</p>
@@ -510,10 +503,10 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
     <Card>
       <CardHeader className="flex-row items-baseline justify-between space-y-0">
         <div className="flex items-baseline gap-3">
-          <CardTitle className="text-[20px]">Per-question rows</CardTitle>
-          <span className="text-[14px] text-muted-foreground">{tag}</span>
+          <CardTitle>Per-question rows</CardTitle>
+          <span className="font-mono text-[11.5px] text-faint">{tag}</span>
         </div>
-        <span className="font-mono text-[14px] text-muted-foreground">
+        <span className="font-mono text-[11.5px] text-muted-foreground">
           {visibleRows.length} of {rows.length} rows · click a column to sort
         </span>
       </CardHeader>
@@ -536,16 +529,16 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
               placeholder="Search question or eval_id"
               value={filters.search}
               onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-              className="w-[320px] pl-9 text-[17.5px]"
+              className="w-[320px] pl-9"
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[15px] text-muted-foreground">Category</span>
+            <span className="text-xs text-muted-foreground">Category</span>
             <Select
               value={filters.category}
               onValueChange={(v) => setFilters((f) => ({ ...f, category: v || "all" }))}
             >
-              <SelectTrigger className="w-[140px] text-[17.5px]" aria-label="Category">
+              <SelectTrigger className="w-[140px]" aria-label="Category">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -559,12 +552,12 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[15px] text-muted-foreground">Split</span>
+            <span className="text-xs text-muted-foreground">Split</span>
             <Select
               value={filters.split}
               onValueChange={(v) => setFilters((f) => ({ ...f, split: v || "all" }))}
             >
-              <SelectTrigger className="w-[140px] text-[17.5px]" aria-label="Split">
+              <SelectTrigger className="w-[140px]" aria-label="Split">
                 <SelectValue placeholder="Split" />
               </SelectTrigger>
               <SelectContent>
@@ -583,7 +576,6 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
               variant={filters.abstainedOnly ? "default" : "outline"}
               aria-pressed={filters.abstainedOnly}
               onClick={() => setFilters((f) => ({ ...f, abstainedOnly: !f.abstainedOnly }))}
-              className="text-[17.5px]"
             >
               Abstained
             </Button>
@@ -592,7 +584,6 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
               variant={filters.sourceMissOnly ? "default" : "outline"}
               aria-pressed={filters.sourceMissOnly}
               onClick={() => setFilters((f) => ({ ...f, sourceMissOnly: !f.sourceMissOnly }))}
-              className="text-[17.5px]"
             >
               Source miss
             </Button>
@@ -600,30 +591,25 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
         </div>
 
         <div className="max-h-[70vh] overflow-auto [&_[data-slot=table-container]]:overflow-visible">
-          <Table className="border-separate border-spacing-0 text-[17.5px]">
+          <Table className="border-separate border-spacing-0">
             <TableHeader>
               <TableRow>
                 <SortableTableHead
                   label="eval_id"
-                  fontSize={13.5}
+                  fontSize={11}
                   uppercase
                   active={sortKey === "eval_id"}
                   dir={sortDir}
                   onClick={() => toggleSort("eval_id")}
                 />
                 <TableHead
-                  className="sticky top-0 z-10 w-[300px] font-medium uppercase tracking-[0.08em] shadow-[inset_0_-1px_0_oklch(0.90_0.01_95)]"
-                  style={{
-                    background: "oklch(0.975 0.006 95)",
-                    color: "oklch(0.50 0.02 245)",
-                    fontSize: "13.5px",
-                  }}
+                  className="sticky top-0 z-10 w-[300px] bg-muted text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
                 >
                   Question
                 </TableHead>
                 <SortableTableHead
                   label="Category"
-                  fontSize={13.5}
+                  fontSize={11}
                   uppercase
                   active={sortKey === "category"}
                   dir={sortDir}
@@ -631,7 +617,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                 />
                 <SortableTableHead
                   label="Split"
-                  fontSize={13.5}
+                  fontSize={11}
                   uppercase
                   active={sortKey === "split"}
                   dir={sortDir}
@@ -639,7 +625,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                 />
                 <SortableTableHead
                   label="Abst."
-                  fontSize={13.5}
+                  fontSize={11}
                   uppercase
                   active={sortKey === "abstained"}
                   dir={sortDir}
@@ -649,7 +635,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                   <SortableTableHead
                     key={m.key}
                     label={m.short}
-                    fontSize={13.5}
+                    fontSize={11}
                     uppercase
                     align="right"
                     active={sortKey === m.key}
@@ -659,7 +645,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                 ))}
                 <SortableTableHead
                   label="Elapsed"
-                  fontSize={13.5}
+                  fontSize={11}
                   uppercase
                   align="right"
                   active={sortKey === "elapsed_s"}
@@ -675,8 +661,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                     key={row.eval_id ?? `${row.question}-${index}`}
                     role="button"
                     tabIndex={0}
-                    className="cursor-pointer"
-                    style={{ background: index % 2 === 1 ? "oklch(0.982 0.005 95)" : undefined }}
+                    className={cn("cursor-pointer", index % 2 === 1 && "bg-muted/40")}
                     onClick={() => setSelectedRow(row)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -685,7 +670,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                       }
                     }}
                   >
-                    <TableCell className="align-top font-mono text-[15px] text-muted-foreground">
+                    <TableCell className="align-top font-mono text-muted-foreground">
                       {row.eval_id ?? "—"}
                     </TableCell>
                     <TableCell className="w-[300px] max-w-[300px] align-top">
@@ -699,7 +684,7 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                     </TableCell>
                     <TableCell className="align-top">
                       {row.abstained ? (
-                        <span className="font-medium" style={{ color: "oklch(0.48 0.10 78)" }}>
+                        <span className="font-medium text-warn">
                           yes
                         </span>
                       ) : (
@@ -711,14 +696,14 @@ function RowsTriage({ tag, bands }: { tag: string; bands: EvalPolicy["quality_ba
                       return (
                         <TableCell
                           key={key}
-                          className="text-right align-top font-mono text-[15px]"
-                          style={{ color: c.bandKey === "na" ? "oklch(0.60 0.02 245)" : c.color }}
+                          className="text-right align-top font-mono"
+                          style={{ color: c.bandKey === "na" ? "var(--faint)" : c.color }}
                         >
                           {c.fmt}
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-right align-top font-mono text-[15px] text-muted-foreground">
+                    <TableCell className="text-right align-top font-mono text-muted-foreground">
                       {row.elapsed_s != null ? `${row.elapsed_s.toFixed(1)}s` : "—"}
                     </TableCell>
                   </TableRow>
@@ -752,29 +737,28 @@ export default function EvalDetail() {
   const policyQuery = useQuery({ queryKey: ["evalPolicy"], queryFn: getEvalPolicy });
   const policy = policyQuery.data ?? DEFAULT_EVAL_POLICY;
 
-  if (!tag) return <p className="text-red-600">Eval run not found.</p>;
-  if (query.isLoading) return <p>Loading…</p>;
-  if (query.error) return <p className="text-red-600">Eval run not found.</p>;
+  if (!tag) return <p className="text-danger">Eval run not found.</p>;
+  if (query.isLoading) return <p className="text-muted-foreground">Loading…</p>;
+  if (query.error) return <p className="text-danger">Eval run not found.</p>;
 
   const run = query.data!;
   const holdout = Boolean(run.meta?.holdout);
   const ss = splitStyle(holdout);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
       <Link
         to="/evals"
-        className="self-start text-[13.5px] font-medium no-underline hover:underline"
-        style={{ color: "oklch(0.42 0.105 158)" }}
+        className="self-start text-[12.5px] font-medium text-muted-foreground hover:underline"
       >
         ← Back to all runs
       </Link>
       <div className="flex flex-col gap-2">
-        <h1 className="m-0 break-all font-mono text-[19px] font-semibold">{run.tag}</h1>
+        <h1 className="m-0 font-mono text-[19px] font-semibold break-all">{run.tag}</h1>
+        {run.label ? <div className="mt-1 font-serif text-lg text-muted-foreground">{run.label}</div> : null}
         <div className="flex flex-wrap gap-1.5">
           <span
-            className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-            style={{ background: "oklch(0.92 0.018 88)", color: "oklch(0.31 0.025 245)" }}
+            className="rounded-full bg-muted px-2.5 py-[3px] text-[11.5px] font-medium"
           >
             {run.model ?? "—"}
           </span>
@@ -784,7 +768,7 @@ export default function EvalDetail() {
           >
             {holdout ? "Holdout" : "Regression + Dev"}
           </span>
-          <Pill>{run.date ?? "—"}</Pill>
+          <Pill>{formatDate(run.date)}</Pill>
           <Pill mono>{run.git_sha ?? "—"}</Pill>
           <Pill>{run.question_count ?? "—"} questions</Pill>
         </div>
@@ -792,8 +776,10 @@ export default function EvalDetail() {
 
       <SummaryTiles run={run} bands={policy.quality_bands} />
       <HowToRead noiseFloor={policy.noise_floor} />
-      <ByCategory run={run} bands={policy.quality_bands} />
-      <RunConfig run={run} />
+      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+        <ByCategory run={run} bands={policy.quality_bands} />
+        <RunConfig run={run} />
+      </div>
       <ComparePanel tag={tag} bands={policy.quality_bands} noiseFloor={policy.noise_floor} />
       <RowsTriage tag={tag} bands={policy.quality_bands} />
       <EvalRunLogs tag={tag} />

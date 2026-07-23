@@ -16,6 +16,8 @@ import {
 } from "@/lib/evalBands";
 import { EvalMetricTile } from "@/components/EvalMetricTile";
 import { SortableTableHead } from "@/components/SortableTableHead";
+import { PageHeader } from "@/components/ui/page-header";
+import { formatDate } from "@/lib/format";
 import {
   Table,
   TableBody,
@@ -27,20 +29,14 @@ import {
 function QualityBandsLegend({ bands }: { bands: EvalPolicy["quality_bands"] | undefined }) {
   const items = qualityBands(bands);
   return (
-    <div
-      className="flex flex-wrap items-center gap-2.5 rounded-xl border px-4 py-3"
-      style={{ background: "oklch(0.955 0.006 95)", borderColor: "oklch(0.88 0.01 95)" }}
-    >
-      <span
-        className="text-[15px] font-semibold uppercase tracking-wide"
-        style={{ color: "oklch(0.48 0.025 245)" }}
-      >
+    <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-muted px-4 py-3">
+      <span className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
         Quality bands
       </span>
       {items.map((b) => (
         <span
           key={b.label}
-          className="inline-flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[15.625px] font-medium"
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-xs font-medium"
           style={{ color: b.color, background: b.bg, border: `1px solid ${b.bd}` }}
         >
           <span className="h-2 w-2 rounded-sm" style={{ background: b.color }} />
@@ -55,8 +51,7 @@ function QualityBandsLegend({ bands }: { bands: EvalPolicy["quality_bands"] | un
 function badgePill(children: React.ReactNode, mono = false) {
   return (
     <span
-      className={`rounded-full border px-2.5 py-0.5 text-[15px] ${mono ? "font-mono" : ""}`}
-      style={{ borderColor: "oklch(0.86 0.014 95)", color: "oklch(0.48 0.025 245)" }}
+      className={`rounded-full border border-border bg-muted px-2.5 py-[3px] text-[11.5px] text-muted-foreground ${mono ? "font-mono" : ""}`}
     >
       {children}
     </span>
@@ -66,36 +61,22 @@ function badgePill(children: React.ReactNode, mono = false) {
 function HeroCard({ latest, tag }: { latest: ReturnType<typeof buildDetailSummary>; tag: string }) {
   if (!latest) return null;
   return (
-    <div
-      className="overflow-hidden rounded-2xl bg-card"
-      style={{ boxShadow: "0 0 0 1px oklch(0.22 0.018 245 / 0.10)" }}
-    >
-      <div
-        className="flex flex-wrap items-start justify-between gap-4 border-b px-5 pb-4 pt-5"
-        style={{ borderColor: "oklch(0.90 0.01 95)" }}
-      >
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow)]">
+      <div className="flex flex-wrap items-start justify-between gap-3.5 border-b border-border px-5 py-4">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <span
-              className="text-[13.75px] font-bold uppercase tracking-wide"
-              style={{ color: "oklch(0.42 0.105 158)" }}
-            >
+            <span className="text-[11px] font-bold tracking-[0.06em] text-primary uppercase">
               Latest run
             </span>
-            <span className="text-[20px] font-semibold">{latest.label || "—"}</span>
+            <span className="font-serif text-[19px] font-semibold">{latest.label || "—"}</span>
           </div>
-          <span className="font-mono text-[15px]" style={{ color: "oklch(0.5 0.02 245)" }}>
-            {tag}
-          </span>
+          <span className="mt-0.5 font-mono text-xs text-faint">{tag}</span>
         </div>
         <div className="flex flex-wrap justify-end gap-1.5">
-          <span
-            className="rounded-full px-2.5 py-0.5 text-[15px] font-medium"
-            style={{ background: "oklch(0.92 0.018 88)", color: "oklch(0.31 0.025 245)" }}
-          >
+          <span className="rounded-full bg-muted px-2.5 py-[3px] text-[11.5px] font-medium">
             {latest.model || "—"}
           </span>
-          {badgePill(latest.date || "—")}
+          {badgePill(formatDate(latest.date))}
           {badgePill(latest.git || "—", true)}
           {badgePill(`${latest.questions ?? "—"} questions`)}
         </div>
@@ -103,7 +84,7 @@ function HeroCard({ latest, tag }: { latest: ReturnType<typeof buildDetailSummar
       <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
         {latest.tiles.map((t) => {
           const { metricKey, ...tileProps } = t;
-          return <EvalMetricTile key={metricKey} {...tileProps} scale={1.25} />;
+          return <EvalMetricTile key={metricKey} {...tileProps} scale={1} />;
         })}
       </div>
     </div>
@@ -219,28 +200,27 @@ function AllRunsTable({
   }, [runs, sortKey, sortDir]);
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-card" style={{ boxShadow: "0 0 0 1px oklch(0.22 0.018 245 / 0.10)" }}>
-      <div className="flex items-baseline justify-between px-5 pb-3 pt-4">
-        <span className="text-[18.75px] font-semibold">All runs</span>
-        <span className="text-[15px]" style={{ color: "oklch(0.5 0.02 245)" }}>
-          arrows compare each run to the one before ·{" "}
-          <span style={{ color: "oklch(0.55 0.02 245)" }}>≈ = within judge noise</span> · click a column to sort
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow)]">
+      <div className="flex items-baseline justify-between border-b border-border px-[18px] py-3.5">
+        <span className="font-serif text-base font-semibold">All runs</span>
+        <span className="text-[11.5px] text-faint">
+          arrows compare each run to the one before · ≈ = within judge noise · click a column to sort
         </span>
       </div>
       <div className="max-h-[70vh] overflow-auto [&_[data-slot=table-container]]:overflow-visible">
-        <Table className="border-separate border-spacing-0 text-[17.5px]">
+        <Table className="border-separate border-spacing-0">
           <TableHeader>
-            <TableRow style={{ background: "oklch(0.975 0.006 95)" }}>
+            <TableRow className="bg-muted">
               <SortableTableHead
                 label="Run"
-                fontSize={17.5}
+                fontSize={11}
                 active={sortKey === "run"}
                 dir={sortDir}
                 onClick={() => toggleSort("run")}
               />
               <SortableTableHead
                 label="Split"
-                fontSize={17.5}
+                fontSize={11}
                 active={sortKey === "split"}
                 dir={sortDir}
                 onClick={() => toggleSort("split")}
@@ -249,7 +229,7 @@ function AllRunsTable({
                 <SortableTableHead
                   key={m.key}
                   label={m.short}
-                  fontSize={17.5}
+                  fontSize={11}
                   align="right"
                   active={sortKey === m.key}
                   dir={sortDir}
@@ -258,7 +238,7 @@ function AllRunsTable({
               ))}
               <SortableTableHead
                 label="Abstention"
-                fontSize={17.5}
+                fontSize={11}
                 align="right"
                 active={sortKey === "abstention"}
                 dir={sortDir}
@@ -279,29 +259,26 @@ function AllRunsTable({
                       className="flex flex-col gap-0.5 text-inherit no-underline hover:underline"
                     >
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[16.875px] font-semibold">{run.label || run.tag}</span>
+                        <span className="text-[13px] font-semibold text-primary">{run.label || run.tag}</span>
                         {run.tag === latestNonHoldout?.tag && (
-                          <span
-                            className="rounded-full px-1.5 py-px text-[12.5px] font-bold uppercase tracking-wide"
-                            style={{ color: "oklch(0.42 0.105 158)", background: "oklch(0.955 0.035 158)" }}
-                          >
+                          <span className="rounded-full bg-primary-bg px-1.5 py-px text-[12.5px] font-bold text-primary uppercase tracking-wide">
                             latest
                           </span>
                         )}
                         {run.holdout && (
-                          <span title="Sealed — aggregate only" className="text-[13.75px]" style={{ color: "oklch(0.45 0.06 300)" }}>
+                          <span title="Sealed — aggregate only" className="text-[13.75px] text-violet">
                             🔒 sealed
                           </span>
                         )}
                       </div>
-                      <span className="font-mono text-[13.75px]" style={{ color: "oklch(0.55 0.02 245)" }}>
-                        {run.date ?? "—"} · {run.git_sha ?? "—"}
+                      <span className="font-mono text-[10.5px] text-faint">
+                        {formatDate(run.date)} · {run.git_sha ?? "—"}
                       </span>
                     </Link>
                   </TableCell>
                   <TableCell className="align-top">
                     <span
-                      className="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[14.375px] font-medium"
+                      className="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium"
                       style={{ color: ss.color, background: ss.bg, border: `1px solid ${ss.bd}` }}
                     >
                       {run.holdout ? "Holdout" : "Regression + Dev"}
@@ -314,12 +291,12 @@ function AllRunsTable({
                       <TableCell key={m.key} className="text-right align-top">
                         <span className="inline-flex items-center justify-end gap-1.5">
                           {t.show && (
-                            <span title={t.title} className="text-[13.75px]" style={{ color: t.color }}>
+                            <span title={t.title} className="text-[10px]" style={{ color: t.color }}>
                               {t.sym}
                             </span>
                           )}
                           <span
-                            className="font-mono rounded-md px-2 py-0.5 text-[15.625px] font-semibold"
+                            className="font-mono rounded-md px-2 py-0.5 text-[12px] font-semibold"
                             style={{ color: c.chip.color, background: c.chip.background, border: c.chip.border }}
                           >
                             {c.fmt}
@@ -330,7 +307,7 @@ function AllRunsTable({
                   })}
                   <TableCell className="text-right align-top">
                     <span
-                      className="font-mono rounded-md px-2 py-0.5 text-[15.625px] font-semibold"
+                      className="font-mono rounded-md px-2 py-0.5 text-[12px] font-semibold"
                       style={{ color: abstC.chip.color, background: abstC.chip.background, border: abstC.chip.border }}
                     >
                       {abstC.fmt}
@@ -357,23 +334,14 @@ function SplitsExplainer({ splits }: { splits: EvalPolicy["splits"] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {splits.map((sp) => (
-        <div
-          key={sp.key}
-          className="flex flex-col gap-1.5 rounded-xl bg-card p-4"
-          style={{ boxShadow: "0 0 0 1px oklch(0.22 0.018 245 / 0.08)" }}
-        >
+        <div key={sp.key} className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2">
-            <span className="text-[17.5px] font-semibold">{sp.name}</span>
-            <span
-              className="font-mono rounded-full px-1.5 py-px text-[14.375px]"
-              style={{ color: "oklch(0.5 0.02 245)", background: "oklch(0.955 0.006 95)" }}
-            >
+            <span className="font-serif text-sm font-semibold">{sp.name}</span>
+            <span className="font-mono rounded-full bg-muted px-1.5 py-px text-[11px] text-faint">
               {sp.count} rows
             </span>
           </div>
-          <p className="m-0 text-[15px] leading-relaxed" style={{ color: "oklch(0.44 0.02 245)" }}>
-            {sp.plain}
-          </p>
+          <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">{sp.plain}</p>
         </div>
       ))}
     </div>
@@ -393,18 +361,16 @@ export default function Evals() {
   });
   const heroSummary = buildDetailSummary(latestRunQuery.data, latestTag, policy.quality_bands);
 
-  if (runsQuery.isLoading) return <p>Loading…</p>;
-  if (runsQuery.error) return <p className="text-red-600">Failed to load eval runs.</p>;
+  if (runsQuery.isLoading) return <p className="text-muted-foreground">Loading…</p>;
+  if (runsQuery.error) return <p className="text-danger">Failed to load eval runs.</p>;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="m-0 text-[32.5px] font-semibold tracking-tight">Evaluations</h1>
-        <p className="m-0 max-w-[640px] text-[17.5px]" style={{ color: "oklch(0.48 0.025 245)" }}>
-          Each run grades the system against a fixed exam of legal questions. Higher is better; the bands below
-          tell you whether a score is actually good.
-        </p>
-      </div>
+    <div className="mx-auto flex max-w-[1240px] flex-col gap-4">
+      <PageHeader
+        eyebrow="RAGAS quality"
+        title="Evaluations"
+        subtitle="Each run grades the system against a fixed exam of legal questions. Higher is better; the bands below tell you whether a score is actually good."
+      />
 
       <QualityBandsLegend bands={policy.quality_bands} />
 

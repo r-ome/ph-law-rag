@@ -24,9 +24,15 @@ export function EvalMetricTile({
   const [expanded, setExpanded] = useState(false);
   const px = (base: number) => `${base * scale}px`;
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-      <div className="flex items-center justify-between">
-        <span className="font-medium" style={{ color: "oklch(0.42 0.02 245)", fontSize: px(13) }}>
+    <div
+      className="flex flex-col gap-1.5 rounded-xl p-3.5"
+      style={{ border: chip.border, background: chip.background }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="font-semibold tracking-[0.04em] text-muted-foreground uppercase"
+          style={{ fontSize: px(11.5) }}
+        >
           {label}
         </span>
         <button
@@ -34,36 +40,31 @@ export function EvalMetricTile({
           aria-label={`What is ${label}?`}
           aria-expanded={expanded}
           onClick={() => setExpanded((v) => !v)}
-          className="flex h-[19px] w-[19px] cursor-pointer items-center justify-center rounded-full border font-bold leading-none"
-          style={{
-            borderColor: "oklch(0.84 0.014 95)",
-            background: "oklch(0.97 0.006 95)",
-            color: "oklch(0.5 0.02 245)",
-            fontSize: px(11),
-          }}
+          className="flex size-[18px] cursor-pointer items-center justify-center rounded-full border border-border bg-card font-bold leading-none text-faint"
+          style={{ fontSize: px(10) }}
         >
           ?
         </button>
       </div>
-      <span className="font-mono font-semibold tracking-tight" style={{ color, fontSize: px(24) }}>
+      <span
+        className="font-mono font-semibold tracking-[-0.02em]"
+        style={{ color, fontSize: px(27) }}
+      >
         {value}
       </span>
-      {sub && (
-        <span className="text-muted-foreground" style={{ fontSize: px(12) }}>
+      {sub ? (
+        <span className="text-faint" style={{ fontSize: px(11) }}>
           {sub}
         </span>
-      )}
-      <span
-        className="self-start rounded-full px-2.5 py-0.5 font-semibold"
-        style={{ color: chip.color, background: chip.background, border: chip.border, fontSize: px(11) }}
-      >
+      ) : null}
+      <span className="font-semibold" style={{ color, fontSize: px(11) }}>
         {bandLabel}
       </span>
-      {expanded && (
-        <p className="m-0 leading-relaxed text-muted-foreground" style={{ fontSize: px(12) }}>
+      {expanded ? (
+        <p className="m-0 leading-relaxed text-muted-foreground" style={{ fontSize: px(11.5) }}>
           {plain}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

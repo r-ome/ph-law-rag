@@ -72,7 +72,7 @@ export default function EvalRunLogs({ tag }: { tag: string }) {
         ) : null}
 
         {logsQuery.isLoading && <p>Loading logs…</p>}
-        {logsQuery.error && <p className="text-sm text-red-600">Failed to load run logs.</p>}
+        {logsQuery.error && <p className="text-sm text-danger">Failed to load run logs.</p>}
 
         {data?.holdout_redacted ? (
           <p className="text-sm text-muted-foreground">Holdout run — logs are redacted.</p>

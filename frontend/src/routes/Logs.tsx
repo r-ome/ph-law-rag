@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getLogs } from "@/api/client";
 import { LogTable } from "@/components/LogTable";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -23,41 +24,42 @@ export default function Logs() {
   });
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Logs</h1>
-        <p className="text-sm text-muted-foreground">Tail of the structured app log.</p>
+    <div className="mx-auto max-w-[1180px]">
+      <PageHeader
+        eyebrow="Structured log"
+        title="Logs"
+        subtitle="Tail of the structured application log."
+      />
+
+      <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
+        <Select value={level} onValueChange={(v) => setLevel((v ?? "all") as Level)}>
+          <SelectTrigger className="w-[150px]" aria-label="Log level">
+            <SelectValue placeholder="Level" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">all</SelectItem>
+            <SelectItem value="debug">debug</SelectItem>
+            <SelectItem value="info">info</SelectItem>
+            <SelectItem value="warning">warning</SelectItem>
+            <SelectItem value="error">error</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={() => logsQuery.refetch()}>
+          Refresh
+        </Button>
+        <span className="font-mono text-[12.5px] text-faint">
+          count {logsQuery.data?.count ?? 0}
+        </span>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>App Log</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={level} onValueChange={(v) => setLevel((v ?? "all") as Level)}>
-              <SelectTrigger className="w-[150px]" aria-label="Log level">
-                <SelectValue placeholder="Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">all</SelectItem>
-                <SelectItem value="debug">debug</SelectItem>
-                <SelectItem value="info">info</SelectItem>
-                <SelectItem value="warning">warning</SelectItem>
-                <SelectItem value="error">error</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={() => logsQuery.refetch()}>
-              Refresh
-            </Button>
-            <span className="text-sm text-muted-foreground">count {logsQuery.data?.count ?? 0}</span>
-          </div>
+      {logsQuery.isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
+      {logsQuery.error ? <p className="text-danger">Failed to load logs.</p> : null}
 
-          {logsQuery.isLoading && <p>Loading...</p>}
-          {logsQuery.error && <p className="text-sm text-red-600">Failed to load logs.</p>}
+      <ScrollArea className="h-[calc(100vh-220px)] max-h-[calc(100vh-220px)] overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow)]">
+        <div className="px-4 py-3.5">
           <LogTable entries={logsQuery.data?.entries ?? []} />
-        </CardContent>
-      </Card>
+        </div>
+      </ScrollArea>
     </div>
   );
 }

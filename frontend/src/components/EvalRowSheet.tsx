@@ -40,7 +40,7 @@ function SourceChips({
   return (
     <div className="flex flex-wrap gap-1.5">
       {deduped.map((source) => (
-        <Badge key={source} variant={missingSet.has(source) ? "destructive" : "secondary"}>
+        <Badge key={source} variant={missingSet.has(source) ? "destructive" : "secondary"} className="font-mono">
           {source}
         </Badge>
       ))}
@@ -55,7 +55,7 @@ function ChunkHit({ hit }: { hit: ChunkLookupHit }) {
   return (
     <div className="rounded-md border bg-background p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <Link to={`/documents/${hit.doc_id}`} className="font-medium hover:underline">
+        <Link to={`/documents/${hit.doc_id}`} className="font-medium text-primary hover:underline">
           {hit.title ?? hit.doc_id}
         </Link>
         <span className="text-muted-foreground">#{hit.chunk_index ?? "—"}</span>
@@ -85,7 +85,7 @@ function PipelineStages({ row }: { row: EvalRow }) {
   if (row.debug_stages.length === 0) return null;
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-semibold">Pipeline stages</h3>
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">Pipeline stages</h3>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -139,14 +139,14 @@ function SelectedChunks({ row, open }: { row: EvalRow; open: boolean }) {
 
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-semibold">Selected chunks</h3>
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">Selected chunks</h3>
       {chunkIds.length > lookupChunkIds.length && (
         <p className="text-sm text-muted-foreground">
           Showing first {lookupChunkIds.length} of {chunkIds.length} selected chunks.
         </p>
       )}
       {chunkQuery.isLoading && <p className="text-sm text-muted-foreground">Loading chunks…</p>}
-      {chunkQuery.error && <p className="text-sm text-red-600">Failed to load chunks.</p>}
+      {chunkQuery.error && <p className="text-sm text-danger">Failed to load chunks.</p>}
       {chunkQuery.data && (
         <div className="space-y-2">
           {chunkQuery.data.chunks.map((hit) => (
@@ -182,7 +182,7 @@ export default function EvalRowSheet({
             <ScrollArea className="min-h-0 flex-1 px-4 pb-6">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">{row.question}</p>
+                  <p className="font-serif text-[16.5px] font-medium leading-[1.45]">{row.question}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {row.category && <Badge variant="outline">{row.category}</Badge>}
                     {row.split && <Badge variant="outline">{row.split}</Badge>}
@@ -212,7 +212,7 @@ export default function EvalRowSheet({
 
                 {row.evidence && (
                   <section className="space-y-2">
-                    <h3 className="text-sm font-semibold">Evidence</h3>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">Evidence</h3>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={verdictBadgeVariant(row.evidence.verdict)}>
                         {row.evidence.verdict ?? "—"}
@@ -234,18 +234,18 @@ export default function EvalRowSheet({
                 )}
 
                 <section className="space-y-3">
-                  <h3 className="text-sm font-semibold">Sources</h3>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">Sources</h3>
                   <div className="space-y-2">
                     <div>
-                      <div className="text-xs text-muted-foreground">Expected</div>
+                      <div className="text-[11px] text-faint">Expected</div>
                       <SourceChips sources={row.expected_sources} missing={row.expected_missing} />
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Retrieved</div>
+                      <div className="text-[11px] text-faint">Retrieved</div>
                       <SourceChips sources={row.retrieved_sources} missing={[]} />
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Cited</div>
+                      <div className="text-[11px] text-faint">Cited</div>
                       <SourceChips sources={row.cited_sources} missing={[]} />
                     </div>
                   </div>
@@ -255,11 +255,11 @@ export default function EvalRowSheet({
 
                 <section className="space-y-3">
                   <div>
-                    <div className="text-xs text-muted-foreground">Answer</div>
-                    <div className="whitespace-pre-wrap text-sm">{row.answer || "—"}</div>
+                    <div className="text-[11px] text-faint">Answer</div>
+                    <div className="whitespace-pre-wrap font-serif text-sm leading-[1.6]">{row.answer || "—"}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Ground truth</div>
+                    <div className="text-[11px] text-faint">Ground truth</div>
                     <div className="whitespace-pre-wrap text-sm text-muted-foreground">
                       {row.ground_truth ?? "—"}
                     </div>
@@ -267,7 +267,7 @@ export default function EvalRowSheet({
                 </section>
 
                 <section className="space-y-2">
-                  <h3 className="text-sm font-semibold">Contexts</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-faint">Contexts</h3>
                   <ScrollArea className="h-40 rounded-md border p-3">
                     <div className="space-y-3 whitespace-pre-wrap text-sm">
                       {row.contexts.length > 0

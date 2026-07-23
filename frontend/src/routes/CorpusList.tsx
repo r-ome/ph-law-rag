@@ -5,6 +5,7 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { listDocuments, type DocumentSummary } from "@/api/client";
@@ -26,45 +27,72 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel } from "@/components/ui/panel";
+import { docStatusTone } from "@/lib/status";
 
 const ALL = "__all__";
 const EMPTY_DOCUMENTS: DocumentSummary[] = [];
-
-function statusVariant(status: string): "default" | "secondary" | "outline" {
-  if (status === "operative") return "default";
-  if (status === "unknown") return "outline";
-  return "secondary";
-}
+const COL_WIDTHS = ["31%", "14%", "11%", "12%", "13%", "10%", "9%"];
 
 const columns: ColumnDef<DocumentSummary>[] = [
   {
     accessorKey: "title",
     header: "Title",
     cell: ({ row }) => (
-      <Link to={`/documents/${row.original.doc_id}`} className="font-medium hover:underline">
+      <Link
+        to={`/documents/${row.original.doc_id}`}
+        className="block truncate font-serif font-medium text-primary hover:underline"
+      >
         {row.original.title}
       </Link>
     ),
   },
-  { accessorKey: "category", header: "Category" },
-  { accessorKey: "doc_type", header: "Type" },
+  {
+    accessorKey: "category",
+    header: "Category",
+    cell: ({ row }) => (
+      <span className="block truncate text-muted-foreground">{row.original.category}</span>
+    ),
+  },
+  {
+    accessorKey: "doc_type",
+    header: "Type",
+    cell: ({ row }) => (
+      <span className="block truncate text-muted-foreground">{row.original.doc_type}</span>
+    ),
+  },
   {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant={statusVariant(row.original.status)}>{row.original.status}</Badge>
+      <Badge variant={docStatusTone(row.original.status)}>{row.original.status}</Badge>
     ),
   },
-  { accessorKey: "source_index", header: "Source" },
+  {
+    accessorKey: "source_index",
+    header: "Source",
+    cell: ({ row }) => (
+      <span className="block truncate font-mono text-[11px] text-faint">
+        {row.original.source_index ?? "—"}
+      </span>
+    ),
+  },
   {
     accessorKey: "official_number",
     header: "No.",
-    cell: ({ row }) => row.original.official_number ?? "—",
+    cell: ({ row }) => (
+      <span className="block truncate font-mono text-[11.5px] text-muted-foreground">
+        {row.original.official_number ?? "—"}
+      </span>
+    ),
   },
   {
     accessorKey: "chunk_count",
     header: () => <div className="text-right">Chunks</div>,
-    cell: ({ row }) => <div className="text-right">{row.original.chunk_count}</div>,
+    cell: ({ row }) => (
+      <div className="text-right font-mono">{row.original.chunk_count}</div>
+    ),
   },
 ];
 
@@ -120,6 +148,8 @@ export default function CorpusList() {
     data: filtered,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 15 } },
   });
 
   function clearFilters() {
@@ -130,12 +160,18 @@ export default function CorpusList() {
     setSourceIndex(ALL);
   }
 
-  if (isLoading) return <p>Loading…</p>;
-  if (error) return <p className="text-red-600">Failed to load documents.</p>;
+  if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
+  if (error) return <p className="text-danger">Failed to load documents.</p>;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mx-auto max-w-[1240px]">
+      <PageHeader
+        eyebrow="Primary sources"
+        title="Corpus"
+        subtitle="A curated allowlist of Philippine-law primary sources, chunked and indexed for retrieval."
+      />
+
+      <div className="mb-3.5 flex flex-wrap items-center gap-2">
         <Input
           placeholder="Search title or tags…"
           value={search}
@@ -197,38 +233,68 @@ export default function CorpusList() {
         <Button variant="outline" onClick={clearFilters}>
           Clear filters
         </Button>
+        <span className="ml-auto font-mono text-[12.5px] text-faint">
+          {filtered.length} of {docs.length} documents
+        </span>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {filtered.length} of {docs.length} documents
-      </p>
+      <Panel>
+        <Table className="table-fixed">
+          <colgroup>
+            {COL_WIDTHS.map((w, i) => (
+              <col key={i} style={{ width: w }} />
+            ))}
+          </colgroup>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="bg-muted">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="px-[18px] py-2.5">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Panel>
 
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="font-mono text-[12px] text-faint">
+          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

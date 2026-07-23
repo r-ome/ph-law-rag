@@ -23,10 +23,12 @@ function ChunkCard({ chunk }: { chunk: ChunkTrace }) {
   const visibleText = expanded ? fullText : chunk.preview;
 
   return (
-    <div className="rounded-md border bg-background p-3 text-sm">
+    <div className="rounded-lg border border-border bg-muted p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{score(chunk.score)}</Badge>
-        <span className="font-medium">{chunk.source_id || "unknown"}</span>
+        <span className="rounded-[5px] border border-border bg-card px-1.5 py-px font-mono text-[10.5px] font-semibold">
+          {score(chunk.score)}
+        </span>
+        <span className="font-mono text-[10.5px] text-muted-foreground">{chunk.source_id || "unknown"}</span>
         {chunk.unit_label && <span className="text-muted-foreground">{chunk.unit_label}</span>}
         {chunk.expanded_from_parent && <Badge>expanded_from_parent</Badge>}
         {chunk.expanded_from_sibling && (
@@ -41,7 +43,7 @@ function ChunkCard({ chunk }: { chunk: ChunkTrace }) {
           <Badge variant="outline">dedup {chunk.dedup_merged_chunk_ids.length}</Badge>
         )}
       </div>
-      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted p-2 font-mono text-xs leading-5">
+      <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-card p-2 font-mono text-[11px] leading-5">
         {visibleText}
       </pre>
       {canExpand && (
@@ -68,9 +70,9 @@ function ChunkCard({ chunk }: { chunk: ChunkTrace }) {
 function ChunkList({ title, chunks }: { title: string; chunks: ChunkTrace[] }) {
   return (
     <div className="min-w-0 space-y-2">
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="text-[11px] font-semibold tracking-[0.05em] text-faint uppercase">{title}</h3>
       {chunks.length === 0 ? (
-        <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">none</p>
+        <p className="rounded-md border border-dashed p-3 text-sm text-faint">none</p>
       ) : (
         chunks.map((chunk) => (
           <ChunkCard key={chunk.chunk_id} chunk={chunk} />
@@ -93,7 +95,7 @@ export default function TraceView({ trace }: { trace: TraceRecord }) {
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex flex-wrap gap-2 text-sm">
-          <Badge>{strategy}</Badge>
+          <Badge variant="tint-primary">{strategy}</Badge>
           <Badge variant="outline">{trace.latency_ms ?? "n/a"} ms</Badge>
           <Badge variant="outline">prompt {trace.prompt_length ?? 0}</Badge>
           <Badge variant="secondary">{trace.generator_model ?? "no generator"}</Badge>
@@ -107,21 +109,21 @@ export default function TraceView({ trace }: { trace: TraceRecord }) {
         <Separator />
 
         <section className="grid gap-2 text-sm md:grid-cols-4">
-          <h2 className="font-semibold md:col-span-4">Router</h2>
+          <h2 className="font-semibold text-faint md:col-span-4">Router</h2>
           <div>
-            <span className="text-muted-foreground">Enabled</span>
+            <span className="text-faint">Enabled</span>
             <div>{textValue(router.enabled)}</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Model</span>
+            <span className="text-faint">Model</span>
             <div>{textValue(router.model)}</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Decision</span>
+            <span className="text-faint">Decision</span>
             <div className="break-all">{textValue(router.decision)}</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Skipped</span>
+            <span className="text-faint">Skipped</span>
             <div>{textValue(router.skipped_reason)}</div>
           </div>
         </section>
@@ -137,14 +139,14 @@ export default function TraceView({ trace }: { trace: TraceRecord }) {
         <Separator />
 
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold">Feature Flags</h2>
+          <h2 className="text-sm font-semibold text-faint">Feature Flags</h2>
           {flags.length === 0 ? (
             <p className="text-sm text-muted-foreground">none</p>
           ) : (
             <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
               {flags.map(([key, value]) => (
                 <div key={key} className="rounded-md border p-2">
-                  <div className="text-muted-foreground">{key}</div>
+                  <div className="text-faint">{key}</div>
                   <div className="break-all font-medium">{textValue(value)}</div>
                 </div>
               ))}

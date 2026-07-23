@@ -1,44 +1,43 @@
 import type { LogEntry } from "@/api/client";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { formatTime } from "@/lib/format";
 
-function logLevelVariant(level?: string | null): "default" | "secondary" | "destructive" | "outline" {
-  if (level === "error" || level === "critical") return "destructive";
-  if (level === "warning") return "secondary";
-  if (level === "info") return "default";
-  return "outline";
+function levelColor(level?: string | null): string {
+  switch (level) {
+    case "error":
+    case "critical":
+      return "var(--danger)";
+    case "warning":
+      return "var(--warn)";
+    case "info":
+      return "var(--primary)";
+    case "debug":
+      return "var(--faint)";
+    default:
+      return "var(--muted)";
+  }
 }
 
 export function LogTable({ entries }: { entries: LogEntry[] }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Timestamp</TableHead>
-          <TableHead>Level</TableHead>
-          <TableHead>Logger</TableHead>
-          <TableHead>Event</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {entries.map((entry, index) => (
-          <TableRow key={`${entry.timestamp ?? index}-${index}`} className="font-mono text-xs">
-            <TableCell className="whitespace-nowrap">{entry.timestamp ?? "n/a"}</TableCell>
-            <TableCell>
-              <Badge variant={logLevelVariant(entry.level)}>{entry.level ?? "raw"}</Badge>
-            </TableCell>
-            <TableCell>{entry.logger ?? ""}</TableCell>
-            <TableCell className="break-all">{entry.event ?? entry.raw ?? ""}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <div className="flex flex-col gap-0.5">
+      {entries.map((entry, index) => (
+        <div
+          key={`${entry.timestamp ?? index}-${index}`}
+          className="flex gap-2 font-mono text-[11.5px] leading-[1.6]"
+        >
+          <span className="shrink-0 text-faint">{formatTime(entry.timestamp) || "n/a"}</span>
+          <span
+            className="w-[52px] shrink-0 font-semibold uppercase"
+            style={{ color: levelColor(entry.level) }}
+          >
+            {entry.level ?? "raw"}
+          </span>
+          <span className="break-all">
+            {entry.event ?? entry.raw ?? ""}
+            {entry.logger ? <span className="text-faint"> · {entry.logger}</span> : null}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
